@@ -1,0 +1,65 @@
+[gd_scene load_steps=11 format=3 uid="uid://bnv528gs1hngu"]
+
+[ext_resource type="Script" uid="uid://26nsb7j0ik8a" path="res://Scripts/Managers/GameManager.cs" id="1_03gy3"]
+[ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
+[ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
+[ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
+[ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_wjun0"]
+[ext_resource type="PackedScene" uid="uid://jlrj0meior1r" path="res://Prefabs/UI/LifeBarUI.tscn" id="7_gfl13"]
+[ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOverUI.tscn" id="8_4xied"]
+[ext_resource type="PackedScene" uid="uid://kufqrmkh1vbu" path="res://Prefabs/ReplayGem.tscn" id="9_8u8ny"]
+[ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
+[ext_resource type="Script" uid="uid://ce4epv6lyxy1x" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
+
+[node name="Root" type="Node2D"]
+
+[node name="Interface" type="CanvasLayer" parent="."]
+follow_viewport_enabled = true
+
+[node name="LifeBarUI" parent="Interface" instance=ExtResource("7_gfl13")]
+offset_left = -564.0
+offset_top = -316.0
+
+[node name="GameOverScreenUI" parent="Interface" instance=ExtResource("8_4xied")]
+visible = false
+offset_left = -610.0
+offset_top = -337.0
+offset_right = -522.0
+offset_bottom = -296.0
+
+[node name="Level" type="Node" parent="."]
+
+[node name="BackGround" type="Sprite2D" parent="Level"]
+z_index = -3
+position = Vector2(-1, -5)
+scale = Vector2(0.800781, 0.688233)
+texture = ExtResource("2_8u8ny")
+
+[node name="Ground" parent="Level" instance=ExtResource("3_r6l07")]
+z_index = -2
+position = Vector2(6, 294)
+
+[node name="Characters" type="Node" parent="."]
+
+[node name="Monster" parent="Characters" instance=ExtResource("5_wjun0")]
+position = Vector2(280, 61)
+
+[node name="Player" parent="Characters" instance=ExtResource("4_e2fbs")]
+position = Vector2(-236, 85)
+
+[node name="Systems" type="Node" parent="."]
+
+[node name="GameManager" type="Node2D" parent="Systems"]
+script = ExtResource("1_03gy3")
+ReplayGemScene = ExtResource("9_8u8ny")
+
+[node name="AudioManager" type="AudioStreamPlayer2D" parent="Systems"]
+position = Vector2(4, 0)
+stream = ExtResource("9_r6l07")
+volume_db = 6.038
+autoplay = true
+
+[node name="Camera2D" type="Camera2D" parent="Systems"]
+
+[node name="ReplayRecorder" type="Node" parent="Systems"]
+script = ExtResource("10_r6l07")

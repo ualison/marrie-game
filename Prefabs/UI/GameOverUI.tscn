@@ -1,0 +1,64 @@
+[gd_scene load_steps=2 format=3 uid="uid://56gc36rfogg8"]
+
+[ext_resource type="Script" uid="uid://7ir786mw0fu2" path="res://Scripts/Interface/GameOverUI.cs" id="1_k52d1"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_k52d1")
+
+[node name="BackgroundColor" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(1, 1, 1, 0.623529)
+
+[node name="CenterContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 25
+alignment = 1
+
+[node name="GameOverLabel" type="Label" parent="CenterContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.591773, 0.0396483, 0.150928, 1)
+theme_override_font_sizes/font_size = 48
+text = "GAME OVER"
+horizontal_alignment = 1
+
+[node name="SubMessageLabel" type="Label" parent="CenterContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.847059)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 20
+text = "As interferências temporais te consumiram.."
+horizontal_alignment = 1
+
+[node name="ButtonContainer" type="HBoxContainer" parent="CenterContainer"]
+layout_mode = 2
+theme_override_constants/separation = 35
+alignment = 1
+
+[node name="RestartButton" type="Button" parent="CenterContainer/ButtonContainer"]
+custom_minimum_size = Vector2(220, 40)
+layout_mode = 2
+text = "Tentar Novamente"
+
+[node name="QuitButton" type="Button" parent="CenterContainer/ButtonContainer"]
+custom_minimum_size = Vector2(220, 40)
+layout_mode = 2
+text = "Sair do Jogo"
+
+[connection signal="QuitRequested" from="." to="." method="OnQuitRequested"]
+[connection signal="RestartRequested" from="." to="." method="OnRestartRequested"]

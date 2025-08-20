@@ -1,0 +1,37 @@
+[gd_scene load_steps=6 format=3 uid="uid://ckwbdf3jm340m"]
+
+[ext_resource type="Texture2D" uid="uid://b8enx5tgxhj2i" path="res://Art/Marrie.png" id="1_rpqav"]
+[ext_resource type="Script" uid="uid://dtbbh4gt6l7cr" path="res://Scripts/Player/Player.cs" id="2_kyqiw"]
+[ext_resource type="Script" uid="uid://bfetyy0iofqcj" path="res://Scripts/Player/PlayerLife.cs" id="3_gntrk"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_gntrk"]
+size = Vector2(133, 271)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
+size = Vector2(120, 268)
+
+[node name="Root" type="Node2D"]
+
+[node name="CharacterBody2D" type="CharacterBody2D" parent="."]
+position = Vector2(0, 4)
+script = ExtResource("2_kyqiw")
+
+[node name="HurtBox" type="Area2D" parent="CharacterBody2D"]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/HurtBox"]
+position = Vector2(0.5, -1.5)
+shape = SubResource("RectangleShape2D_gntrk")
+debug_color = Color(0.775656, 0.308414, 0.792495, 0.42)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]
+shape = SubResource("RectangleShape2D_kyqiw")
+
+[node name="MarrieSprite" type="Sprite2D" parent="CharacterBody2D"]
+position = Vector2(3.49999, -0.999997)
+scale = Vector2(0.196289, 0.182536)
+texture = ExtResource("1_rpqav")
+
+[node name="PlayerLife" type="Node2D" parent="CharacterBody2D"]
+position = Vector2(0, -4)
+script = ExtResource("3_gntrk")
+MaxLife = 2

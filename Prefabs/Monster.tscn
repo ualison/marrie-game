@@ -1,0 +1,33 @@
+[gd_scene load_steps=5 format=3 uid="uid://djryvxjy0bkfe"]
+
+[ext_resource type="Script" uid="uid://c0o15dmumujxy" path="res://Scripts/Enemy/Monster.cs" id="1_brqr3"]
+[ext_resource type="Texture2D" uid="uid://c76ebwrr37a4j" path="res://Art/Monster.png" id="2_brqr3"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wqfq0"]
+size = Vector2(277, 369)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
+size = Vector2(262, 365)
+
+[node name="Root" type="Node2D"]
+
+[node name="CharacterBody2D" type="CharacterBody2D" parent="."]
+position = Vector2(0, 4)
+script = ExtResource("1_brqr3")
+
+[node name="DamageArea" type="Area2D" parent="CharacterBody2D"]
+position = Vector2(0, -4)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/DamageArea"]
+position = Vector2(3.5, 1.5)
+shape = SubResource("RectangleShape2D_wqfq0")
+debug_color = Color(0.764087, 0.04706, 0.125471, 0.42)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]
+position = Vector2(3, 0.5)
+shape = SubResource("RectangleShape2D_kyqiw")
+
+[node name="MonsterSprite" type="Sprite2D" parent="CharacterBody2D"]
+position = Vector2(0.50001, -5.74996)
+scale = Vector2(0.28418, 0.275065)
+texture = ExtResource("2_brqr3")
