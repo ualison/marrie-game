@@ -1,85 +1,116 @@
 using Godot;
 
 // Player health management with invulnerability periods and event notifications
-// Simplified with better performance and cleaner responsibility separation
 public partial class PlayerLife : Node
 {
-	[Signal] public delegate void LifeChangedEventHandler(int currentLife, int maxLife);
-	[Signal] public delegate void PlayerDiedEventHandler();
-	
-	[Export] public int MaxLife { get; set; } = 3;
-	[Export] public float InvulnerabilityTime { get; set; } = 2.0f;
-	
-	public int CurrentLife { get; private set; }
-	public bool IsInvulnerable { get; private set; }
-	public bool IsDead => CurrentLife <= 0;
-	
-	private Timer _invulnerabilityTimer;
-	
-	public override void _Ready()
-	{
-		CurrentLife = MaxLife;
-		SetupInvulnerabilityTimer();
-		NotifyLifeChanged();
-	}
-	
-	// Attempts to damage player, returns true if damage was applied
-	public bool TakeDamage(int damage = 1)
-	{
-		if (IsDead || IsInvulnerable) return false;
-		
-		CurrentLife = Mathf.Max(0, CurrentLife - damage);
-		StartInvulnerability();
-		NotifyLifeChanged();
-		
-		if (IsDead)
-			EmitSignal(SignalName.PlayerDied);
-		
-		return true;
-	}
-	
-	// Heals player without exceeding maximum health
-	public void Heal(int amount = 1)
-	{
-		if (IsDead) return;
-		
-		CurrentLife = Mathf.Min(MaxLife, CurrentLife + amount);
-		NotifyLifeChanged();
-	}
-	
-	// Resets to full health for game restart
-	public void Reset()
-	{
-		CurrentLife = MaxLife;
-		IsInvulnerable = false;
-		_invulnerabilityTimer.Stop();
-		NotifyLifeChanged();
-	}
-	
-	// Updates maximum health and clamps current health
-	public void SetMaxLife(int newMaxLife)
-	{
-		MaxLife = newMaxLife;
-		CurrentLife = Mathf.Min(CurrentLife, MaxLife);
-		NotifyLifeChanged();
-	}
-	
-	private void SetupInvulnerabilityTimer()
-	{
-		_invulnerabilityTimer = new Timer
-		{
-			WaitTime = InvulnerabilityTime,
-			OneShot = true
-		};
-		_invulnerabilityTimer.Timeout += () => IsInvulnerable = false;
-		AddChild(_invulnerabilityTimer);
-	}
-	
-	private void StartInvulnerability()
-	{
-		IsInvulnerable = true;
-		_invulnerabilityTimer.Start();
-	}
-	
-	private void NotifyLifeChanged() => EmitSignal(SignalName.LifeChanged, CurrentLife, MaxLife);
+    #region Signals
+    [Signal] public delegate void LifeChangedEventHandler(int currentLife, int maxLife);
+    [Signal] public delegate void PlayerDiedEventHandler();
+    #endregion
+
+    #region Exported Properties
+    [Export] public int MaxLife { get; set; } = 3;
+    [Export] public float InvulnerabilityTime { get; set; } = 2.0f;
+    #endregion
+
+    #region Public Properties
+    public int CurrentLife { get; private set; }
+    public bool IsInvulnerable { get; private set; }
+    public bool IsDead => CurrentLife <= 0;
+    #endregion
+
+    #region Components
+    private Timer _invulnerabilityTimer;
+    #endregion
+
+    #region Initialization
+    public override void _Ready()
+    {
+        // Initialize health to maximum and setup systems
+        CurrentLife = MaxLife;
+        SetupInvulnerabilityTimer();
+        NotifyLifeChanged();
+    }
+
+    private void SetupInvulnerabilityTimer()
+    {
+        // Create timer for invulnerability period management
+        _invulnerabilityTimer = new Timer
+        {
+            WaitTime = InvulnerabilityTime,
+            OneShot = true
+        };
+        _invulnerabilityTimer.Timeout += EndInvulnerability;
+        AddChild(_invulnerabilityTimer);
+    }
+    #endregion
+
+    #region Health Management
+    public bool TakeDamage(int damage = 1)
+    {
+        // Prevent damage if dead or invulnerable
+        if (IsDead || IsInvulnerable) return false;
+
+        // Apply damage and clamp to minimum of 0
+        CurrentLife = Mathf.Max(0, CurrentLife - damage);
+        StartInvulnerability();
+        NotifyLifeChanged();
+
+        // Emit death signal if health depleted
+        if (IsDead)
+            EmitSignal(SignalName.PlayerDied);
+
+        return true;
+    }
+
+    public void Heal(int amount = 1)
+    {
+        // Cannot heal when dead
+        if (IsDead) return;
+
+        // Apply healing and clamp to maximum health
+        CurrentLife = Mathf.Min(MaxLife, CurrentLife + amount);
+        NotifyLifeChanged();
+    }
+
+    public void Reset()
+    {
+        // Reset to full health for game restart
+        CurrentLife = MaxLife;
+        IsInvulnerable = false;
+        _invulnerabilityTimer.Stop();
+        NotifyLifeChanged();
+    }
+
+    public void SetMaxLife(int newMaxLife)
+    {
+        // Update maximum health and clamp current health if needed
+        MaxLife = newMaxLife;
+        CurrentLife = Mathf.Min(CurrentLife, MaxLife);
+        NotifyLifeChanged();
+    }
+    #endregion
+
+    #region Invulnerability System
+    private void StartInvulnerability()
+    {
+        // Begin invulnerability period after taking damage
+        IsInvulnerable = true;
+        _invulnerabilityTimer.Start();
+    }
+
+    private void EndInvulnerability()
+    {
+        // End invulnerability period when timer expires
+        IsInvulnerable = false;
+    }
+    #endregion
+
+    #region Event Notification
+    private void NotifyLifeChanged()
+    {
+        // Notify subscribers of health changes
+        EmitSignal(SignalName.LifeChanged, CurrentLife, MaxLife);
+    }
+    #endregion
 }

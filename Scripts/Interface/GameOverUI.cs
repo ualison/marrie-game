@@ -1,134 +1,170 @@
 using Godot;
 
 // Game over screen UI controller with smooth transitions and flexible messaging
-// Simplified for better performance and cleaner component discovery
 public partial class GameOverUI : Control
 {
-	[Export] public string GameOverMessage { get; set; } = "Game Over!";
-	[Export] public string SubMessage { get; set; } = "Temporal interferences consumed you...";
+    #region Configuration
+    [Export] public string GameOverMessage { get; set; } = "Game Over!";
+    [Export] public string SubMessage { get; set; } = "Temporal interferences consumed you...";
+    #endregion
 
-	[Signal] public delegate void RestartRequestedEventHandler();
-	[Signal] public delegate void QuitRequestedEventHandler();
+    #region Signals
+    [Signal] public delegate void RestartRequestedEventHandler();
+    [Signal] public delegate void QuitRequestedEventHandler();
+    #endregion
 
-	// Cached UI references for performance
-	private Label _gameOverLabel;
-	private Label _subMessageLabel;
-	private Button _restartButton;
-	private Button _quitButton;
+    #region UI Components
+    private Label _gameOverLabel;
+    private Label _subMessageLabel;
+    private Button _restartButton;
+    private Button _quitButton;
+    #endregion
 
-	public override void _Ready()
-	{
-		Hide();
-		DiscoverUIElements();
-		ConnectButtons();
-		UpdateDisplayedText();
-	}
+    #region Initialization
+    public override void _Ready()
+    {
+        // Setup UI components and hide initially
+        Hide();
+        DiscoverUIElements();
+        ConnectButtons();
+        UpdateDisplayedText();
+    }
 
-	// Shows game over screen with optional custom messages and smooth fade-in
-	public void ShowGameOver(string customMessage = null, string customSubMessage = null)
-	{
-		if (customMessage != null) GameOverMessage = customMessage;
-		if (customSubMessage != null) SubMessage = customSubMessage;
+    private void DiscoverUIElements()
+    {
+        // Find UI components with optimized search and fallback
+        _gameOverLabel = GetNodeOrNull<Label>("VBoxContainer/GameOverLabel")
+            ?? FindUIElement<Label>("GameOverLabel");
 
-		UpdateDisplayedText();
-		Show();
+        _subMessageLabel = GetNodeOrNull<Label>("VBoxContainer/SubMessageLabel")
+            ?? FindUIElement<Label>("SubMessageLabel");
 
-		// Smooth fade-in transition
-		Modulate = new Color(1, 1, 1, 0);
-		var tween = CreateTween();
-		tween.TweenProperty(this, "modulate:a", 1.0f, 0.5f);
+        _restartButton = GetNodeOrNull<Button>("VBoxContainer/ButtonContainer/RestartButton")
+            ?? FindUIElement<Button>("RestartButton");
 
-		_restartButton?.GrabFocus();
-	}
+        _quitButton = GetNodeOrNull<Button>("VBoxContainer/ButtonContainer/QuitButton")
+            ?? FindUIElement<Button>("QuitButton");
 
-	// Hides the game over screen
-	public void HideGameOver() => Hide();
+        LogDiscoveredElements();
+    }
 
-	// Updates both message texts
-	public void SetMessages(string mainMessage, string subMessage)
-	{
-		GameOverMessage = mainMessage;
-		SubMessage = subMessage;
-		UpdateDisplayedText();
-	}
+    private T FindUIElement<T>(string name) where T : class
+    {
+        // Breadth-first search for UI elements when direct paths fail
+        var queue = new System.Collections.Generic.Queue<Node>();
+        queue.Enqueue(this);
 
-	private void DiscoverUIElements()
-	{
-		// Optimized UI discovery with fallback search
-		_gameOverLabel = GetNodeOrNull<Label>("VBoxContainer/GameOverLabel")
-			?? FindUIElement<Label>("GameOverLabel");
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (current.Name == name && current is T element)
+                return element;
 
-		_subMessageLabel = GetNodeOrNull<Label>("VBoxContainer/SubMessageLabel")
-			?? FindUIElement<Label>("SubMessageLabel");
+            foreach (Node child in current.GetChildren())
+                queue.Enqueue(child);
+        }
 
-		_restartButton = GetNodeOrNull<Button>("VBoxContainer/ButtonContainer/RestartButton")
-			?? FindUIElement<Button>("RestartButton");
+        return null;
+    }
 
-		_quitButton = GetNodeOrNull<Button>("VBoxContainer/ButtonContainer/QuitButton")
-			?? FindUIElement<Button>("QuitButton");
+    private void ConnectButtons()
+    {
+        // Connect button press events
+        if (_restartButton != null)
+            _restartButton.Pressed += OnRestartPressed;
 
-		LogDiscoveredElements();
-	}
+        if (_quitButton != null)
+            _quitButton.Pressed += OnQuitPressed;
+    }
 
-	// Efficient UI element search using breadth-first traversal
-	private T FindUIElement<T>(string name) where T : class
-	{
-		var queue = new System.Collections.Generic.Queue<Node>();
-		queue.Enqueue(this);
+    private void UpdateDisplayedText()
+    {
+        // Update text content in UI labels
+        if (_gameOverLabel != null)
+            _gameOverLabel.Text = GameOverMessage;
 
-		while (queue.Count > 0)
-		{
-			var current = queue.Dequeue();
-			if (current.Name == name && current is T element)
-				return element;
+        if (_subMessageLabel != null)
+            _subMessageLabel.Text = SubMessage;
+    }
+    #endregion
 
-			foreach (Node child in current.GetChildren())
-				queue.Enqueue(child);
-		}
+    #region Display Control
+    public void ShowGameOver(string customMessage = null, string customSubMessage = null)
+    {
+        // Display game over screen with optional custom messages
+        UpdateMessages(customMessage, customSubMessage);
+        UpdateDisplayedText();
+        ShowWithFadeIn();
+        FocusRestartButton();
+    }
 
-		return null;
-	}
+    private void UpdateMessages(string customMessage, string customSubMessage)
+    {
+        // Update messages if custom ones provided
+        if (customMessage != null) GameOverMessage = customMessage;
+        if (customSubMessage != null) SubMessage = customSubMessage;
+    }
 
-	private void ConnectButtons()
-	{
-		if (_restartButton != null)
-			_restartButton.Pressed += OnRestartPressed;
+    private void ShowWithFadeIn()
+    {
+        // Show with smooth fade-in transition
+        Show();
+        Modulate = new Color(1, 1, 1, 0);
+        var tween = CreateTween();
+        tween.TweenProperty(this, "modulate:a", 1.0f, 0.5f);
+    }
 
-		if (_quitButton != null)
-			_quitButton.Pressed += OnQuitPressed;
-	}
+    private void FocusRestartButton()
+    {
+        // Set focus to restart button for keyboard navigation
+        _restartButton?.GrabFocus();
+    }
 
-	private void UpdateDisplayedText()
-	{
-		if (_gameOverLabel != null)
-			_gameOverLabel.Text = GameOverMessage;
+    public void HideGameOver()
+    {
+        // Hide the game over screen
+        Hide();
+    }
 
-		if (_subMessageLabel != null)
-			_subMessageLabel.Text = SubMessage;
-	}
+    public void SetMessages(string mainMessage, string subMessage)
+    {
+        // Update both message texts and refresh display
+        GameOverMessage = mainMessage;
+        SubMessage = subMessage;
+        UpdateDisplayedText();
+    }
+    #endregion
 
-	private void OnRestartPressed()
-	{
-		// Add safety check before emitting signal
-		if (IsInsideTree())
-		{
-			EmitSignal(SignalName.RestartRequested);
-		}
-		else
-		{
-			GD.PrintErr("GameOverUI not in tree - cannot emit RestartRequested signal");
-		}
-	}
-	private void OnQuitPressed() => EmitSignal(SignalName.QuitRequested);
+    #region Event Handlers
+    private void OnRestartPressed()
+    {
+        // Handle restart button press with safety checks
+        if (IsInsideTree())
+        {
+            EmitSignal(SignalName.RestartRequested);
+        }
+        else
+        {
+            GD.PrintErr("GameOverUI not in tree - cannot emit RestartRequested signal");
+        }
+    }
 
+    private void OnQuitPressed()
+    {
+        // Handle quit button press
+        EmitSignal(SignalName.QuitRequested);
+    }
+    #endregion
 
-
-	private void LogDiscoveredElements()
-	{
-		GD.Print("GameOverUI elements discovered:");
-		GD.Print($"- GameOverLabel: {(_gameOverLabel != null ? "✓" : "✗")}");
-		GD.Print($"- SubMessageLabel: {(_subMessageLabel != null ? "✓" : "✗")}");
-		GD.Print($"- RestartButton: {(_restartButton != null ? "✓" : "✗")}");
-		GD.Print($"- QuitButton: {(_quitButton != null ? "✓" : "✗")}");
-	}
+    #region Debug Utilities
+    private void LogDiscoveredElements()
+    {
+        // Log discovered UI elements for debugging
+        GD.Print("GameOverUI elements discovered:");
+        GD.Print($"- GameOverLabel: {(_gameOverLabel != null ? "✓" : "✗")}");
+        GD.Print($"- SubMessageLabel: {(_subMessageLabel != null ? "✓" : "✗")}");
+        GD.Print($"- RestartButton: {(_restartButton != null ? "✓" : "✗")}");
+        GD.Print($"- QuitButton: {(_quitButton != null ? "✓" : "✗")}");
+    }
+    #endregion
 }

@@ -1,303 +1,364 @@
 using Godot;
 
-// Main character controller - handles movement, damage, and visual feedback
-// Refactored for better performance and cleaner separation of concerns
+// Main character controller handling movement, damage, and visual feedback
 public partial class Player : CharacterBody2D
 {
-	[Export] public float Speed = 120.0f;
-	[Export] public float JumpHeight = 100.0f;
+    #region Exported Properties
+    [Export] public float Speed = 120.0f;
+    [Export] public float JumpHeight = 100.0f;
+    #endregion
 
-	private float _jumpVelocity;
-	private bool _facingRight = true;
-	private float _gravity = ProjectSettings.GetSetting("physics/2d/default_gravity").AsSingle();
-	private bool _isPaused = false;
+    #region Movement State
+    private float _jumpVelocity;
+    private bool _facingRight = true;
+    private float _gravity;
+    private bool _isPaused = false;
+    #endregion
 
-	// Cached component references for performance
-	private Node2D _sprite;
-	private PlayerLife _playerLife;
-	private Area2D _hurtBox;
+    #region Components
+    private Node2D _sprite;
+    private PlayerLife _playerLife;
+    private Area2D _hurtBox;
+    #endregion
 
-	// Visual feedback system
-	private Tween _blinkTween;
-	private Timer _visualTimer;
-	private bool _isBlinking;
+    #region Visual Effects
+    private Tween _blinkTween;
+    private Timer _visualTimer;
+    private bool _isBlinking;
+    #endregion
 
-	public override void _Ready()
-	{
-		AddToGroup("player");
-		InitializeComponents();
-		CalculateJumpVelocity();
-		GD.Print($"Player initialized - Health system: {(_playerLife != null ? "✓" : "✗")}");
-	}
+    #region Initialization
+    public override void _Ready()
+    {
+        // Add to group for easy discovery and initialize all systems
+        AddToGroup("player");
+        InitializePhysics();
+        InitializeComponents();
+        GD.Print($"Player initialized - Health system: {(_playerLife != null ? "✓" : "✗")}");
+    }
 
-	public override void _PhysicsProcess(double delta)
-	{
-		if (_isPaused || _playerLife?.IsDead == true) return; // Add _isPaused check
+    private void InitializePhysics()
+    {
+        // Cache gravity and calculate jump velocity based on desired height
+        _gravity = ProjectSettings.GetSetting("physics/2d/default_gravity").AsSingle();
+        _jumpVelocity = -Mathf.Sqrt(2.0f * _gravity * JumpHeight);
+    }
 
-		ApplyGravity(delta);
-		HandleJumpInput();
-		HandleMovementInput();
+    private void InitializeComponents()
+    {
+        // Setup all required components in order
+        FindSpriteComponent();
+        SetupLifeSystem();
+        SetupHurtBox();
+        SetupVisualTimer();
+    }
+    #endregion
 
-		MoveAndSlide();
+    #region Core Game Loop
+    public override void _PhysicsProcess(double delta)
+    {
+        // Skip physics when paused or dead
+        if (_isPaused || _playerLife?.IsDead == true) return;
 
-		UpdateVisuals();
-	}
+        ProcessMovement(delta);
+        UpdateVisuals();
+    }
 
-	// Handles damage from external sources
-	public bool TakeDamage(int damage = 1) => _playerLife?.TakeDamage(damage) ?? false;
+    private void ProcessMovement(double delta)
+    {
+        // Apply gravity, handle input, and move character
+        ApplyGravity(delta);
+        HandleJumpInput();
+        HandleMovementInput();
+        MoveAndSlide();
+    }
+    #endregion
 
-	// Heals the player
-	public void Heal(int amount = 1) => _playerLife?.Heal(amount);
+    #region Physics and Movement
+    private void ApplyGravity(double delta)
+    {
+        // Apply gravity when not grounded
+        if (!IsOnFloor())
+        {
+            Velocity = new Vector2(Velocity.X, Velocity.Y + _gravity * (float)delta);
+        }
+    }
 
-	// Gets the player's life system for external access
-	public PlayerLife GetLifeSystem() => _playerLife;
+    private void HandleJumpInput()
+    {
+        // Jump when accept pressed and on ground
+        if (Input.IsActionJustPressed("ui_accept") && IsOnFloor())
+        {
+            Velocity = new Vector2(Velocity.X, _jumpVelocity);
+        }
+    }
 
-	// Resets player to initial state
-	public void Reset()
-	{
-		_playerLife?.Reset();
-		Velocity = Vector2.Zero;
-		StopVisualEffects();
-		RestoreNormalAppearance();
-	}
+    private void HandleMovementInput()
+    {
+        // Get horizontal input and apply movement or friction
+        float horizontal = Input.GetAxis("ui_left", "ui_right");
 
-	private void InitializeComponents()
-	{
-		FindSpriteComponent();
-		SetupLifeSystem();
-		SetupHurtBox();
-		SetupVisualTimer();
-	}
+        Velocity = horizontal != 0
+            ? new Vector2(horizontal * Speed, Velocity.Y)
+            : new Vector2(Mathf.MoveToward(Velocity.X, 0, Speed), Velocity.Y);
+    }
+    #endregion
 
-	private void FindSpriteComponent()
-	{
-		// Optimized sprite discovery - check common names first
-		_sprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D")
-			?? GetNodeOrNull<Sprite2D>("Sprite2D")
-			?? GetNodeOrNull<Node2D>("MarrieSprite")
-			?? FindFirstSpriteChild();
-	}
+    #region Visual Updates
+    private void UpdateVisuals()
+    {
+        // Update sprite direction, animations, and special effects
+        float direction = Input.GetAxis("ui_left", "ui_right");
+        UpdateSpriteDirection(direction);
+        UpdateAnimations(direction);
+        UpdateInvulnerabilityVisual();
+    }
 
-	private Node2D FindFirstSpriteChild()
-	{
-		foreach (Node child in GetChildren())
-		{
-			if (child is Sprite2D or AnimatedSprite2D)
-				return child as Node2D;
-		}
-		return null;
-	}
+    private void UpdateSpriteDirection(float direction)
+    {
+        // Flip sprite based on movement direction
+        if (_sprite == null || direction == 0) return;
 
-	private void SetupLifeSystem()
-	{
-		// Find existing PlayerLife or create one
-		_playerLife = GetNodeOrNull<PlayerLife>("PlayerLife") ?? FindPlayerLifeInChildren();
+        bool shouldFaceRight = direction > 0;
+        if (shouldFaceRight != _facingRight)
+        {
+            _facingRight = shouldFaceRight;
+            var scale = _sprite.Scale;
+            _sprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
+        }
+    }
 
-		if (_playerLife == null)
-		{
-			_playerLife = new PlayerLife { Name = "PlayerLife" };
-			AddChild(_playerLife);
-			CallDeferred(nameof(AddLifeSystemToGroup));
-		}
+    private void UpdateAnimations(float direction)
+    {
+        // Play appropriate animation based on state
+        if (_sprite is not AnimatedSprite2D animSprite || animSprite.SpriteFrames == null) return;
 
-		// Connect death signal
-		if (!_playerLife.IsConnected(PlayerLife.SignalName.PlayerDied, new Callable(this, nameof(OnPlayerDied))))
-		{
-			_playerLife.PlayerDied += OnPlayerDied;
-		}
-	}
+        string animation = DetermineAnimation(direction);
+        if (animSprite.SpriteFrames.HasAnimation(animation))
+            animSprite.Play(animation);
+    }
 
-	private PlayerLife FindPlayerLifeInChildren()
-	{
-		foreach (Node child in GetChildren())
-		{
-			if (child is PlayerLife life)
-				return life;
-		}
-		return null;
-	}
+    private string DetermineAnimation(float direction)
+    {
+        // Choose animation based on movement state
+        if (!IsOnFloor())
+            return Velocity.Y < 0 ? "jump" : "fall";
+        
+        return Mathf.Abs(direction) > 0 ? "walk" : "idle";
+    }
 
-	private void AddLifeSystemToGroup()
-	{
-		_playerLife?.AddToGroup("life_system");
-	}
+    private void UpdateInvulnerabilityVisual()
+    {
+        // Start or stop blinking effect based on invulnerability state
+        if (_playerLife == null) return;
 
-	private void SetupHurtBox()
-	{
-		_hurtBox = GetNodeOrNull<Area2D>("HurtBox");
-		if (_hurtBox != null)
-		{
-			_hurtBox.BodyEntered += OnHurtBoxBodyEntered;
-			_hurtBox.AreaEntered += OnHurtBoxAreaEntered;
-		}
-	}
+        if (_playerLife.IsInvulnerable && !_isBlinking)
+            StartBlinkEffect();
+        else if (!_playerLife.IsInvulnerable && _isBlinking)
+            StopVisualEffects();
+    }
+    #endregion
 
-	private void SetupVisualTimer()
-	{
-		_visualTimer = new Timer { OneShot = true };
-		_visualTimer.Timeout += StopVisualEffects;
-		AddChild(_visualTimer);
-	}
+    #region Component Setup
+    private void FindSpriteComponent()
+    {
+        // Find sprite component with optimized search order
+        _sprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D")
+            ?? GetNodeOrNull<Sprite2D>("Sprite2D")
+            ?? GetNodeOrNull<Node2D>("MarrieSprite")
+            ?? FindFirstSpriteChild();
+    }
 
-	private void CalculateJumpVelocity()
-	{
-		_jumpVelocity = -Mathf.Sqrt(2.0f * _gravity * JumpHeight);
-	}
+    private Node2D FindFirstSpriteChild()
+    {
+        // Fallback search through all children
+        foreach (Node child in GetChildren())
+        {
+            if (child is Sprite2D or AnimatedSprite2D)
+                return child as Node2D;
+        }
+        return null;
+    }
 
-	private void ApplyGravity(double delta)
-	{
-		if (!IsOnFloor())
-		{
-			Velocity = new Vector2(Velocity.X, Velocity.Y + _gravity * (float)delta);
-		}
-	}
+    private void SetupLifeSystem()
+    {
+        // Find or create PlayerLife component
+        _playerLife = GetNodeOrNull<PlayerLife>("PlayerLife") ?? FindPlayerLifeInChildren();
 
-	private void HandleJumpInput()
-	{
-		if (Input.IsActionJustPressed("ui_accept") && IsOnFloor())
-		{
-			Velocity = new Vector2(Velocity.X, _jumpVelocity);
-		}
-	}
+        if (_playerLife == null)
+        {
+            _playerLife = new PlayerLife { Name = "PlayerLife" };
+            AddChild(_playerLife);
+            CallDeferred(nameof(AddLifeSystemToGroup));
+        }
 
-	private void HandleMovementInput()
-	{
-		float horizontal = Input.GetAxis("ui_left", "ui_right");
+        ConnectLifeSystemSignals();
+    }
 
-		Velocity = horizontal != 0
-			? new Vector2(horizontal * Speed, Velocity.Y)
-			: new Vector2(Mathf.MoveToward(Velocity.X, 0, Speed), Velocity.Y);
-	}
+    private PlayerLife FindPlayerLifeInChildren()
+    {
+        // Search for existing PlayerLife in children
+        foreach (Node child in GetChildren())
+        {
+            if (child is PlayerLife life)
+                return life;
+        }
+        return null;
+    }
 
-	private void UpdateVisuals()
-	{
-		float direction = Input.GetAxis("ui_left", "ui_right");
-		UpdateSpriteDirection(direction);
-		UpdateAnimations(direction);
-		UpdateInvulnerabilityVisual();
-	}
+    private void ConnectLifeSystemSignals()
+    {
+        // Connect death signal to avoid duplicate connections
+        if (!_playerLife.IsConnected(PlayerLife.SignalName.PlayerDied, new Callable(this, nameof(OnPlayerDied))))
+        {
+            _playerLife.PlayerDied += OnPlayerDied;
+        }
+    }
 
-	private void UpdateSpriteDirection(float direction)
-	{
-		if (_sprite == null || direction == 0) return;
+    private void AddLifeSystemToGroup()
+    {
+        // Add PlayerLife to group for external discovery
+        _playerLife?.AddToGroup("life_system");
+    }
 
-		bool shouldFaceRight = direction > 0;
-		if (shouldFaceRight != _facingRight)
-		{
-			_facingRight = shouldFaceRight;
-			var scale = _sprite.Scale;
-			_sprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
-		}
-	}
+    private void SetupHurtBox()
+    {
+        // Connect hurt box signals for damage detection
+        _hurtBox = GetNodeOrNull<Area2D>("HurtBox");
+        if (_hurtBox != null)
+        {
+            _hurtBox.BodyEntered += OnHurtBoxBodyEntered;
+            _hurtBox.AreaEntered += OnHurtBoxAreaEntered;
+        }
+    }
 
-	private void UpdateAnimations(float direction)
-	{
-		if (_sprite is not AnimatedSprite2D animSprite || animSprite.SpriteFrames == null) return;
+    private void SetupVisualTimer()
+    {
+        // Timer for visual effect duration control
+        _visualTimer = new Timer { OneShot = true };
+        _visualTimer.Timeout += StopVisualEffects;
+        AddChild(_visualTimer);
+    }
+    #endregion
 
-		string animation = IsOnFloor()
-			? (Mathf.Abs(direction) > 0 ? "walk" : "idle")
-			: (Velocity.Y < 0 ? "jump" : "fall");
+    #region Visual Effects
+    private void StartBlinkEffect()
+    {
+        // Create blinking effect during invulnerability
+        if (_sprite == null) return;
 
-		if (animSprite.SpriteFrames.HasAnimation(animation))
-			animSprite.Play(animation);
-	}
+        _isBlinking = true;
+        _blinkTween?.Kill();
 
-	private void UpdateInvulnerabilityVisual()
-	{
-		if (_playerLife == null) return;
+        _blinkTween = CreateTween();
+        _blinkTween.SetLoops();
+        _blinkTween.TweenProperty(_sprite, "modulate:a", 0.3f, 0.15f);
+        _blinkTween.TweenProperty(_sprite, "modulate:a", 1.0f, 0.15f);
 
-		if (_playerLife.IsInvulnerable && !_isBlinking)
-			StartBlinkEffect();
-		else if (!_playerLife.IsInvulnerable && _isBlinking)
-			StopVisualEffects();
-	}
+        _visualTimer.WaitTime = 2.0f;
+        _visualTimer.Start();
+    }
 
-	private void StartBlinkEffect()
-	{
-		if (_sprite == null) return;
+    private void StopVisualEffects()
+    {
+        // Stop all visual effects and restore normal appearance
+        _isBlinking = false;
+        _visualTimer.Stop();
+        _blinkTween?.Kill();
+        RestoreNormalAppearance();
+    }
 
-		_isBlinking = true;
-		_blinkTween?.Kill();
+    private void RestoreNormalAppearance()
+    {
+        // Reset sprite to normal color
+        if (_sprite != null)
+            _sprite.Modulate = Colors.White;
+    }
+    #endregion
 
-		_blinkTween = CreateTween();
-		_blinkTween.SetLoops();
-		_blinkTween.TweenProperty(_sprite, "modulate:a", 0.3f, 0.15f);
-		_blinkTween.TweenProperty(_sprite, "modulate:a", 1.0f, 0.15f);
+    #region Damage System
+    private void OnHurtBoxBodyEntered(Node2D body)
+    {
+        // Handle collision with enemy bodies
+        if (body.IsInGroup("enemy"))
+            ProcessDamageFromEnemy(body);
+    }
 
-		_visualTimer.WaitTime = 2.0f;
-		_visualTimer.Start();
-	}
+    private void OnHurtBoxAreaEntered(Area2D area)
+    {
+        // Handle collision with enemy areas
+        if (area.IsInGroup("enemy"))
+            ProcessDamageFromEnemy(area);
+    }
 
-	private void StopVisualEffects()
-	{
-		_isBlinking = false;
-		_visualTimer.Stop();
-		_blinkTween?.Kill();
-		RestoreNormalAppearance();
-	}
+    private void ProcessDamageFromEnemy(Node2D enemy)
+    {
+        // Apply damage and knockback if successful
+        if (TakeDamage(1))
+        {
+            ApplyKnockback(enemy);
+            GD.Print($"Player took damage! Health: {_playerLife.CurrentLife}");
+        }
+    }
 
-	private void RestoreNormalAppearance()
-	{
-		if (_sprite != null)
-			_sprite.Modulate = Colors.White;
-	}
+    private void ApplyKnockback(Node2D source)
+    {
+        // Calculate knockback direction and apply velocity
+        Vector2 direction = (GlobalPosition - source.GlobalPosition).Normalized();
+        if (direction.Length() < 0.1f) direction = Vector2.Left; // Fallback direction
 
-	private void OnHurtBoxBodyEntered(Node2D body)
-	{
-		if (body.IsInGroup("enemy"))
-			ProcessDamageFromEnemy(body);
-	}
+        Velocity = new Vector2(direction.X * 200.0f, -100.0f);
+    }
 
-	private void OnHurtBoxAreaEntered(Area2D area)
-	{
-		if (area.IsInGroup("enemy"))
-			ProcessDamageFromEnemy(area);
-	}
+    private void OnPlayerDied()
+    {
+        // Handle player death - stop movement and apply visual effects
+        GD.Print("Player died!");
+        Velocity = Vector2.Zero;
 
-	private void ProcessDamageFromEnemy(Node2D enemy)
-	{
-		if (TakeDamage(1))
-		{
-			ApplyKnockback(enemy);
-			GD.Print($"Player took damage! Health: {_playerLife.CurrentLife}");
-		}
-	}
+        ApplyDeathVisuals();
+        GameManager.Instance?.PlayerDied(GlobalPosition);
+    }
 
-	private void ApplyKnockback(Node2D source)
-	{
-		Vector2 direction = (GlobalPosition - source.GlobalPosition).Normalized();
-		if (direction.Length() < 0.1f) direction = Vector2.Left;
+    private void ApplyDeathVisuals()
+    {
+        // Apply death tint and animation
+        if (_sprite != null)
+            _sprite.Modulate = new Color(1.0f, 0.3f, 0.3f, 0.7f);
 
-		Velocity = new Vector2(direction.X * 200.0f, -100.0f);
-	}
+        if (_sprite is AnimatedSprite2D animSprite && animSprite.SpriteFrames?.HasAnimation("death") == true)
+            animSprite.Play("death");
+    }
+    #endregion
 
-	private void OnPlayerDied()
-	{
-		GD.Print("Player died!");
-		Velocity = Vector2.Zero;
+    #region Public API
+    public bool TakeDamage(int damage = 1) => _playerLife?.TakeDamage(damage) ?? false;
+    public void Heal(int amount = 1) => _playerLife?.Heal(amount);
+    public PlayerLife GetLifeSystem() => _playerLife; // Get life system for external access
 
-		// Apply death visual effect
-		if (_sprite != null)
-			_sprite.Modulate = new Color(1.0f, 0.3f, 0.3f, 0.7f);
+    public void Reset()
+    {
+        // Reset player to initial state
+        _playerLife?.Reset();
+        Velocity = Vector2.Zero;
+        StopVisualEffects();
+        RestoreNormalAppearance();
+    }
 
-		// Play death animation if available
-		if (_sprite is AnimatedSprite2D animSprite && animSprite.SpriteFrames?.HasAnimation("death") == true)
-			animSprite.Play("death");
+    public void PausePlayer()
+    {
+        // Pause player movement for replay mode
+        _isPaused = true;
+        GD.Print("Player paused for replay");
+    }
 
-		GameManager.Instance?.PlayerDied(GlobalPosition);
-	}
+    public void ResumePlayer()
+    {
+        // Resume player movement after replay
+        _isPaused = false;
+        GD.Print("Player resumed after replay");
+    }
 
-	public void PausePlayer()
-	{
-		_isPaused = true;
-		GD.Print("Player paused for replay");
-	}
-
-	public void ResumePlayer()
-	{
-		_isPaused = false;
-		GD.Print("Player resumed after replay");
-	}
-
-	public bool IsPaused() => _isPaused;
+    public bool IsPaused() => _isPaused; // Check if player is paused
+    #endregion
 }

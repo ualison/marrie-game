@@ -1,279 +1,310 @@
 using Godot;
 using System.Collections.Generic;
 
-// Ghost version of player that replays recorded movements
-// Enhanced with better error handling and visual feedback
+// Ghost version of player that replays recorded movements with smooth interpolation
 public partial class GhostPlayer : CharacterBody2D
 {
+    #region Constants and Configuration
+    private const float RECORD_INTERVAL = 0.1f; // Match ReplayRecorder interval
+    private const float MIN_MOVEMENT = 0.5f; // Minimum distance to filter stationary frames
+    private const float SMOOTH_SPEED = 10.0f; // Position interpolation speed
+    private static readonly Color GHOST_TINT = new(0.5f, 0.5f, 1.0f, 0.7f); // Semi-transparent blue
+    #endregion
 
-	 private const float RecordInterval = 0.1f; // Match ReplayRecorder interval
-	private List<ReplayFrame> _replayFrames;
-	private int _currentFrameIndex;
-	private float _replayStartTime;
-	private bool _isReplaying;
+    #region State Variables
+    private List<ReplayFrame> _replayFrames;
+    private int _currentFrameIndex;
+    private float _replayStartTime;
+    private bool _isReplaying;
+    #endregion
 
-	// Cached sprite references for performance
-	private AnimatedSprite2D _animatedSprite;
-	private Sprite2D _sprite;
-	private Node2D _activeSprite;
+    #region Visual Components
+    private AnimatedSprite2D _animatedSprite;
+    private Sprite2D _sprite;
+    private Node2D _activeSprite;
+    #endregion
 
-	// Add these for smoothing
-	private Vector2 _currentPosition;
-	private Vector2 _targetPosition;
-	private float _smoothSpeed = 10.0f;
+    #region Movement Smoothing
+    private Vector2 _currentPosition;
+    private Vector2 _targetPosition;
+    #endregion
 
-	public override void _Ready()
-	{
-		SetupGhostVisuals();
-		DisableCollisions();
-		Hide();
-
-		// Add debug info
-		GD.Print($"GhostPlayer ready: {Name}, Parent: {GetParent()?.Name}");
-	}
-
-	public override void _Process(double delta)
-	{
-		if (!_isReplaying || _replayFrames == null) return;
-
-		float elapsedTime = Time.GetTicksMsec() / 1000.0f - _replayStartTime;
-		var targetFrame = FindFrameAtTime(elapsedTime);
-
-		if (targetFrame != null)
-		{
-			_targetPosition = targetFrame.Position;
-			ApplyFrameToGhost(targetFrame);
-		}
-		else if (_currentFrameIndex >= _replayFrames.Count)
-		{
-			StopReplay();
-			return;
-		}
-
-		// Smooth position interpolation
-		_currentPosition = _currentPosition.Lerp(_targetPosition, _smoothSpeed * (float)delta);
-		GlobalPosition = _currentPosition;
-	}
-	public void StartReplay(List<ReplayFrame> frames)
-	{
-		if (frames == null || frames.Count == 0)
-		{
-			GD.Print("GhostPlayer: No frames to replay");
-			return;
-		}
-
-		// Filter out stationary sequences to remove pause periods
-		var filteredFrames = FilterStatinaryFrames(frames);
-
-		if (filteredFrames.Count == 0)
-		{
-			GD.Print("GhostPlayer: No movement frames after filtering");
-			return;
-		}
-
-		_replayFrames = filteredFrames;
-		_currentFrameIndex = 0;
-		_replayStartTime = Time.GetTicksMsec() / 1000.0f;
-		_isReplaying = true;
-
-		GlobalPosition = filteredFrames[0].Position;
-
-		Show();
-		GD.Print($"GhostPlayer: Started replay with {filteredFrames.Count} filtered frames (was {frames.Count})");
-	}
-
-private List<ReplayFrame> FilterStatinaryFrames(List<ReplayFrame> originalFrames)
-{
-    var filtered = new List<ReplayFrame>();
-    const float MIN_MOVEMENT = 0.5f;
-    
-    Vector2 lastPos = Vector2.Zero;
-    float timeCompression = 0f;
-    
-    for (int i = 0; i < originalFrames.Count; i++)
+    #region Initialization
+    public override void _Ready()
     {
-        var frame = originalFrames[i];
-        
-        // Always keep first frame
-        if (i == 0)
+        // Setup visual appearance and disable physics interactions
+        SetupGhostVisuals();
+        DisableCollisions();
+        Hide();
+
+        GD.Print($"GhostPlayer ready: {Name}, Parent: {GetParent()?.Name}");
+    }
+    #endregion
+
+    #region Core Update Loop
+    public override void _Process(double delta)
+    {
+        // Skip processing if not replaying or no data available
+        if (!_isReplaying || _replayFrames == null) return;
+
+        // Calculate elapsed time since replay started
+        float elapsedTime = Time.GetTicksMsec() / 1000.0f - _replayStartTime;
+        var targetFrame = FindFrameAtTime(elapsedTime);
+
+        if (targetFrame != null)
         {
-            filtered.Add(frame);
-            lastPos = frame.Position;
-            continue;
+            // Update target position and apply frame data
+            _targetPosition = targetFrame.Position;
+            ApplyFrameToGhost(targetFrame);
         }
-        
-        float distance = frame.Position.DistanceTo(lastPos);
-        
-        if (distance > MIN_MOVEMENT)
+        else if (_currentFrameIndex >= _replayFrames.Count)
         {
-            // Movement detected - add frame with compressed time
-            var newFrame = new ReplayFrame
+            // End replay when all frames are processed
+            StopReplay();
+            return;
+        }
+
+        // Smoothly interpolate to target position for fluid movement
+        _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * (float)delta);
+        GlobalPosition = _currentPosition;
+    }
+    #endregion
+
+    #region Replay Control
+    public void StartReplay(List<ReplayFrame> frames)
+    {
+        // Validate input data before starting replay
+        if (frames == null || frames.Count == 0)
+        {
+            GD.Print("GhostPlayer: No frames to replay");
+            return;
+        }
+
+        // Remove stationary sequences to eliminate pause periods
+        var filteredFrames = FilterStatinaryFrames(frames);
+        if (filteredFrames.Count == 0)
+        {
+            GD.Print("GhostPlayer: No movement frames after filtering");
+            return;
+        }
+
+        // Initialize replay state
+        _replayFrames = filteredFrames;
+        _currentFrameIndex = 0;
+        _replayStartTime = Time.GetTicksMsec() / 1000.0f;
+        _isReplaying = true;
+
+        // Set initial position and make ghost visible
+        GlobalPosition = filteredFrames[0].Position;
+        _currentPosition = GlobalPosition;
+        _targetPosition = GlobalPosition;
+
+        Show();
+        GD.Print($"GhostPlayer: Started replay with {filteredFrames.Count} filtered frames (was {frames.Count})");
+    }
+
+    public void StopReplay()
+    {
+        // End replay and hide ghost
+        _isReplaying = false;
+        Hide();
+        GD.Print("GhostPlayer: Replay stopped");
+    }
+
+    public bool IsReplaying() => _isReplaying; // Check if currently replaying
+    #endregion
+
+    #region Frame Processing
+    private List<ReplayFrame> FilterStatinaryFrames(List<ReplayFrame> originalFrames)
+    {
+        // Remove frames where player is stationary to compress timeline
+        var filtered = new List<ReplayFrame>();
+        Vector2 lastPos = Vector2.Zero;
+        float timeCompression = 0f;
+
+        for (int i = 0; i < originalFrames.Count; i++)
+        {
+            var frame = originalFrames[i];
+
+            // Always keep first frame as reference point
+            if (i == 0)
             {
-                Timestamp = frame.Timestamp - timeCompression,
-                Position = frame.Position,
-                Rotation = frame.Rotation,
-                Animation = frame.Animation,
-                SpriteFlip = frame.SpriteFlip
-            };
-            filtered.Add(newFrame);
-            lastPos = frame.Position;
+                filtered.Add(frame);
+                lastPos = frame.Position;
+                continue;
+            }
+
+            float distance = frame.Position.DistanceTo(lastPos);
+
+            if (distance > MIN_MOVEMENT)
+            {
+                // Movement detected - add frame with compressed timestamp
+                var newFrame = new ReplayFrame
+                {
+                    Timestamp = frame.Timestamp - timeCompression,
+                    Position = frame.Position,
+                    Rotation = frame.Rotation,
+                    Animation = frame.Animation,
+                    SpriteFlip = frame.SpriteFlip
+                };
+                filtered.Add(newFrame);
+                lastPos = frame.Position;
+            }
+            else
+            {
+                // No movement - accumulate time compression
+                timeCompression += RECORD_INTERVAL;
+            }
+        }
+
+        return filtered;
+    }
+
+    private ReplayFrame FindFrameAtTime(float time)
+    {
+        // Find frame that should be playing at current time
+        for (int i = _currentFrameIndex; i < _replayFrames.Count; i++)
+        {
+            if (_replayFrames[i].Timestamp >= time)
+            {
+                _currentFrameIndex = i;
+                return _replayFrames[i];
+            }
+        }
+
+        // Return null when past all frames to signal end
+        return null;
+    }
+
+    private void ApplyFrameToGhost(ReplayFrame frame)
+    {
+        // Apply rotation from frame data
+        GlobalRotation = frame.Rotation;
+
+        // Apply sprite flip state
+        if (_activeSprite != null)
+        {
+            var currentScale = _activeSprite.Scale;
+            _activeSprite.Scale = new Vector2(
+                frame.SpriteFlip ? -Mathf.Abs(currentScale.X) : Mathf.Abs(currentScale.X),
+                currentScale.Y
+            );
+        }
+
+        // Play animation if available and valid
+        if (_animatedSprite != null && !string.IsNullOrEmpty(frame.Animation))
+        {
+            if (_animatedSprite.SpriteFrames?.HasAnimation(frame.Animation) == true)
+            {
+                if (_animatedSprite.Animation != frame.Animation)
+                    _animatedSprite.Play(frame.Animation);
+            }
+        }
+    }
+    #endregion
+
+    #region Visual Setup
+    private void SetupGhostVisuals()
+    {
+        // Find sprite components and apply ghost effect
+        DiscoverSpriteComponents();
+        ApplyGhostEffect();
+    }
+
+    private void DiscoverSpriteComponents()
+    {
+        // Try animated sprite first (most common)
+        _animatedSprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
+        if (_animatedSprite != null)
+        {
+            _activeSprite = _animatedSprite;
+            GD.Print($"GhostPlayer: Found AnimatedSprite2D: {_animatedSprite.Name}");
+            return;
+        }
+
+        // Check for various sprite node names as fallback
+        _sprite = GetNodeOrNull<Sprite2D>("Sprite2D")
+            ?? GetNodeOrNull<Sprite2D>("GhostMarrieSprite")
+            ?? GetNodeOrNull<Sprite2D>("MarrieSprite");
+
+        if (_sprite != null)
+        {
+            _activeSprite = _sprite;
+            GD.Print($"GhostPlayer: Found Sprite2D: {_sprite.Name}");
+            return;
+        }
+
+        // Check if custom names are actually AnimatedSprite2D
+        _animatedSprite = GetNodeOrNull<AnimatedSprite2D>("GhostMarrieSprite")
+            ?? GetNodeOrNull<AnimatedSprite2D>("MarrieSprite");
+
+        if (_animatedSprite != null)
+        {
+            _activeSprite = _animatedSprite;
+            GD.Print($"GhostPlayer: Found custom AnimatedSprite2D: {_animatedSprite.Name}");
         }
         else
         {
-            // No movement - accumulate time to compress
-            timeCompression += 0.1f; // Recording interval
+            // Log error and show available children for debugging
+            GD.PrintErr("GhostPlayer: No sprite component found!");
+            LogAvailableChildren();
         }
     }
-    
-    return filtered;
-}
-	private ReplayFrame FindFrameAtTime(float time)
-	{
-		// Find the frame that should be playing at this time
-		for (int i = _currentFrameIndex; i < _replayFrames.Count; i++)
-		{
-			if (_replayFrames[i].Timestamp >= time)
-			{
-				_currentFrameIndex = i;
-				return _replayFrames[i];
-			}
-		}
 
-		// If we've gone past all frames, return null to signal end
-		return null;
-	}
-	// Stops replay and hides ghost
-	public void StopReplay()
-	{
-		_isReplaying = false;
-		Hide();
-		GD.Print("GhostPlayer: Replay stopped");
-	}
+    private void ApplyGhostEffect()
+    {
+        // Apply semi-transparent blue tint for ghost appearance
+        if (_activeSprite != null)
+        {
+            _activeSprite.Modulate = GHOST_TINT;
+            _activeSprite.Show();
+            GD.Print($"GhostPlayer: Applied ghost effect to '{_activeSprite.Name}'");
+        }
+        else
+        {
+            // Create fallback visual if no sprite found
+            GD.PrintErr("GhostPlayer: No sprite found for ghost effect - creating fallback");
+            CreateFallbackVisual();
+        }
+    }
 
-	// Checks if currently replaying
-	public bool IsReplaying() => _isReplaying;
+    private void CreateFallbackVisual()
+    {
+        // Create simple colored rectangle as fallback visual
+        var fallbackSprite = new Sprite2D { Name = "FallbackGhostSprite" };
 
-	private void SetupGhostVisuals()
-	{
-		DiscoverSpriteComponents();
-		ApplyGhostEffect();
-	}
+        // Generate blue rectangle texture
+        var imageTexture = new ImageTexture();
+        var image = Image.CreateEmpty(32, 32, false, Image.Format.Rgba8);
+        image.Fill(new Color(0, 0, 1));
+        imageTexture.SetImage(image);
 
-	// Finds sprite components with fallback names
-	private void DiscoverSpriteComponents()
-	{
-		// Try animated sprite first
-		_animatedSprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
-		if (_animatedSprite != null)
-		{
-			_activeSprite = _animatedSprite;
-			GD.Print($"GhostPlayer: Found AnimatedSprite2D: {_animatedSprite.Name}");
-			return;
-		}
+        fallbackSprite.Texture = imageTexture;
+        fallbackSprite.Modulate = GHOST_TINT;
 
-		// Check for various sprite node names
-		_sprite = GetNodeOrNull<Sprite2D>("Sprite2D")
-			?? GetNodeOrNull<Sprite2D>("GhostMarrieSprite")
-			?? GetNodeOrNull<Sprite2D>("MarrieSprite");
+        AddChild(fallbackSprite);
+        _activeSprite = fallbackSprite;
 
-		if (_sprite != null)
-		{
-			_activeSprite = _sprite;
-			GD.Print($"GhostPlayer: Found Sprite2D: {_sprite.Name}");
-			return;
-		}
+        GD.Print("GhostPlayer: Created fallback visual");
+    }
 
-		// Check if custom names are actually AnimatedSprite2D
-		_animatedSprite = GetNodeOrNull<AnimatedSprite2D>("GhostMarrieSprite")
-			?? GetNodeOrNull<AnimatedSprite2D>("MarrieSprite");
+    private void DisableCollisions()
+    {
+        // Prevent ghost from interfering with physics
+        SetCollisionLayerValue(1, false);
+        SetCollisionMaskValue(1, false);
+    }
+    #endregion
 
-		if (_animatedSprite != null)
-		{
-			_activeSprite = _animatedSprite;
-			GD.Print($"GhostPlayer: Found custom AnimatedSprite2D: {_animatedSprite.Name}");
-		}
-		else
-		{
-			GD.PrintErr("GhostPlayer: No sprite component found!");
-
-			// List all children for debugging
-			GD.Print("GhostPlayer children:");
-			foreach (Node child in GetChildren())
-			{
-				GD.Print($"  - {child.Name} ({child.GetType().Name})");
-			}
-		}
-	}
-
-	private void ApplyGhostEffect()
-	{
-		if (_activeSprite != null)
-		{
-			// Semi-transparent blue tint for ghost effect
-			_activeSprite.Modulate = new Color(0.5f, 0.5f, 1.0f, 0.7f);
-			_activeSprite.Show();
-			GD.Print($"GhostPlayer: Applied ghost effect to '{_activeSprite.Name}'");
-		}
-		else
-		{
-			GD.PrintErr("GhostPlayer: No sprite found for ghost effect - creating fallback");
-			CreateFallbackVisual();
-		}
-	}
-
-	// Creates a simple visual fallback if no sprite is found
-	private void CreateFallbackVisual()
-	{
-		var fallbackSprite = new Sprite2D();
-		fallbackSprite.Name = "FallbackGhostSprite";
-
-		// Create a simple colored rectangle texture
-		var imageTexture = new ImageTexture();
-		var image = Image.CreateEmpty(32, 32, false, Image.Format.Rgba8);
-		image.Fill(new Color(0, 0, 1)); // Blue color
-		imageTexture.SetImage(image);
-
-		fallbackSprite.Texture = imageTexture;
-		fallbackSprite.Modulate = new Color(0.5f, 0.5f, 1.0f, 0.7f);
-
-		AddChild(fallbackSprite);
-		_activeSprite = fallbackSprite;
-
-		GD.Print("GhostPlayer: Created fallback visual");
-	}
-
-	private void DisableCollisions()
-	{
-		SetCollisionLayerValue(1, false);
-		SetCollisionMaskValue(1, false);
-	}
-
-	// Applies frame data to ghost's visual state
-	private void ApplyFrameToGhost(ReplayFrame frame)
-	{
-		// Don't update position here anymore - handled in _Process
-		// _targetPosition is set in _Process
-
-		GlobalRotation = frame.Rotation;
-
-		// Apply sprite flip
-		if (_activeSprite != null)
-		{
-			var currentScale = _activeSprite.Scale;
-			_activeSprite.Scale = new Vector2(
-				frame.SpriteFlip ? -Mathf.Abs(currentScale.X) : Mathf.Abs(currentScale.X),
-				currentScale.Y
-			);
-		}
-
-		// Play animation if available
-		if (_animatedSprite != null && !string.IsNullOrEmpty(frame.Animation))
-		{
-			if (_animatedSprite.SpriteFrames?.HasAnimation(frame.Animation) == true)
-			{
-				if (_animatedSprite.Animation != frame.Animation)
-					_animatedSprite.Play(frame.Animation);
-			}
-		}
-	}
+    #region Debug Utilities
+    private void LogAvailableChildren()
+    {
+        // List all children for debugging sprite discovery issues
+        GD.Print("GhostPlayer children:");
+        foreach (Node child in GetChildren())
+        {
+            GD.Print($"  - {child.Name} ({child.GetType().Name})");
+        }
+    }
+    #endregion
 }
