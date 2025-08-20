@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=10 format=3 uid="uid://bnv528gs1hngu"]
 
 [ext_resource type="Script" uid="uid://26nsb7j0ik8a" path="res://Scripts/Managers/GameManager.cs" id="1_03gy3"]
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
@@ -7,7 +7,6 @@
 [ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_wjun0"]
 [ext_resource type="PackedScene" uid="uid://jlrj0meior1r" path="res://Prefabs/UI/LifeBarUI.tscn" id="7_gfl13"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOverUI.tscn" id="8_4xied"]
-[ext_resource type="PackedScene" uid="uid://kufqrmkh1vbu" path="res://Prefabs/ReplayGem.tscn" id="9_8u8ny"]
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
 [ext_resource type="Script" uid="uid://ce4epv6lyxy1x" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
 
@@ -51,7 +50,6 @@ position = Vector2(-236, 85)
 
 [node name="GameManager" type="Node2D" parent="Systems"]
 script = ExtResource("1_03gy3")
-ReplayGemScene = ExtResource("9_8u8ny")
 
 [node name="AudioManager" type="AudioStreamPlayer2D" parent="Systems"]
 position = Vector2(4, 0)
