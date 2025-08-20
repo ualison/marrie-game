@@ -9,11 +9,19 @@ public partial class ReplayRecorder : Node
 
 	[Export] public float RecordInterval { get; set; } = 0.1f;
 
+	private float _pauseStartTime; // Add this line
+
 	public bool IsRecording { get; private set; }
+	private bool _isPausedForReplay = false;
 
 	// In-memory frame storage
 	private readonly List<ReplayFrame> _playerFrames = new();
 	private readonly List<ReplayFrame> _monsterFrames = new();
+
+private Vector2 _lastPlayerPosition = Vector2.Zero;
+private bool _playerWasMoving = true;
+
+// In-memory frame storage
 
 	private float _recordTimer;
 	private float _startTime;
@@ -36,7 +44,7 @@ public partial class ReplayRecorder : Node
 			if (Instance != this)
 			{
 				QueueFree();
-				return;
+				return; 
 			}
 			CallDeferred(nameof(InitializeRecording));
 		}
@@ -44,6 +52,12 @@ public partial class ReplayRecorder : Node
 	public override void _Process(double delta)
 	{
 		if (!IsRecording) return;
+
+		// Check if player is actually moving
+		bool playerIsMoving = CheckPlayerMovement();
+
+		// Don't record if paused for replay OR if player is frozen
+		if (_isPausedForReplay || !playerIsMoving) return;
 
 		_recordTimer += (float)delta;
 
@@ -53,24 +67,53 @@ public partial class ReplayRecorder : Node
 			_recordTimer = 0.0f;
 		}
 	}
+private bool CheckPlayerMovement()
+{
+    if (_player == null) return false;
 
-	private void CaptureCurrentFrame()
-	{
-		// Use total elapsed time since recording started
-		float currentTime = Time.GetTicksMsec() / 1000.0f - _startTime;
+    Vector2 currentPosition = _player.GlobalPosition;
+    bool isMoving = currentPosition.DistanceTo(_lastPlayerPosition) > 0.1f;
+    
+    // Update last position if player is moving
+    if (isMoving)
+    {
+        _lastPlayerPosition = currentPosition;
+        _playerWasMoving = true;
+    }
+    else if (_playerWasMoving)
+    {
+        // Player just stopped - record one final frame
+        _playerWasMoving = false;
+        return true;
+    }
+    
+    return isMoving;
+}
 
-		// Record player state
-		if (_player != null)
-		{
-			_playerFrames.Add(CreateFrameForCharacter(_player, currentTime));
-		}
+private void CaptureCurrentFrame()
+{
+    // Use total elapsed time since recording started
+    float currentTime = Time.GetTicksMsec() / 1000.0f - _startTime;
 
-		// Record monster state
-		if (_monster != null)
-		{
-			_monsterFrames.Add(CreateFrameForCharacter(_monster, currentTime));
-		}
-	}
+    // Record player state
+    if (_player != null)
+    {
+        var frame = CreateFrameForCharacter(_player, currentTime);
+        _playerFrames.Add(frame);
+        
+        // Debug: Print every 10th frame to check for gaps
+        if (_playerFrames.Count % 10 == 0)
+        {
+            GD.Print($"Frame {_playerFrames.Count}: Time={currentTime:F2}s, Pos={frame.Position}");
+        }
+    }
+
+    // Record monster state
+    if (_monster != null)
+    {
+        _monsterFrames.Add(CreateFrameForCharacter(_monster, currentTime));
+    }
+}
 	// Stops recording and logs final frame count
 	public void StopRecording()
 	{
@@ -92,10 +135,10 @@ public partial class ReplayRecorder : Node
 	{
 		_playerFrames.Clear();
 		_monsterFrames.Clear();
-		GD.Print("Recording data cleared");
+		_recordTimer = 0f;
+		GD.Print("Recording data cleared - ready for new session");
 	}
-
-	private void InitializeRecording()
+	public void InitializeRecording()
 	{
 		if (GetTree() == null)
 		{
@@ -107,6 +150,7 @@ public partial class ReplayRecorder : Node
 
 		if (_player != null)
 		{
+			// Always start fresh recording for new session
 			StartRecording();
 		}
 	}
@@ -119,13 +163,24 @@ public partial class ReplayRecorder : Node
 		GD.Print($"ReplayRecorder discovered - Player: {_player != null}, Monster: {_monster != null}");
 	}
 
-	private void StartRecording()
-	{
-		IsRecording = true;
-		_recordTimer = 0f;
-		_startTime = Time.GetTicksMsec() / 1000.0f; // Store start time in seconds
-		GD.Print("ReplayRecorder: Started recording");
-	}
+private void StartRecording()
+{
+    // Clear any previous recording data first
+    ClearRecording();
+    
+    IsRecording = true;
+    _recordTimer = 0f;
+    _startTime = Time.GetTicksMsec() / 1000.0f;
+    
+    // Initialize movement tracking
+    if (_player != null)
+    {
+        _lastPlayerPosition = _player.GlobalPosition;
+        _playerWasMoving = true;
+    }
+    
+    GD.Print("ReplayRecorder: Started new recording session");
+}
 	// Creates replay frame from character's current state
 	private ReplayFrame CreateFrameForCharacter(Node2D character, float timestamp)
 	{
@@ -165,4 +220,27 @@ public partial class ReplayRecorder : Node
 
 		return sprite?.Scale.X < 0;
 	}
+
+public void PauseRecording()
+{
+    _isPausedForReplay = true;
+    
+    // Store the exact time when we paused to resume timeline correctly
+    _pauseStartTime = Time.GetTicksMsec() / 1000.0f;
+    
+    GD.Print("Recording paused for replay");
+}
+
+public void ResumeRecording()
+{
+    if (_isPausedForReplay)
+    {
+        // Calculate how long we were paused and adjust start time
+        float pauseDuration = (Time.GetTicksMsec() / 1000.0f) - _pauseStartTime;
+        _startTime += pauseDuration; // Shift start time to maintain timeline continuity
+        
+        _isPausedForReplay = false;
+        GD.Print($"Recording resumed after {pauseDuration:F2}s pause");
+    }
+}
 }

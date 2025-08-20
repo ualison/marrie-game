@@ -111,11 +111,12 @@ public partial class GameManager : Node
         var deathRecord = new DeathRecord(_currentDeathId, deathPosition);
         if (ReplayRecorder.Instance != null)
         {
+            // Get the current session's frames before stopping
             deathRecord.PlayerFrames = ReplayRecorder.Instance.GetPlayerFrames();
             deathRecord.MonsterFrames = ReplayRecorder.Instance.GetMonsterFrames();
             ReplayRecorder.Instance.StopRecording();
-            // Clear old recording data for next session
-            ReplayRecorder.Instance.ClearRecording();
+
+            GD.Print($"Captured {deathRecord.PlayerFrames.Count} frames for this death");
         }
 
         _deathRecords[_currentDeathId] = deathRecord;
@@ -156,7 +157,6 @@ public partial class GameManager : Node
     // Restarts the game and reloads scene - gem will appear if replay data exists
     public void RestartGame()
     {
-        // Add comprehensive null checks
         var tree = GetTree();
         if (tree == null)
         {
@@ -174,18 +174,23 @@ public partial class GameManager : Node
         bool shouldShowGem = HasReplayData && LastDeathPosition != Vector2.Zero;
         Vector2 gemPosition = LastDeathPosition;
 
-        GD.Print($"🔄 Restart: shouldShowGem={shouldShowGem}, position={gemPosition}");
+        GD.Print($"Restart: shouldShowGem={shouldShowGem}, position={gemPosition}");
 
         // Clear game over state but KEEP replay data
         IsGameOver = false;
 
+        // Clear the recorder for the new session
+        if (ReplayRecorder.Instance != null)
+        {
+            ReplayRecorder.Instance.ClearRecording();
+        }
+
         // Store the timer reference to prevent disposal issues
         if (shouldShowGem)
         {
-            var timer = tree.CreateTimer(0.5f); // Increased delay
+            var timer = tree.CreateTimer(0.5f);
             timer.Timeout += () =>
             {
-                // Triple safety check before creating gem
                 if (IsInstanceValid(this) && GetTree() != null && GameManager.Instance == this)
                 {
                     CreateAndShowReplayGem(gemPosition);
@@ -193,7 +198,6 @@ public partial class GameManager : Node
             };
         }
 
-        // Use CallDeferred to ensure we're not in the middle of signal processing
         CallDeferred(nameof(DoSceneReload));
     }
 

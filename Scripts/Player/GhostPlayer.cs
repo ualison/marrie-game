@@ -5,6 +5,8 @@ using System.Collections.Generic;
 // Enhanced with better error handling and visual feedback
 public partial class GhostPlayer : CharacterBody2D
 {
+
+	 private const float RecordInterval = 0.1f; // Match ReplayRecorder interval
 	private List<ReplayFrame> _replayFrames;
 	private int _currentFrameIndex;
 	private float _replayStartTime;
@@ -60,19 +62,71 @@ public partial class GhostPlayer : CharacterBody2D
 			return;
 		}
 
-		_replayFrames = frames;
+		// Filter out stationary sequences to remove pause periods
+		var filteredFrames = FilterStatinaryFrames(frames);
+
+		if (filteredFrames.Count == 0)
+		{
+			GD.Print("GhostPlayer: No movement frames after filtering");
+			return;
+		}
+
+		_replayFrames = filteredFrames;
 		_currentFrameIndex = 0;
 		_replayStartTime = Time.GetTicksMsec() / 1000.0f;
 		_isReplaying = true;
 
-		// Initialize smooth movement
-		_currentPosition = frames[0].Position;
-		_targetPosition = frames[0].Position;
-		GlobalPosition = _currentPosition;
+		GlobalPosition = filteredFrames[0].Position;
 
 		Show();
-		GD.Print($"GhostPlayer: Started replay with {frames.Count} frames");
+		GD.Print($"GhostPlayer: Started replay with {filteredFrames.Count} filtered frames (was {frames.Count})");
 	}
+
+private List<ReplayFrame> FilterStatinaryFrames(List<ReplayFrame> originalFrames)
+{
+    var filtered = new List<ReplayFrame>();
+    const float MIN_MOVEMENT = 0.5f;
+    
+    Vector2 lastPos = Vector2.Zero;
+    float timeCompression = 0f;
+    
+    for (int i = 0; i < originalFrames.Count; i++)
+    {
+        var frame = originalFrames[i];
+        
+        // Always keep first frame
+        if (i == 0)
+        {
+            filtered.Add(frame);
+            lastPos = frame.Position;
+            continue;
+        }
+        
+        float distance = frame.Position.DistanceTo(lastPos);
+        
+        if (distance > MIN_MOVEMENT)
+        {
+            // Movement detected - add frame with compressed time
+            var newFrame = new ReplayFrame
+            {
+                Timestamp = frame.Timestamp - timeCompression,
+                Position = frame.Position,
+                Rotation = frame.Rotation,
+                Animation = frame.Animation,
+                SpriteFlip = frame.SpriteFlip
+            };
+            filtered.Add(newFrame);
+            lastPos = frame.Position;
+        }
+        else
+        {
+            // No movement - accumulate time to compress
+            timeCompression += 0.1f; // Recording interval
+        }
+    }
+    
+    return filtered;
+}
 	private ReplayFrame FindFrameAtTime(float time)
 	{
 		// Find the frame that should be playing at this time
