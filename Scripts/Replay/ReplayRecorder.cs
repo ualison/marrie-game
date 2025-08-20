@@ -54,6 +54,23 @@ public partial class ReplayRecorder : Node
 		}
 	}
 
+	private void CaptureCurrentFrame()
+	{
+		// Use total elapsed time since recording started
+		float currentTime = Time.GetTicksMsec() / 1000.0f - _startTime;
+
+		// Record player state
+		if (_player != null)
+		{
+			_playerFrames.Add(CreateFrameForCharacter(_player, currentTime));
+		}
+
+		// Record monster state
+		if (_monster != null)
+		{
+			_monsterFrames.Add(CreateFrameForCharacter(_monster, currentTime));
+		}
+	}
 	// Stops recording and logs final frame count
 	public void StopRecording()
 	{
@@ -105,25 +122,9 @@ public partial class ReplayRecorder : Node
 	private void StartRecording()
 	{
 		IsRecording = true;
-		_recordTimer = 0f; // Start timer at 0
+		_recordTimer = 0f;
+		_startTime = Time.GetTicksMsec() / 1000.0f; // Store start time in seconds
 		GD.Print("ReplayRecorder: Started recording");
-	}
-
-	private void CaptureCurrentFrame()
-	{
-		float currentTime = _recordTimer; // Use accumulated record timer instead
-
-		// Record player state
-		if (_player != null)
-		{
-			_playerFrames.Add(CreateFrameForCharacter(_player, currentTime));
-		}
-
-		// Record monster state
-		if (_monster != null)
-		{
-			_monsterFrames.Add(CreateFrameForCharacter(_monster, currentTime));
-		}
 	}
 	// Creates replay frame from character's current state
 	private ReplayFrame CreateFrameForCharacter(Node2D character, float timestamp)

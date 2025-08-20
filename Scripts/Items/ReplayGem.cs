@@ -114,82 +114,68 @@ public partial class ReplayGem : Node2D
     }
 
     private void StartReplay()
-{
-    GD.Print("=== StartReplay called ===");
-    
-    GD.Print($"GameManager.Instance is null: {GameManager.Instance == null}");
-    
-    if (GameManager.Instance == null)
     {
-        GD.Print("GameManager.Instance is null - cannot get death record");
-        return;
-    }
-    
-    GD.Print("Calling GetLastDeathRecord...");
-    var deathRecord = GameManager.Instance.GetLastDeathRecord();
-    
-    if (deathRecord == null)
-    {
-        GD.Print("No death record available");
-        return;
-    }
+        GD.Print("=== StartReplay called ===");
 
-    var playerFrames = deathRecord.PlayerFrames;
-    GD.Print($"Using stored death record: {deathRecord.DeathId}");
-    GD.Print($"Player frames count: {playerFrames.Count}");
-
-    if (playerFrames.Count == 0)
-    {
-        GD.Print("No player frames to replay - EXITING");
-        return;
-    }
-
-    // Print first few frames for debugging
-    for (int i = 0; i < Mathf.Min(3, playerFrames.Count); i++)
-    {
-        var frame = playerFrames[i];
-        GD.Print($"Frame {i}: Time={frame.Timestamp}, Pos={frame.Position}");
-    }
-
-    // Clean up any existing ghost first
-    CleanupGhost();
-
-    // Try to find existing ghost player first
-    var ghostPlayer = GetTree().GetFirstNodeInGroup("ghost_player") as GhostPlayer;
-    GD.Print($"Found existing ghost: {ghostPlayer != null}");
-
-    // If no ghost exists, create one dynamically
-    if (ghostPlayer == null)
-    {
-        GD.Print("Creating new ghost...");
-        ghostPlayer = CreateGhostPlayer();
-        GD.Print($"Ghost created successfully: {ghostPlayer != null}");
-    }
-
-    if (ghostPlayer != null)
-    {
-        GD.Print("Starting ghost replay...");
-        ghostPlayer.StartReplay(playerFrames);
-        _currentGhost = ghostPlayer;
-
-        if (_promptLabel != null)
+        if (GameManager.Instance == null)
         {
-            _promptLabel.Hide();
+            GD.Print("GameManager.Instance is null - cannot get death record");
+            return;
         }
 
-        // Hide gem during replay (optional)
-        _gemSprite?.Hide();
+        var deathRecord = GameManager.Instance.GetLastDeathRecord();
+        if (deathRecord == null)
+        {
+            GD.Print("No death record available");
+            return;
+        }
 
-        GD.Print("Ghost replay started successfully");
+        var playerFrames = deathRecord.PlayerFrames;
+        GD.Print($"Player frames count: {playerFrames.Count}");
 
-        // Schedule cleanup after replay completes
-        ScheduleReplayCleanup(playerFrames);
+        if (playerFrames.Count == 0)
+        {
+            GD.Print("No player frames to replay");
+            return;
+        }
+
+        // CRITICAL: Clean up any existing ghosts first
+        CleanupGhost();
+
+        // Small delay to ensure cleanup completes
+        GetTree().CreateTimer(0.1f).Timeout += () =>
+        {
+            CreateAndStartGhost(playerFrames);
+        };
     }
-    else
+
+    private void CreateAndStartGhost(System.Collections.Generic.List<ReplayFrame> playerFrames)
     {
-        GD.Print("FAILED: Ghost player is null!");
+        // Create new ghost
+        var ghostPlayer = CreateGhostPlayer();
+
+        if (ghostPlayer != null)
+        {
+            GD.Print("Starting ghost replay...");
+            ghostPlayer.StartReplay(playerFrames);
+            _currentGhost = ghostPlayer;
+
+            if (_promptLabel != null)
+            {
+                _promptLabel.Hide();
+            }
+
+            // Hide gem during replay
+            _gemSprite?.Hide();
+
+            // Schedule cleanup after replay completes
+            ScheduleReplayCleanup(playerFrames);
+        }
+        else
+        {
+            GD.Print("FAILED: Could not create ghost player");
+        }
     }
-}
 
     private GhostPlayer CreateGhostPlayer()
     {
@@ -287,25 +273,42 @@ public partial class ReplayGem : Node2D
         if (frames.Count == 0) return;
 
         // Calculate total replay duration
-        float replayDuration = frames[frames.Count - 1].Timestamp + 1.0f; // Add 1 second buffer
+        float replayDuration = frames[frames.Count - 1].Timestamp + 1.0f;
 
         // Schedule cleanup
         GetTree().CreateTimer(replayDuration).Timeout += () =>
         {
             CleanupGhost();
-            _gemSprite?.Show(); // Show gem again after replay
-            GD.Print("Replay completed - ghost cleaned up");
+
+            // Always show gem again after replay, regardless of death count
+            if (_gemSprite != null && IsInstanceValid(this))
+            {
+                _gemSprite.Show();
+            }
+
+            GD.Print("Replay completed - ghost cleaned up, gem visible again");
         };
     }
-
     private void CleanupGhost()
     {
+        // Clean up current ghost reference
         if (_currentGhost != null && IsInstanceValid(_currentGhost))
         {
             _currentGhost.StopReplay();
             _currentGhost.QueueFree();
             _currentGhost = null;
-            GD.Print("Ghost player cleaned up");
+            GD.Print("Current ghost cleaned up");
+        }
+
+        // Clean up any other ghost players that might exist
+        var allGhosts = GetTree().GetNodesInGroup("ghost_player");
+        foreach (Node ghost in allGhosts)
+        {
+            if (IsInstanceValid(ghost))
+            {
+                ghost.QueueFree();
+                GD.Print("Additional ghost cleaned up");
+            }
         }
     }
 

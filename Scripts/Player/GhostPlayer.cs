@@ -15,6 +15,11 @@ public partial class GhostPlayer : CharacterBody2D
 	private Sprite2D _sprite;
 	private Node2D _activeSprite;
 
+	// Add these for smoothing
+	private Vector2 _currentPosition;
+	private Vector2 _targetPosition;
+	private float _smoothSpeed = 10.0f;
+
 	public override void _Ready()
 	{
 		SetupGhostVisuals();
@@ -29,20 +34,24 @@ public partial class GhostPlayer : CharacterBody2D
 	{
 		if (!_isReplaying || _replayFrames == null) return;
 
-		_replayStartTime += (float)delta;
-		var targetFrame = FindFrameAtTime(_replayStartTime);
+		float elapsedTime = Time.GetTicksMsec() / 1000.0f - _replayStartTime;
+		var targetFrame = FindFrameAtTime(elapsedTime);
 
 		if (targetFrame != null)
 		{
+			_targetPosition = targetFrame.Position;
 			ApplyFrameToGhost(targetFrame);
 		}
-		else
+		else if (_currentFrameIndex >= _replayFrames.Count)
 		{
-			// No more frames - stop replay
 			StopReplay();
+			return;
 		}
-	}
 
+		// Smooth position interpolation
+		_currentPosition = _currentPosition.Lerp(_targetPosition, _smoothSpeed * (float)delta);
+		GlobalPosition = _currentPosition;
+	}
 	public void StartReplay(List<ReplayFrame> frames)
 	{
 		if (frames == null || frames.Count == 0)
@@ -53,22 +62,17 @@ public partial class GhostPlayer : CharacterBody2D
 
 		_replayFrames = frames;
 		_currentFrameIndex = 0;
-		_replayStartTime = 0f; // Start from 0
+		_replayStartTime = Time.GetTicksMsec() / 1000.0f;
 		_isReplaying = true;
 
-		// Set starting position to first frame
-		if (frames.Count > 0)
-		{
-			GlobalPosition = frames[0].Position;
-		}
+		// Initialize smooth movement
+		_currentPosition = frames[0].Position;
+		_targetPosition = frames[0].Position;
+		GlobalPosition = _currentPosition;
 
 		Show();
 		GD.Print($"GhostPlayer: Started replay with {frames.Count} frames");
-		GD.Print($"GhostPlayer: First frame position: {frames[0].Position}");
-		GD.Print($"GhostPlayer: Ghost position: {GlobalPosition}");
-		GD.Print($"GhostPlayer: Ghost visible: {Visible}");
 	}
-
 	private ReplayFrame FindFrameAtTime(float time)
 	{
 		// Find the frame that should be playing at this time
@@ -193,8 +197,9 @@ public partial class GhostPlayer : CharacterBody2D
 	// Applies frame data to ghost's visual state
 	private void ApplyFrameToGhost(ReplayFrame frame)
 	{
-		// Update position and rotation
-		GlobalPosition = frame.Position;
+		// Don't update position here anymore - handled in _Process
+		// _targetPosition is set in _Process
+
 		GlobalRotation = frame.Rotation;
 
 		// Apply sprite flip

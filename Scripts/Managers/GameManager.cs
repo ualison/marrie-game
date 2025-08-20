@@ -33,11 +33,26 @@ public partial class GameManager : Node
         {
             Instance = this;
             ProcessMode = ProcessModeEnum.Always;
+
+            // CRITICAL: Ensure GameManager is attached to root and persists
+            CallDeferred(nameof(EnsurePersistentAtRoot));
+
             GD.Print("GameManager AutoLoad initialized");
         }
+        else if (Instance != this)
+        {
+            // If another instance exists, free this one
+            QueueFree();
+            return;
+        }
 
-        // Connect to scene changes
-        GetTree().NodeAdded += OnNodeAdded;
+        // Connect to scene changes with null check
+        var currentTree = GetTree();
+        if (currentTree != null)
+        {
+            currentTree.NodeAdded += OnNodeAdded;
+        }
+
         CallDeferred(nameof(Initialize));
     }
 
@@ -99,6 +114,8 @@ public partial class GameManager : Node
             deathRecord.PlayerFrames = ReplayRecorder.Instance.GetPlayerFrames();
             deathRecord.MonsterFrames = ReplayRecorder.Instance.GetMonsterFrames();
             ReplayRecorder.Instance.StopRecording();
+            // Clear old recording data for next session
+            ReplayRecorder.Instance.ClearRecording();
         }
 
         _deathRecords[_currentDeathId] = deathRecord;
@@ -106,7 +123,6 @@ public partial class GameManager : Node
 
         GetTree().CreateTimer(2.0f).Timeout += ShowGameOverScreen;
     }
-
     public DeathRecord GetLastDeathRecord()
     {
         GD.Print($"GetLastDeathRecord - Current ID: '{_currentDeathId}'");
@@ -138,50 +154,68 @@ public partial class GameManager : Node
 
     #region Scene Management
     // Restarts the game and reloads scene - gem will appear if replay data exists
-   public void RestartGame()
-{
-    // Add null check for GetTree()
-    if (GetTree() == null)
+    public void RestartGame()
     {
-        GD.PrintErr("GetTree() is null in RestartGame - cannot reload scene");
-        return;
-    }
-
-    // Store replay state before reload
-    bool shouldShowGem = HasReplayData && LastDeathPosition != Vector2.Zero;
-    Vector2 gemPosition = LastDeathPosition;
-
-    GD.Print($"🔄 Restart: shouldShowGem={shouldShowGem}, position={gemPosition}");
-    GD.Print($"Current HasReplayData: {HasReplayData}");
-
-    // Clear game over state but KEEP replay data
-    IsGameOver = false;
-
-    // Reload scene - add null check here too
-    var tree = GetTree();
-    if (tree?.CurrentScene != null)
-    {
-        tree.ReloadCurrentScene();
-    }
-    else
-    {
-        GD.PrintErr("Cannot reload scene - CurrentScene is null");
-        return;
-    }
-
-    // Backup: Force gem creation if the automatic system fails
-    if (shouldShowGem)
-    {
-        tree.CreateTimer(0.3f).Timeout += () =>
+        // Add comprehensive null checks
+        var tree = GetTree();
+        if (tree == null)
         {
-            if (_replayGem == null || !IsInstanceValid(_replayGem))
+            GD.PrintErr("GetTree() is null in RestartGame - GameManager may have been freed");
+            return;
+        }
+
+        if (tree.CurrentScene == null)
+        {
+            GD.PrintErr("CurrentScene is null - cannot reload scene");
+            return;
+        }
+
+        // Store replay state before reload
+        bool shouldShowGem = HasReplayData && LastDeathPosition != Vector2.Zero;
+        Vector2 gemPosition = LastDeathPosition;
+
+        GD.Print($"🔄 Restart: shouldShowGem={shouldShowGem}, position={gemPosition}");
+
+        // Clear game over state but KEEP replay data
+        IsGameOver = false;
+
+        // Store the timer reference to prevent disposal issues
+        if (shouldShowGem)
+        {
+            var timer = tree.CreateTimer(0.5f); // Increased delay
+            timer.Timeout += () =>
             {
-                GD.Print("🔧 Backup: Force creating gem after restart");
-                CreateAndShowReplayGem(gemPosition);
-            }
-        };
+                // Triple safety check before creating gem
+                if (IsInstanceValid(this) && GetTree() != null && GameManager.Instance == this)
+                {
+                    CreateAndShowReplayGem(gemPosition);
+                }
+            };
+        }
+
+        // Use CallDeferred to ensure we're not in the middle of signal processing
+        CallDeferred(nameof(DoSceneReload));
     }
-}
+
+    private void DoSceneReload()
+    {
+        // Additional safety check since this is called deferred
+        if (!IsInstanceValid(this))
+        {
+            GD.PrintErr("GameManager disposed before DoSceneReload could execute");
+            return;
+        }
+
+        var tree = GetTree();
+        if (tree?.CurrentScene != null)
+        {
+            tree.ReloadCurrentScene();
+        }
+        else
+        {
+            GD.PrintErr("Cannot reload scene - tree or CurrentScene is null");
+        }
+    }
     public void QuitGame() => GetTree().Quit();
     #endregion
 
@@ -249,6 +283,20 @@ public partial class GameManager : Node
     // Creates and positions the replay gem at death location
     private void CreateAndShowReplayGem(Vector2 position)
     {
+        // CRITICAL: Add disposal and validity checks at the start
+        if (!IsInstanceValid(this))
+        {
+            GD.PrintErr("GameManager disposed - cannot create ReplayGem");
+            return;
+        }
+
+        var tree = GetTree();
+        if (tree == null)
+        {
+            GD.PrintErr("GetTree() returned null - cannot create ReplayGem");
+            return;
+        }
+
         GD.Print($"CreateAndShowReplayGem called with position: {position}");
 
         var replayGemScene = GetReplayGemScene();
@@ -282,11 +330,18 @@ public partial class GameManager : Node
         }
 
         // Add to scene tree FIRST (this will trigger _Ready)
-        var parent = GetTree().CurrentScene;
+        var parent = tree.CurrentScene;
         if (parent == null)
         {
             GD.PrintErr("CurrentScene is null; cannot add ReplayGem. Will retry on next frame.");
-            GetTree().CreateTimer(0.016f).Timeout += () => CreateAndShowReplayGem(position);
+            // Don't retry if we're disposed - just fail gracefully
+            if (IsInstanceValid(this))
+            {
+                tree.CreateTimer(0.016f).Timeout += () =>
+                {
+                    if (IsInstanceValid(this)) CreateAndShowReplayGem(position);
+                };
+            }
             return;
         }
 
@@ -342,8 +397,8 @@ public partial class GameManager : Node
     #region Utility Methods
     private void EnsurePersistentAtRoot()
     {
-        var root = GetTree().Root;
-        if (GetParent() != root)
+        var tree = GetTree();
+        if (tree?.Root != null && GetParent() != tree.Root)
         {
             CallDeferred(nameof(ReparentToRoot));
         }
@@ -351,11 +406,16 @@ public partial class GameManager : Node
 
     private void ReparentToRoot()
     {
-        var root = GetTree().Root;
-        if (GetParent() != root)
+        var tree = GetTree();
+        if (tree?.Root != null && IsInstanceValid(this))
         {
-            Reparent(root);
-            GD.Print("GameManager reparented to Root for persistence across scene reloads.");
+            var currentParent = GetParent();
+            if (currentParent != tree.Root)
+            {
+                currentParent?.RemoveChild(this);
+                tree.Root.AddChild(this);
+                GD.Print("GameManager reparented to Root for persistence across scene reloads.");
+            }
         }
     }
 
@@ -387,6 +447,12 @@ public partial class GameManager : Node
         GD.Print($"LastDeathPosition: {LastDeathPosition}");
         GD.Print($"ReplayGem exists: {_replayGem != null && IsInstanceValid(_replayGem)}");
     }
+
+    // Add this method before the #region Cleanup
+    private bool IsValidAndInTree()
+    {
+        return IsInstanceValid(this) && IsInsideTree() && GetTree() != null;
+    }
     #endregion
 
     #region Cleanup
@@ -397,6 +463,12 @@ public partial class GameManager : Node
             GetTree().Root.ChildEnteredTree -= OnRootChildEntered;
             Instance = null;
         }
+    }
+
+    // Add this method before the #endregion Cleanup
+    private bool IsValidForOperations()
+    {
+        return IsInsideTree() && GetTree() != null && GetTree().CurrentScene != null;
     }
     #endregion
 }
