@@ -33,41 +33,43 @@ public partial class ReplayRecorder : Node
 
     #region Character References
     private Player _player;
-    private Monster _monster;
+    private Node2D _monster; // Can be Monster or FollowerMonster
     #endregion
 
     #region Initialization
     public override void _Ready()
     {
-        // Setup singleton pattern with persistence
-        if (Instance == null)
+        // Simple setup for scene node - no singleton needed
+        Instance = this;
+        ProcessMode = ProcessModeEnum.Always;
+        
+        GD.Print($"ReplayRecorder _Ready: {Name}, Parent: {GetParent()?.Name}");
+        
+        // Initialize immediately
+        DiscoverCharacters();
+        
+        // Start recording if player is available
+        if (_player != null)
         {
-            Instance = this;
-            ProcessMode = ProcessModeEnum.Always;
-            CallDeferred(nameof(InitializeRecording));
-        }
-        else if (Instance != this)
-        {
-            // Remove duplicate instances
-            QueueFree();
-            return;
+            StartRecording();
         }
         else
         {
-            // Reinitialize existing instance
-            CallDeferred(nameof(InitializeRecording));
+            // Retry in next frame if player not found yet
+            GetTree().CreateTimer(0.1f).Timeout += () => {
+                if (_player == null) {
+                    DiscoverCharacters();
+                    if (_player != null) {
+                        StartRecording();
+                    }
+                }
+            };
         }
     }
 
     public void InitializeRecording()
     {
-        // Ensure tree is available before initializing
-        if (GetTree() == null)
-        {
-            CallDeferred(nameof(InitializeRecording));
-            return;
-        }
-
+        // Simple initialization without complex deferred calling
         DiscoverCharacters();
 
         // Start recording if player is available
@@ -81,56 +83,45 @@ public partial class ReplayRecorder : Node
     {
         // Find player and monster characters in the scene
         _player = GetTree().GetFirstNodeInGroup("player") as Player;
-        _monster = GetTree().GetFirstNodeInGroup("enemies") as Monster;
+        
+        // Try FollowerMonster first, then regular Monster
+        _monster = GetTree().GetFirstNodeInGroup("enemies") as FollowerMonster;
+        if (_monster == null)
+        {
+            _monster = GetTree().GetFirstNodeInGroup("enemies") as Monster;
+        }
 
-        GD.Print($"ReplayRecorder discovered - Player: {_player != null}, Monster: {_monster != null}");
+        GD.Print($"ReplayRecorder discovered - Player: {_player != null}, Monster: {_monster != null} ({_monster?.GetType().Name})");
     }
     #endregion
 
     #region Core Recording Loop
     public override void _Process(double delta)
     {
+        // Always print this to verify _Process is being called
+        if (_playerFrames.Count < 5) // Only first 5 times to avoid spam
+        {
+            GD.Print($"_Process called: IsRecording={IsRecording}, Paused={_isPausedForReplay}, Timer={_recordTimer:F2}");
+        }
+
         // Skip processing if not recording
-        if (!IsRecording) return;
+        if (!IsRecording) 
+        {
+            return;
+        }
 
-        // Check if player is actually moving to avoid recording static frames
-        bool playerIsMoving = CheckPlayerMovement();
-
-        // Don't record if paused for replay or player is stationary
-        if (_isPausedForReplay || !playerIsMoving) return;
+        // Don't record if paused for replay
+        if (_isPausedForReplay) return;
 
         _recordTimer += (float)delta;
 
         // Record frame at specified intervals
         if (_recordTimer >= RecordInterval)
         {
+            GD.Print($"RECORDING FRAME! Timer={_recordTimer:F2}");
             CaptureCurrentFrame();
             _recordTimer = 0.0f;
         }
-    }
-
-    private bool CheckPlayerMovement()
-    {
-        // Determine if player has moved since last check
-        if (_player == null) return false;
-
-        Vector2 currentPosition = _player.GlobalPosition;
-        bool isMoving = currentPosition.DistanceTo(_lastPlayerPosition) > MIN_MOVEMENT_THRESHOLD;
-
-        if (isMoving)
-        {
-            // Player is moving - update last position
-            _lastPlayerPosition = currentPosition;
-            _playerWasMoving = true;
-        }
-        else if (_playerWasMoving)
-        {
-            // Player just stopped - record one final frame
-            _playerWasMoving = false;
-            return true;
-        }
-
-        return isMoving;
     }
 
     private void CaptureCurrentFrame()
@@ -144,11 +135,8 @@ public partial class ReplayRecorder : Node
             var frame = CreateFrameForCharacter(_player, currentTime);
             _playerFrames.Add(frame);
 
-            // Debug: Print every 10th frame to check for gaps
-            if (_playerFrames.Count % 10 == 0)
-            {
-                GD.Print($"Frame {_playerFrames.Count}: Time={currentTime:F2}s, Pos={frame.Position}");
-            }
+            // Debug: Print every frame to check recording
+            GD.Print($"Frame {_playerFrames.Count}: Time={currentTime:F2}s, Pos={frame.Position}");
         }
 
         // Record monster state if available
@@ -169,14 +157,10 @@ public partial class ReplayRecorder : Node
         _recordTimer = 0f;
         _startTime = Time.GetTicksMsec() / 1000.0f;
 
-        // Initialize movement tracking
-        if (_player != null)
-        {
-            _lastPlayerPosition = _player.GlobalPosition;
-            _playerWasMoving = true;
-        }
-
-        GD.Print("ReplayRecorder: Started new recording session");
+        GD.Print($"ReplayRecorder: Started new recording session - IsRecording={IsRecording}, Player exists: {_player != null}");
+        GD.Print($"Process mode: {ProcessMode}, Tree exists: {GetTree() != null}");
+        GD.Print($"Singleton check: Instance == this: {Instance == this}, Instance exists: {Instance != null}");
+        GD.Print($"Node name: {Name}, Parent: {GetParent()?.Name}, IsInsideTree: {IsInsideTree()}");
     }
 
     public void StopRecording()

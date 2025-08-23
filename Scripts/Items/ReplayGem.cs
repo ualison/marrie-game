@@ -5,6 +5,7 @@ public partial class ReplayGem : Node2D
 {
     #region Configuration
     [Export] public PackedScene GhostPlayerScene { get; set; } // Assign in inspector if available
+    [Export] public PackedScene GhostMonsterScene { get; set; } // Assign in inspector if available
     #endregion
 
     #region UI Components
@@ -16,6 +17,7 @@ public partial class ReplayGem : Node2D
     #region State
     private bool _playerNearby = false;
     private GhostPlayer _currentGhost;
+    private GhostMonster _currentGhostMonster; // Added for monster tracking
     #endregion
 
     #region Initialization
@@ -163,10 +165,10 @@ public partial class ReplayGem : Node2D
     }
     #endregion
 
-    #region Replay System
+    #region Replay System - ORIGINAL LOGIC PRESERVED
     private void StartReplay()
     {
-        // Initialize replay with data validation
+        // Initialize replay with data validation - ORIGINAL METHOD
         GD.Print("=== StartReplay called ===");
 
         // Pause recording immediately to prevent interference
@@ -181,14 +183,14 @@ public partial class ReplayGem : Node2D
         var playerFrames = deathRecord.PlayerFrames;
         if (!ValidateFrameData(playerFrames)) return;
 
-        // Clean up existing ghosts and start new replay
+        // Clean up existing ghosts and start new replay - ORIGINAL FLOW
         CleanupGhost();
-        GetTree().CreateTimer(0.1f).Timeout += () => CreateAndStartGhost(playerFrames);
+        GetTree().CreateTimer(0.1f).Timeout += () => CreateAndStartGhost(playerFrames, deathRecord.MonsterFrames);
     }
 
     private DeathRecord GetDeathRecord()
     {
-        // Retrieve death record from GameManager
+        // Retrieve death record from GameManager - ORIGINAL METHOD
         if (GameManager.Instance == null)
         {
             GD.Print("GameManager.Instance is null - cannot get death record");
@@ -200,7 +202,7 @@ public partial class ReplayGem : Node2D
 
     private bool ValidateFrameData(System.Collections.Generic.List<ReplayFrame> playerFrames)
     {
-        // Validate frame data before starting replay
+        // Validate frame data before starting replay - ORIGINAL METHOD
         GD.Print($"Player frames count: {playerFrames.Count}");
 
         if (playerFrames.Count == 0)
@@ -212,9 +214,10 @@ public partial class ReplayGem : Node2D
         return true;
     }
 
-    private void CreateAndStartGhost(System.Collections.Generic.List<ReplayFrame> playerFrames)
+    private void CreateAndStartGhost(System.Collections.Generic.List<ReplayFrame> playerFrames, 
+                                    System.Collections.Generic.List<ReplayFrame> monsterFrames)
     {
-        // Create ghost player and start replay
+        // Create and start ghost - ORIGINAL METHOD NAME AND FLOW
         var ghostPlayer = CreateGhostPlayer();
 
         if (ghostPlayer != null)
@@ -224,6 +227,13 @@ public partial class ReplayGem : Node2D
             PauseOriginalPlayer();
             StartGhostReplay(ghostPlayer, playerFrames);
             HideGemDuringReplay();
+            
+            // NEW: Add monster ghost if data available
+            if (monsterFrames != null && monsterFrames.Count > 0)
+            {
+                CreateAndStartMonsterGhost(monsterFrames);
+            }
+            
             ScheduleReplayCleanup(playerFrames);
         }
         else
@@ -232,9 +242,21 @@ public partial class ReplayGem : Node2D
         }
     }
 
+    private void CreateAndStartMonsterGhost(System.Collections.Generic.List<ReplayFrame> monsterFrames)
+    {
+        // NEW: Create monster ghost separately to avoid disrupting player flow
+        var ghostMonster = CreateGhostMonster();
+        if (ghostMonster != null)
+        {
+            ghostMonster.StartReplay(monsterFrames, "FollowerMonster");
+            _currentGhostMonster = ghostMonster;
+            GD.Print($"Ghost monster started with {monsterFrames.Count} frames");
+        }
+    }
+
     private void PauseOriginalPlayer()
     {
-        // Pause the original player during replay
+        // Pause the original player during replay - ORIGINAL METHOD
         var player = GetTree().GetFirstNodeInGroup("player") as Player;
         if (player != null)
         {
@@ -244,14 +266,14 @@ public partial class ReplayGem : Node2D
 
     private void StartGhostReplay(GhostPlayer ghostPlayer, System.Collections.Generic.List<ReplayFrame> playerFrames)
     {
-        // Start the ghost replay and track reference
+        // Start the ghost replay and track reference - ORIGINAL METHOD
         ghostPlayer.StartReplay(playerFrames);
         _currentGhost = ghostPlayer;
     }
 
     private void HideGemDuringReplay()
     {
-        // Hide UI elements during replay
+        // Hide UI elements during replay - ORIGINAL METHOD
         if (_promptLabel != null)
         {
             _promptLabel.Hide();
@@ -261,7 +283,7 @@ public partial class ReplayGem : Node2D
 
     private void ScheduleReplayCleanup(System.Collections.Generic.List<ReplayFrame> frames)
     {
-        // Schedule cleanup when replay completes
+        // Schedule cleanup when replay completes - ORIGINAL METHOD
         if (frames.Count == 0) return;
 
         float replayDuration = frames[frames.Count - 1].Timestamp + 1.0f;
@@ -274,7 +296,7 @@ public partial class ReplayGem : Node2D
 
     private void CleanupAfterReplay()
     {
-        // Restore game state after replay ends
+        // Restore game state after replay ends - ORIGINAL METHOD
         CleanupGhost();
         ResumeOriginalPlayer();
         RestartRecording();
@@ -285,7 +307,7 @@ public partial class ReplayGem : Node2D
 
     private void ResumeOriginalPlayer()
     {
-        // Resume the original player
+        // Resume the original player - ORIGINAL METHOD
         var player = GetTree().GetFirstNodeInGroup("player") as Player;
         if (player != null)
         {
@@ -295,7 +317,7 @@ public partial class ReplayGem : Node2D
 
     private void RestartRecording()
     {
-        // Restart recording after replay
+        // Restart recording after replay - ORIGINAL METHOD
         if (ReplayRecorder.Instance != null)
         {
             ReplayRecorder.Instance.InitializeRecording();
@@ -304,7 +326,7 @@ public partial class ReplayGem : Node2D
 
     private void ShowGemAfterReplay()
     {
-        // Show gem again after replay if still valid
+        // Show gem again after replay if still valid - ORIGINAL METHOD
         if (_gemSprite != null && IsInstanceValid(this))
         {
             _gemSprite.Show();
@@ -312,10 +334,10 @@ public partial class ReplayGem : Node2D
     }
     #endregion
 
-    #region Ghost Creation
+    #region Ghost Creation - ORIGINAL METHODS UNTOUCHED
     private GhostPlayer CreateGhostPlayer()
     {
-        // Create ghost player using available methods
+        // Create ghost player using available methods - ORIGINAL METHOD
         GhostPlayer ghost = null;
 
         // Try scene instantiation first if available
@@ -335,7 +357,7 @@ public partial class ReplayGem : Node2D
 
     private GhostPlayer CreateGhostFromScene()
     {
-        // Create ghost from scene file
+        // Create ghost from scene file - ORIGINAL METHOD
         var ghostNode = GhostPlayerScene.Instantiate();
         var ghost = ghostNode as GhostPlayer;
 
@@ -355,7 +377,7 @@ public partial class ReplayGem : Node2D
 
     private GhostPlayer CreateGhostProgrammatically()
     {
-        // Create ghost programmatically by copying original player structure
+        // Create ghost programmatically by copying original player structure - ORIGINAL METHOD
         var originalPlayer = GetTree().GetFirstNodeInGroup("player") as Player;
         if (originalPlayer == null)
         {
@@ -374,7 +396,7 @@ public partial class ReplayGem : Node2D
 
     private void CopySpriteStructure(Node originalPlayer, GhostPlayer ghost)
     {
-        // Copy sprite structure from original player to ghost
+        // Copy sprite structure from original player to ghost - ORIGINAL METHOD
         var originalAnimSprite = originalPlayer.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D")
                                 ?? originalPlayer.GetNodeOrNull<AnimatedSprite2D>("MarrieSprite");
 
@@ -390,7 +412,7 @@ public partial class ReplayGem : Node2D
 
     private void CreateGhostAnimatedSprite(AnimatedSprite2D originalAnimSprite, GhostPlayer ghost)
     {
-        // Create animated sprite for ghost
+        // Create animated sprite for ghost - ORIGINAL METHOD
         var ghostSprite = new AnimatedSprite2D
         {
             Name = originalAnimSprite.Name,
@@ -404,7 +426,7 @@ public partial class ReplayGem : Node2D
 
     private void CreateGhostStaticSprite(Node originalPlayer, GhostPlayer ghost)
     {
-        // Create static sprite for ghost as fallback
+        // Create static sprite for ghost as fallback - ORIGINAL METHOD
         var originalSprite2D = originalPlayer.GetNodeOrNull<Sprite2D>("Sprite2D")
                             ?? originalPlayer.GetNodeOrNull<Sprite2D>("MarrieSprite");
 
@@ -423,17 +445,121 @@ public partial class ReplayGem : Node2D
 
     private void AddGhostToScene(GhostPlayer ghost)
     {
-        // Add ghost to scene and group
+        // Add ghost to scene and group - ORIGINAL METHOD
         GetTree().CurrentScene.AddChild(ghost);
         ghost.AddToGroup("ghost_player");
     }
     #endregion
 
-    #region Cleanup
+    #region NEW Monster Ghost Creation
+    private GhostMonster CreateGhostMonster()
+    {
+        // Create ghost monster using available methods
+        GhostMonster ghost = null;
+
+        // Try scene instantiation first if available
+        if (GhostMonsterScene != null)
+        {
+            ghost = CreateGhostMonsterFromScene();
+        }
+
+        // Fallback to programmatic creation
+        if (ghost == null)
+        {
+            ghost = CreateGhostMonsterProgrammatically();
+        }
+
+        return ghost;
+    }
+
+    private GhostMonster CreateGhostMonsterFromScene()
+    {
+        // Create ghost monster from scene file
+        var ghostNode = GhostMonsterScene.Instantiate();
+        var ghost = ghostNode as GhostMonster;
+
+        if (ghost != null)
+        {
+            GetTree().CurrentScene.AddChild(ghost);
+            ghost.AddToGroup("ghost_monster");
+            GD.Print("Created ghost monster from scene file");
+        }
+        else
+        {
+            ghostNode?.QueueFree();
+        }
+
+        return ghost;
+    }
+
+    private GhostMonster CreateGhostMonsterProgrammatically()
+    {
+        // Create ghost monster programmatically
+        var originalMonster = GetTree().GetFirstNodeInGroup("enemies") as Node2D;
+        if (originalMonster == null)
+        {
+            GD.Print("Cannot create ghost monster - no original monster found");
+            return null;
+        }
+
+        var ghostMonster = new GhostMonster { Name = "GhostMonster" };
+        
+        CopyMonsterSpriteStructure(originalMonster, ghostMonster);
+        AddGhostMonsterToScene(ghostMonster);
+
+        GD.Print("Created ghost monster programmatically");
+        return ghostMonster;
+    }
+
+    private void CopyMonsterSpriteStructure(Node originalMonster, GhostMonster ghostMonster)
+    {
+        // Try AnimatedSprite2D first
+        var originalAnimSprite = originalMonster.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
+        
+        if (originalAnimSprite != null)
+        {
+            var ghostSprite = new AnimatedSprite2D
+            {
+                Name = originalAnimSprite.Name,
+                SpriteFrames = originalAnimSprite.SpriteFrames,
+                Animation = "idle"
+            };
+            ghostMonster.AddChild(ghostSprite);
+            GD.Print("Copied monster AnimatedSprite2D structure");
+        }
+        else
+        {
+            // Try Sprite2D fallback
+            var originalSprite = originalMonster.GetNodeOrNull<Sprite2D>("MonsterSprite")
+                              ?? originalMonster.GetNodeOrNull<Sprite2D>("Sprite2D");
+            
+            if (originalSprite != null)
+            {
+                var ghostSprite = new Sprite2D
+                {
+                    Name = originalSprite.Name,
+                    Texture = originalSprite.Texture
+                };
+                ghostMonster.AddChild(ghostSprite);
+                GD.Print("Copied monster Sprite2D structure");
+            }
+        }
+    }
+
+    private void AddGhostMonsterToScene(GhostMonster ghostMonster)
+    {
+        // Add ghost monster to scene and group
+        GetTree().CurrentScene.AddChild(ghostMonster);
+        ghostMonster.AddToGroup("ghost_monster");
+    }
+    #endregion
+
+    #region Cleanup - ORIGINAL METHOD PRESERVED + Monster Addition
     private void CleanupGhost()
     {
-        // Clean up current ghost and ensure game state is restored
+        // Clean up current ghost and ensure game state is restored - ORIGINAL METHOD
         CleanupCurrentGhost();
+        CleanupCurrentGhostMonster(); // Added monster cleanup
         CleanupAllGhosts();
         EnsurePlayerResumed();
         EnsureRecordingResumed();
@@ -441,7 +567,7 @@ public partial class ReplayGem : Node2D
 
     private void CleanupCurrentGhost()
     {
-        // Clean up tracked ghost reference
+        // Clean up tracked ghost reference - ORIGINAL METHOD
         if (_currentGhost != null && IsInstanceValid(_currentGhost))
         {
             _currentGhost.StopReplay();
@@ -451,11 +577,33 @@ public partial class ReplayGem : Node2D
         }
     }
 
+    private void CleanupCurrentGhostMonster()
+    {
+        // Clean up tracked monster ghost reference
+        if (_currentGhostMonster != null && IsInstanceValid(_currentGhostMonster))
+        {
+            _currentGhostMonster.StopReplay();
+            _currentGhostMonster.QueueFree();
+            _currentGhostMonster = null;
+            GD.Print("Current ghost monster cleaned up");
+        }
+    }
+
     private void CleanupAllGhosts()
     {
-        // Clean up any other ghost players that might exist
+        // Clean up any other ghost players that might exist - ORIGINAL METHOD EXPANDED
         var allGhosts = GetTree().GetNodesInGroup("ghost_player");
         foreach (Node ghost in allGhosts)
+        {
+            if (IsInstanceValid(ghost))
+            {
+                ghost.QueueFree();
+            }
+        }
+        
+        // Added monster cleanup
+        var allGhostMonsters = GetTree().GetNodesInGroup("ghost_monster");
+        foreach (Node ghost in allGhostMonsters)
         {
             if (IsInstanceValid(ghost))
             {
@@ -466,7 +614,7 @@ public partial class ReplayGem : Node2D
 
     private void EnsurePlayerResumed()
     {
-        // Ensure player is resumed if cleanup is called directly
+        // Ensure player is resumed if cleanup is called directly - ORIGINAL METHOD
         var player = GetTree().GetFirstNodeInGroup("player") as Player;
         if (player?.IsPaused() == true)
         {
@@ -476,7 +624,7 @@ public partial class ReplayGem : Node2D
 
     private void EnsureRecordingResumed()
     {
-        // Ensure recording is resumed if cleanup is called directly
+        // Ensure recording is resumed if cleanup is called directly - ORIGINAL METHOD
         if (ReplayRecorder.Instance != null)
         {
             ReplayRecorder.Instance.ResumeRecording();
@@ -485,7 +633,7 @@ public partial class ReplayGem : Node2D
 
     public override void _ExitTree()
     {
-        // Clean up when gem is removed from scene
+        // Clean up when gem is removed from scene - ORIGINAL METHOD
         CleanupGhost();
     }
     #endregion
