@@ -245,17 +245,19 @@ public partial class FollowerMonster : CharacterBody2D
         Vector2 currentPlayerPos = _player.GlobalPosition;
         float spawnDistance = _currentState == MonsterState.InitialWait ? MinSpawnDistance : FollowDistance;
 
+        // Ensure minimum safe distance to avoid immediate collision
+        float safeDistance = Mathf.Max(spawnDistance, 80.0f);
+
         // Randomly choose left or right side
         _shouldSpawnOnRight = GD.Randf() > 0.5f;
-        float xOffset = _shouldSpawnOnRight ? spawnDistance : -spawnDistance;
+        float xOffset = _shouldSpawnOnRight ? safeDistance : -safeDistance;
 
-        // Simple positioning: same Y as player, offset X
         Vector2 targetPosition = new Vector2(currentPlayerPos.X + xOffset, currentPlayerPos.Y);
 
         GlobalPosition = targetPosition;
         Velocity = Vector2.Zero;
 
-        GD.Print($"Monster positioned on {(_shouldSpawnOnRight ? "right" : "left")} side at distance {Mathf.Abs(xOffset)}");
+        GD.Print($"Monster positioned on {(_shouldSpawnOnRight ? "right" : "left")} side at distance {safeDistance}");
     }
 
     private void EnableCollisionAfterDelay()

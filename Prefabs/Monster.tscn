@@ -4,7 +4,7 @@
 [ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monsterv3.png" id="2_x8qak"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wqfq0"]
-size = Vector2(277, 369)
+size = Vector2(284, 369)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
 size = Vector2(262, 365)
@@ -27,7 +27,7 @@ MaxHiddenTime = 4.0
 position = Vector2(0, -4)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/DamageArea"]
-position = Vector2(3.5, 1.5)
+position = Vector2(4, 1.5)
 shape = SubResource("RectangleShape2D_wqfq0")
 debug_color = Color(0.764087, 0.04706, 0.125471, 0.42)
 

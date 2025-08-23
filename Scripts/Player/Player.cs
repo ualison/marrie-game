@@ -224,14 +224,48 @@ public partial class Player : CharacterBody2D
 
     private void SetupHurtBox()
     {
-        // Connect hurt box signals for damage detection
         _hurtBox = GetNodeOrNull<Area2D>("HurtBox");
         if (_hurtBox != null)
         {
-            _hurtBox.BodyEntered += OnHurtBoxBodyEntered;
-            _hurtBox.AreaEntered += OnHurtBoxAreaEntered;
+            // Remove the old enter-based detection:
+            // _hurtBox.BodyEntered += OnHurtBoxBodyEntered;
+            // _hurtBox.AreaEntered += OnHurtBoxAreaEntered;
+
+            // Use continuous overlap detection instead
+            var timer = new Timer { WaitTime = 0.1f, Autostart = true };
+            timer.Timeout += CheckForEnemyOverlap;
+            AddChild(timer);
         }
     }
+
+// Add this new method to Player.cs:
+private void CheckForEnemyOverlap()
+{
+    if (_hurtBox == null || _playerLife?.IsDead == true) return;
+    
+    var overlappingBodies = _hurtBox.GetOverlappingBodies();
+    var overlappingAreas = _hurtBox.GetOverlappingAreas();
+    
+    // Check overlapping bodies
+    foreach (Node2D body in overlappingBodies)
+    {
+        if (body.IsInGroup("enemies"))
+        {
+            ProcessDamageFromEnemy(body);
+            return; // Only process one enemy per check
+        }
+    }
+    
+    // Check overlapping areas
+    foreach (Area2D area in overlappingAreas)
+    {
+        if (area.IsInGroup("enemies"))
+        {
+            ProcessDamageFromEnemy(area);
+            return;
+        }
+    }
+}
 
     private void SetupVisualTimer()
     {
@@ -243,22 +277,24 @@ public partial class Player : CharacterBody2D
     #endregion
 
     #region Visual Effects
-  private void StartBlinkEffect()
+private void StartBlinkEffect()
 {
     if (_sprite == null) return;
 
     _isBlinking = true;
     _blinkTween?.Kill();
 
+    // Softer red color instead of pure red
+    var lightRed = new Color(1.0f, 0.6f, 0.6f, 1.0f);
+
     _blinkTween = CreateTween();
     _blinkTween.SetLoops();
-    _blinkTween.TweenProperty(_sprite, "modulate", Colors.Red, 0.15f);
+    _blinkTween.TweenProperty(_sprite, "modulate", lightRed, 0.15f);
     _blinkTween.TweenProperty(_sprite, "modulate", Colors.White, 0.15f);
 
     _visualTimer.WaitTime = 2.0f;
     _visualTimer.Start();
 }
-
     private void StopVisualEffects()
     {
         // Stop all visual effects and restore normal appearance

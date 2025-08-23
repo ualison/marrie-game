@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=13 format=3 uid="uid://bnv528gs1hngu"]
 
 [ext_resource type="Script" uid="uid://26nsb7j0ik8a" path="res://Scripts/Managers/GameManager.cs" id="1_03gy3"]
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
@@ -7,7 +7,9 @@
 [ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_wjun0"]
 [ext_resource type="PackedScene" uid="uid://jlrj0meior1r" path="res://Prefabs/UI/LifeBarUI.tscn" id="7_gfl13"]
 [ext_resource type="Script" uid="uid://dkqfskvbog86c" path="res://Scripts/Managers/EnemyManager.cs" id="7_r6l07"]
+[ext_resource type="Texture2D" uid="uid://dl1p663jvus6i" path="res://Art/Tree1.png" id="7_wjun0"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOverUI.tscn" id="8_4xied"]
+[ext_resource type="Texture2D" uid="uid://c3wsakw3ln5j3" path="res://Art/Tree2.png" id="8_j3sk6"]
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
 [ext_resource type="Script" uid="uid://ce4epv6lyxy1x" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
 
@@ -39,13 +41,31 @@ texture = ExtResource("2_8u8ny")
 z_index = -2
 position = Vector2(6, 294)
 
+[node name="Tree1" type="Sprite2D" parent="Level"]
+z_index = 3
+position = Vector2(-583, -172)
+scale = Vector2(0.669922, 0.649089)
+texture = ExtResource("7_wjun0")
+
+[node name="Tree2" type="Sprite2D" parent="Level"]
+z_index = -2
+position = Vector2(-92, -307)
+scale = Vector2(0.689453, 0.752604)
+texture = ExtResource("8_j3sk6")
+
+[node name="Tree3" type="Sprite2D" parent="Level"]
+z_index = 3
+position = Vector2(570, -145)
+scale = Vector2(0.693148, 0.60584)
+texture = ExtResource("7_wjun0")
+
 [node name="Characters" type="Node" parent="."]
 
 [node name="Monster" parent="Characters" instance=ExtResource("5_wjun0")]
-position = Vector2(281, 66)
+position = Vector2(301, 69)
 
 [node name="Player" parent="Characters" instance=ExtResource("4_e2fbs")]
-position = Vector2(-251, 117)
+position = Vector2(-327, 116)
 
 [node name="Systems" type="Node" parent="."]
 
