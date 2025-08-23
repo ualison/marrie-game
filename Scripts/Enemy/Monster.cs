@@ -12,7 +12,6 @@ public partial class Monster : CharacterBody2D
 	
 	public override void _Ready()
 	{
-		AddToGroup("monsters");
 		AddToGroup("enemies");
 		
 		InitializeComponents();
@@ -20,14 +19,14 @@ public partial class Monster : CharacterBody2D
 	}
 	
 	// Visual feedback when dealing damage to player
-	public void PlayDamageEffect()
-	{
-		if (_sprite == null) return;
-		
-		var tween = CreateTween();
-		tween.TweenProperty(_sprite, "modulate", Colors.Red, 0.1f);
-		tween.TweenProperty(_sprite, "modulate", Colors.White, 0.1f);
-	}
+public void PlayDamageEffect()
+{
+    if (_sprite == null) return;
+    
+    var tween = CreateTween();
+    tween.TweenProperty(_sprite, "modulate", Colors.Purple, 0.2f);
+    tween.TweenProperty(_sprite, "modulate", Colors.White, 0.3f);
+}
 	
 	private void InitializeComponents()
 	{

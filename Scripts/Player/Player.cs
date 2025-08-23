@@ -6,6 +6,7 @@ public partial class Player : CharacterBody2D
     #region Exported Properties
     [Export] public float Speed = 120.0f;
     [Export] public float JumpHeight = 100.0f;
+    [Export] public bool StartFacingRight = true; // Configurable initial direction
     #endregion
 
     #region Movement State
@@ -242,22 +243,21 @@ public partial class Player : CharacterBody2D
     #endregion
 
     #region Visual Effects
-    private void StartBlinkEffect()
-    {
-        // Create blinking effect during invulnerability
-        if (_sprite == null) return;
+  private void StartBlinkEffect()
+{
+    if (_sprite == null) return;
 
-        _isBlinking = true;
-        _blinkTween?.Kill();
+    _isBlinking = true;
+    _blinkTween?.Kill();
 
-        _blinkTween = CreateTween();
-        _blinkTween.SetLoops();
-        _blinkTween.TweenProperty(_sprite, "modulate:a", 0.3f, 0.15f);
-        _blinkTween.TweenProperty(_sprite, "modulate:a", 1.0f, 0.15f);
+    _blinkTween = CreateTween();
+    _blinkTween.SetLoops();
+    _blinkTween.TweenProperty(_sprite, "modulate", Colors.Red, 0.15f);
+    _blinkTween.TweenProperty(_sprite, "modulate", Colors.White, 0.15f);
 
-        _visualTimer.WaitTime = 2.0f;
-        _visualTimer.Start();
-    }
+    _visualTimer.WaitTime = 2.0f;
+    _visualTimer.Start();
+}
 
     private void StopVisualEffects()
     {
@@ -280,26 +280,33 @@ public partial class Player : CharacterBody2D
     private void OnHurtBoxBodyEntered(Node2D body)
     {
         // Handle collision with enemy bodies
-        if (body.IsInGroup("enemy"))
+        if (body.IsInGroup("enemies"))
             ProcessDamageFromEnemy(body);
     }
 
     private void OnHurtBoxAreaEntered(Area2D area)
     {
         // Handle collision with enemy areas
-        if (area.IsInGroup("enemy"))
+        if (area.IsInGroup("enemies"))
             ProcessDamageFromEnemy(area);
     }
 
-    private void ProcessDamageFromEnemy(Node2D enemy)
+    
+
+private void ProcessDamageFromEnemy(Node2D enemy)
+{
+    if (enemy is FollowerMonster follower && !follower.CanTakeDamage())
+        return;
+
+    if (TakeDamage(1))
     {
-        // Apply damage and knockback if successful
-        if (TakeDamage(1))
-        {
-            ApplyKnockback(enemy);
-            GD.Print($"Player took damage! Health: {_playerLife.CurrentLife}");
-        }
+        ApplyKnockback(enemy);
+        
+        // Make monster flash purple
+        if (enemy.HasMethod("PlayDamageEffect"))
+            enemy.Call("PlayDamageEffect");
     }
+}
 
     private void ApplyKnockback(Node2D source)
     {
@@ -343,7 +350,29 @@ public partial class Player : CharacterBody2D
         Velocity = Vector2.Zero;
         StopVisualEffects();
         RestoreNormalAppearance();
+
+        // Reset sprite direction to initial state
+        ResetSpriteDirection();
+
+        GD.Print("Player reset complete with direction reset");
     }
+
+private void ResetSpriteDirection()
+{
+    // Reset player to initial facing direction
+    _facingRight = StartFacingRight;
+    
+    if (_sprite != null)
+    {
+        var scale = _sprite.Scale;
+        _sprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
+        GD.Print($"Player sprite direction reset - facing right: {_facingRight}");
+    }
+    else
+    {
+        GD.Print("Player sprite not found for direction reset");
+    }
+}
 
     public void PausePlayer()
     {

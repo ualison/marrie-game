@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=11 format=3 uid="uid://bnv528gs1hngu"]
 
 [ext_resource type="Script" uid="uid://26nsb7j0ik8a" path="res://Scripts/Managers/GameManager.cs" id="1_03gy3"]
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
 [ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_wjun0"]
 [ext_resource type="PackedScene" uid="uid://jlrj0meior1r" path="res://Prefabs/UI/LifeBarUI.tscn" id="7_gfl13"]
+[ext_resource type="Script" uid="uid://dkqfskvbog86c" path="res://Scripts/Managers/EnemyManager.cs" id="7_r6l07"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOverUI.tscn" id="8_4xied"]
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
 [ext_resource type="Script" uid="uid://ce4epv6lyxy1x" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
@@ -41,12 +42,15 @@ position = Vector2(6, 294)
 [node name="Characters" type="Node" parent="."]
 
 [node name="Monster" parent="Characters" instance=ExtResource("5_wjun0")]
-position = Vector2(280, 61)
+position = Vector2(281, 66)
 
 [node name="Player" parent="Characters" instance=ExtResource("4_e2fbs")]
-position = Vector2(-236, 85)
+position = Vector2(-251, 117)
 
 [node name="Systems" type="Node" parent="."]
+
+[node name="EnemyManager" type="Node2D" parent="Systems"]
+script = ExtResource("7_r6l07")
 
 [node name="GameManager" type="Node2D" parent="Systems"]
 script = ExtResource("1_03gy3")
@@ -59,5 +63,5 @@ autoplay = true
 
 [node name="Camera2D" type="Camera2D" parent="Systems"]
 
-[node name="ReplayRecorder" type="Node" parent="Systems"]
+[node name="ReplayManager" type="Node" parent="Systems"]
 script = ExtResource("10_r6l07")

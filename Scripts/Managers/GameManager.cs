@@ -66,8 +66,27 @@ public partial class GameManager : Node
         DiscoverComponents();
         ConnectSystems();
         CachePlayerSpawn();
+
+        // Initialize EnemyManager integration
+        ConnectEnemyManager();
+
         GD.Print("GameManager initialized");
     }
+
+    private void ConnectEnemyManager()
+    {
+        // Connect to EnemyManager if it exists
+        if (EnemyManager.Instance != null)
+        {
+            GD.Print("GameManager: Connected to EnemyManager");
+        }
+        else
+        {
+            GD.Print("GameManager: EnemyManager not found - enemies will use default behavior");
+        }
+    }
+
+
 
     private void EnsurePersistentAtRoot()
     {
@@ -151,26 +170,103 @@ public partial class GameManager : Node
 
     public void RestartGame()
     {
-        // Restart game and reload scene with replay gem if data exists
-        var tree = GetTree();
-        if (!IsValidTree(tree)) return;
-
+        // Store replay state
         bool shouldShowGem = HasReplayData && LastDeathPosition != Vector2.Zero;
         Vector2 gemPosition = LastDeathPosition;
 
-        GD.Print($"Restart: shouldShowGem={shouldShowGem}, position={gemPosition}");
-
-        // Clear game over state but keep replay data
+        // Reset game state
         IsGameOver = false;
         ClearRecorderForNewSession();
 
-        // Schedule gem creation after scene reload
-        if (shouldShowGem)
+        // Debug: Log positions before reset
+        GD.Print($"=== GAME RESTART DEBUG ===");
+        GD.Print($"PlayerSpawnPosition: {PlayerSpawnPosition}");
+        GD.Print($"Player current position: {_player?.GlobalPosition}");
+
+        // Reset player to spawn position and state
+        if (_player != null)
         {
-            ScheduleGemCreation(tree, gemPosition);
+            GD.Print($"Resetting player from {_player.GlobalPosition} to {PlayerSpawnPosition}");
+            _player.GlobalPosition = PlayerSpawnPosition;
+            _player.Reset(); // Use existing Reset() method
+            GD.Print($"Player position after reset: {_player.GlobalPosition}");
+        }
+        else
+        {
+            GD.PrintErr("Player is null - cannot reset position!");
+            // Try to find player again
+            _player = GetTree().GetFirstNodeInGroup("player") as Player;
+            if (_player != null)
+            {
+                GD.Print("Found player, resetting position");
+                _player.GlobalPosition = PlayerSpawnPosition;
+                _player.Reset();
+            }
         }
 
-        CallDeferred(nameof(DoSceneReload));
+        // Notify EnemyManager of game restart
+        EnemyManager.Instance?.OnGameRestart();
+
+        // Hide game over UI
+        _gameOverUI?.HideGameOver();
+
+        // Create replay gem if needed
+        if (shouldShowGem)
+        {
+            CreateAndShowReplayGem(gemPosition);
+        }
+
+        // Start new recording session
+        if (ReplayRecorder.Instance != null)
+        {
+            ReplayRecorder.Instance.StartRecording();
+        }
+
+        // Restart background audio
+        RestartBackgroundAudio();
+
+        GD.Print("Game restarted without scene reload");
+    }
+
+    private void RestartBackgroundAudio()
+    {
+        // Use AudioManager singleton if available
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.RestartBackgroundMusic();
+            return;
+        }
+
+        // Fallback: find AudioManager by group or path
+        var audioManager = GetTree().GetFirstNodeInGroup("background_music") as AudioStreamPlayer2D;
+        if (audioManager == null)
+        {
+            audioManager = GetTree().CurrentScene?.GetNode<AudioStreamPlayer2D>("Systems/AudioManager");
+        }
+
+        if (audioManager != null)
+        {
+            audioManager.Stop();
+            audioManager.Play();
+            GD.Print("AudioManager restarted from beginning");
+        }
+        else
+        {
+            GD.PrintErr("AudioManager not found - check node setup");
+        }
+    }
+
+    private AudioStreamPlayer2D FindAudioPlayer2D(Node node)
+    {
+        // Recursively find AudioStreamPlayer2D
+        if (node is AudioStreamPlayer2D audio) return audio;
+
+        foreach (Node child in node.GetChildren())
+        {
+            var result = FindAudioPlayer2D(child);
+            if (result != null) return result;
+        }
+        return null;
     }
 
     private bool IsValidTree(SceneTree tree)
@@ -206,27 +302,12 @@ public partial class GameManager : Node
         };
     }
 
-    private void DoSceneReload()
+    // Update QuitGame to be more direct:
+    public void QuitGame()
     {
-        // Safely reload current scene
-        if (!IsInstanceValid(this))
-        {
-            GD.PrintErr("GameManager disposed before DoSceneReload could execute");
-            return;
-        }
-
-        var tree = GetTree();
-        if (tree?.CurrentScene != null)
-        {
-            tree.ReloadCurrentScene();
-        }
-        else
-        {
-            GD.PrintErr("Cannot reload scene - tree or CurrentScene is null");
-        }
+        GetTree()?.Quit();
     }
 
-    public void QuitGame() => GetTree().Quit(); // Exit application
     #endregion
 
     #region Death System
@@ -238,6 +319,9 @@ public partial class GameManager : Node
         LastDeathPosition = deathPosition;
         IsGameOver = true;
         HasReplayData = true;
+
+        // Notify EnemyManager of player death
+        EnemyManager.Instance?.OnPlayerDeath();
 
         RecordDeathData(deathPosition);
         GetTree().CreateTimer(2.0f).Timeout += ShowGameOverScreen;
@@ -253,7 +337,7 @@ public partial class GameManager : Node
         GD.Print($"GameManager: Player died at {deathPosition} - recording as {_currentDeathId}");
 
         var deathRecord = new DeathRecord(_currentDeathId, deathPosition);
-        
+
         if (ReplayRecorder.Instance != null)
         {
             // Capture current session frames before stopping

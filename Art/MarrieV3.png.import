@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b8enx5tgxhj2i"
-path="res://.godot/imported/Marrie.png-b35e292022282d7f578c45550f80c895.ctex"
+uid="uid://dubgbfarwhdd5"
+path="res://.godot/imported/MarrieV3.png-0e752555069293e080aaf451bfbba850.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Art/Marrie.png"
-dest_files=["res://.godot/imported/Marrie.png-b35e292022282d7f578c45550f80c895.ctex"]
+source_file="res://Art/MarrieV3.png"
+dest_files=["res://.godot/imported/MarrieV3.png-0e752555069293e080aaf451bfbba850.ctex"]
 
 [params]
 

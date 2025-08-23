@@ -81,7 +81,7 @@ public partial class ReplayRecorder : Node
     {
         // Find player and monster characters in the scene
         _player = GetTree().GetFirstNodeInGroup("player") as Player;
-        _monster = GetTree().GetFirstNodeInGroup("monsters") as Monster;
+        _monster = GetTree().GetFirstNodeInGroup("enemies") as Monster;
 
         GD.Print($"ReplayRecorder discovered - Player: {_player != null}, Monster: {_monster != null}");
     }
@@ -160,7 +160,7 @@ public partial class ReplayRecorder : Node
     #endregion
 
     #region Recording Control
-    private void StartRecording()
+    public void StartRecording()
     {
         // Clear previous data and start fresh recording session
         ClearRecording();
