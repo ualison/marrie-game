@@ -12,6 +12,7 @@ public partial class FollowerMonster : CharacterBody2D
     [Export] public float MaxVisibleTime = 90.0f;
     [Export] public float MinHiddenTime = 10.0f;
     [Export] public float MaxHiddenTime = 45.0f;
+    public bool IsDisabledForReplay { get; private set; } = false;
     #endregion
 
     #region State
@@ -97,8 +98,52 @@ public partial class FollowerMonster : CharacterBody2D
     #endregion
 
     #region Physics
+
+    public void DisableForReplay()
+    {
+        IsDisabledForReplay = true;
+        SetProcessMode(ProcessModeEnum.Disabled);
+        Hide();
+    }
+
+    public void EnableAfterReplay()
+    {
+        IsDisabledForReplay = false;
+        SetProcessMode(ProcessModeEnum.Always);
+
+        // Make monster visible and pause state switching for a moment
+        if (_spriteNode != null)
+        {
+            _spriteNode.Visible = true;
+            _spriteNode.Modulate = Colors.White;
+            Show();
+        }
+
+        // Don't immediately start new behavior - stay visible for a bit
+        _stateTimer.Stop();
+        _currentState = MonsterState.Following;
+        _isVisible = true;
+        _isFullyVisible = true;
+
+        // Enable collision
+        SetCollisionMask(1u);
+        SetCollisionLayer(1u);
+
+        // Wait a few seconds before resuming normal behavior
+        GetTree().CreateTimer(3.0f).Timeout += () =>
+        {
+            if (!IsDisabledForReplay) // Still enabled
+            {
+                StartFollowing(); // Resume normal behavior
+            }
+        };
+
+        GD.Print("FollowerMonster enabled after replay - will resume normal behavior in 3 seconds");
+    }
     public override void _PhysicsProcess(double delta)
     {
+        if (IsDisabledForReplay) return;
+
         if (_player?.GetLifeSystem()?.IsDead != false) return;
 
         if (_currentState == MonsterState.Following)

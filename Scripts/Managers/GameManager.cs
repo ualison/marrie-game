@@ -311,21 +311,33 @@ public partial class GameManager : Node
     #endregion
 
     #region Death System
-    public void PlayerDied(Vector2 deathPosition)
+   public void PlayerDied(Vector2 deathPosition)
+{
+    // Handle player death and record replay data
+    if (IsGameOver) return;
+
+    // Don't allow death during replay
+    if (ReplayRecorder.Instance != null && ReplayRecorder.Instance.IsRecording == false)
     {
-        // Handle player death and record replay data
-        if (IsGameOver) return;
-
-        LastDeathPosition = deathPosition;
-        IsGameOver = true;
-        HasReplayData = true;
-
-        // Notify EnemyManager of player death
-        EnemyManager.Instance?.OnPlayerDeath();
-
-        RecordDeathData(deathPosition);
-        GetTree().CreateTimer(2.0f).Timeout += ShowGameOverScreen;
+        GD.Print("Ignoring player death during replay");
+        return;
     }
+
+    GD.Print($"GameManager: Player died at {deathPosition}");
+    
+    // Set game state
+    IsGameOver = true;
+    LastDeathPosition = deathPosition;
+    HasReplayData = true;
+    
+    // Record death data for replay
+    RecordDeathData(deathPosition);
+    
+    // Show game over screen
+    ShowGameOverScreen();
+    
+    GD.Print("GameManager: Game over sequence complete");
+}
 
     private void RecordDeathData(Vector2 deathPosition)
     {
@@ -378,11 +390,12 @@ public partial class GameManager : Node
             GD.Print($"  Record: {kvp.Key} with {kvp.Value.PlayerFrames.Count} frames");
         }
     }
-
     private void OnPlayerHealthDepleted()
     {
         // Handle health depletion event
         if (IsGameOver) return;
+
+        GD.Print($"OnPlayerHealthDepleted called - Recording: {ReplayRecorder.Instance?.IsRecording}, GameOver: {IsGameOver}");
 
         Vector2 deathPosition = _player?.GlobalPosition ?? Vector2.Zero;
         PlayerDied(deathPosition);

@@ -53,7 +53,9 @@ public partial class GhostMonster : CharacterBody2D
         }
         else if (_currentFrameIndex >= _replayFrames.Count)
         {
-            StopReplay();
+            _isReplaying = false;
+            GD.Print($"GhostMonster: Replay completed at frame {_currentFrameIndex}/{_replayFrames.Count}");
+            GD.Print($"Ghost monster sprite visible: {_activeSprite?.Visible}");
             return;
         }
 
@@ -81,15 +83,33 @@ public partial class GhostMonster : CharacterBody2D
         _currentPosition = GlobalPosition;
         _targetPosition = GlobalPosition;
 
-        Show();
+        // Start with fade in effect like original monster
+        FadeIn();
         GD.Print($"GhostMonster: Started replay with {frames.Count} frames ({monsterType})");
     }
 
     public void StopReplay()
     {
         _isReplaying = false;
-        Hide();
         GD.Print("GhostMonster: Replay stopped");
+    }
+
+    public void FadeOutAndDestroy()
+    {
+        // Called by ReplayGem for cleanup with proper timing
+        if (_activeSprite == null)
+        {
+            QueueFree();
+            return;
+        }
+
+        var tween = CreateTween();
+        tween.TweenProperty(_activeSprite, "modulate:a", 0.0f, 0.5f);
+        tween.TweenCallback(Callable.From(() =>
+        {
+            GD.Print("Ghost monster faded out and destroyed");
+            QueueFree();
+        }));
     }
 
     public bool IsReplaying() => _isReplaying;
@@ -140,6 +160,7 @@ public partial class GhostMonster : CharacterBody2D
         ApplyGhostEffect();
     }
 
+
     private void DiscoverSpriteComponents()
     {
         // Try animated sprite first
@@ -147,19 +168,23 @@ public partial class GhostMonster : CharacterBody2D
         if (_animatedSprite != null)
         {
             _activeSprite = _animatedSprite;
+            GD.Print("GhostMonster: Found AnimatedSprite2D");
             return;
         }
 
-        // Try static sprites
-        _sprite = GetNodeOrNull<Sprite2D>("MonsterSprite") 
-            ?? GetNodeOrNull<Sprite2D>("GhostMonsterSprite");
+        // Try static sprites - match the names from original monsters
+        _sprite = GetNodeOrNull<Sprite2D>("MonsterSprite")  // This is what FollowerMonster uses
+               ?? GetNodeOrNull<Sprite2D>("GhostMonsterSprite")  // Fallback
+               ?? GetNodeOrNull<Sprite2D>("Sprite2D");
 
         if (_sprite != null)
         {
             _activeSprite = _sprite;
+            GD.Print($"GhostMonster: Found sprite: {_sprite.Name}");
         }
         else
         {
+            GD.Print("GhostMonster: No sprite found, creating fallback");
             CreateFallbackVisual();
         }
     }
@@ -191,8 +216,49 @@ public partial class GhostMonster : CharacterBody2D
 
     private void DisableCollisions()
     {
+        // Disable physics collision
         SetCollisionLayerValue(1, false);
         SetCollisionMaskValue(1, false);
+
+        // Disable any damage areas that might exist
+        var damageArea = GetNodeOrNull<Area2D>("DamageArea");
+        if (damageArea != null)
+        {
+            damageArea.SetCollisionLayerValue(1, false);
+            damageArea.SetCollisionMaskValue(1, false);
+            damageArea.Monitoring = false;
+            damageArea.Monitorable = false;
+            GD.Print("Ghost monster damage area disabled");
+        }
+
+        // Disable any other Area2D nodes that might cause interactions
+        foreach (Node child in GetChildren())
+        {
+            if (child is Area2D area)
+            {
+                area.Monitoring = false;
+                area.Monitorable = false;
+                area.SetCollisionLayerValue(1, false);
+                area.SetCollisionMaskValue(1, false);
+            }
+        }
+    }
+
+    private void FadeIn()
+    {
+        if (_activeSprite == null) return;
+
+        // Make sure the ghost monster is shown and visible
+        Show(); // Add this line - ensures the CharacterBody2D itself is visible
+        _activeSprite.Visible = true;
+        _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, 0);
+
+        var tween = CreateTween();
+        tween.TweenProperty(_activeSprite, "modulate:a", GHOST_TINT.A, 0.5f);
+        tween.TweenCallback(Callable.From(() =>
+        {
+            GD.Print($"Ghost monster fully visible at {GlobalPosition}");
+        }));
     }
     #endregion
 }
