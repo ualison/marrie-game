@@ -10,6 +10,9 @@ public static class GameEventSystem
     // Player Events
     public static event Action<Vector2, int> PlayerDied;
     public static event Action<int, int> PlayerHealthChanged;
+    public static event Action<int, int> PlayerManaChanged;
+    public static event Action PlayerManaRestored;
+    public static event Action PlayerManaDepleted;
     
     // Game State Events
     public static event Action<string> GameStateChanged;
@@ -28,6 +31,21 @@ public static class GameEventSystem
     public static void OnPlayerHealthChanged(int currentHealth, int maxHealth)
     {
         PlayerHealthChanged?.Invoke(currentHealth, maxHealth);
+    }
+    
+    public static void OnPlayerManaChanged(int currentMana, int maxMana)
+    {
+        PlayerManaChanged?.Invoke(currentMana, maxMana);
+    }
+    
+    public static void OnPlayerManaRestored()
+    {
+        PlayerManaRestored?.Invoke();
+    }
+    
+    public static void OnPlayerManaDepleted()
+    {
+        PlayerManaDepleted?.Invoke();
     }
     #endregion
     
@@ -60,6 +78,9 @@ public static class GameEventSystem
     {
         PlayerDied = null;
         PlayerHealthChanged = null;
+        PlayerManaChanged = null;
+        PlayerManaRestored = null;
+        PlayerManaDepleted = null;
         GameStateChanged = null;
         GameRestart = null;
         GameRestarted = null;

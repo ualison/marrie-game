@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c8u1u42hhwaci"
-path="res://.godot/imported/FullHeart.png-87eb49fe70b7e456b14def0283c4bf90.ctex"
+uid="uid://bwwymn4vuk225"
+path="res://.godot/imported/AppleMana.png-cc163cea960a5adaaa904684a55047e5.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Art/FullHeart.png"
-dest_files=["res://.godot/imported/FullHeart.png-87eb49fe70b7e456b14def0283c4bf90.ctex"]
+source_file="res://Art/AppleMana.png"
+dest_files=["res://.godot/imported/AppleMana.png-cc163cea960a5adaaa904684a55047e5.ctex"]
 
 [params]
 

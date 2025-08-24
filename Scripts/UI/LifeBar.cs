@@ -1,7 +1,7 @@
 using Godot;
 
 // Player health display with flexible heart representation and automatic PlayerLife connection
-public partial class LifeBarUI : Control
+public partial class LifeBar : Control
 {
     #region Configuration
     [Export] public Texture2D FullHeartTexture { get; set; }

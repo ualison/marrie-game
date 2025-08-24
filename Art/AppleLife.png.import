@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bw6408wklaekv"
-path="res://.godot/imported/EmptyHeart.png-6d021018db4d1e5dcfb8a846e8a52b0c.ctex"
+uid="uid://drdwnrxrmpqqt"
+path="res://.godot/imported/AppleLife.png-f99815a8d875e5d2f873037eebd8b3bb.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Art/EmptyHeart.png"
-dest_files=["res://.godot/imported/EmptyHeart.png-6d021018db4d1e5dcfb8a846e8a52b0c.ctex"]
+source_file="res://Art/AppleLife.png"
+dest_files=["res://.godot/imported/AppleLife.png-f99815a8d875e5d2f873037eebd8b3bb.ctex"]
 
 [params]
 

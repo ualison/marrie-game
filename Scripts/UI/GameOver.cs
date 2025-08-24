@@ -1,7 +1,7 @@
 using Godot;
 
 // Game over screen UI controller with smooth transitions and flexible messaging
-public partial class GameOverUI : Control
+public partial class GameOver : Control
 {
     #region Configuration
     [Export] public string GameOverMessage { get; set; } = "Game Over!";
