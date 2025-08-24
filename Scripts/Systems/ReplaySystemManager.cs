@@ -89,6 +89,9 @@ public partial class ReplaySystemManager : Node
         _recorder.StopRecording();
         SaveDeathRecord(deathPosition);
         
+        // FIXED: Don't create gem immediately - wait for next game reload/restart
+        Log.Debug($"Death recorded at {deathPosition} - gem will appear on next reload", "ReplaySystemManager");
+        
         Log.Replay($"Player death recorded at {deathPosition} (Total deaths: {_deathRecords.Count})", "ReplaySystemManager");
     }
 
@@ -99,20 +102,14 @@ public partial class ReplaySystemManager : Node
         
         Log.Debug($"OnGameRestart - Before: Current death ID: '{_currentDeathId}', Total deaths: {_deathRecords.Count}", "ReplaySystemManager");
         
-        // Find the most recent death record by timestamp
-        DeathRecord lastDeath = null;
-        if (_deathRecords.Count > 0)
-        {
-            lastDeath = _deathRecords.Values
-                .OrderByDescending(record => record.DeathTime)
-                .FirstOrDefault();
-        }
+        // FIXED: Use consistent method to get the most recent death record
+        DeathRecord lastDeath = GetLastDeathRecord();
         
         // Set current death ID to the most recent death for ReplayGem usage
         if (lastDeath != null)
         {
             _currentDeathId = lastDeath.DeathId;
-            Log.Debug($"Set current death ID to: {_currentDeathId} (DeathTime: {lastDeath.DeathTime})", "ReplaySystemManager");
+            Log.Debug($"Set current death ID to: {_currentDeathId} (DeathTime: {lastDeath.DeathTime}, DeathSequence: {lastDeath.DeathSequence})", "ReplaySystemManager");
         }
         else
         {
@@ -127,12 +124,20 @@ public partial class ReplaySystemManager : Node
             _recorder.StartRecording(); // Start fresh recording
         }
         
-        // Create ReplayGem at beginning of new session if we have previous deaths
+        // FIXED: Always create gem on game restart if we have previous deaths
+        // This ensures gem appears only on next reload, not during GameOver UI
         if (lastDeath != null)
         {
-            Log.Debug($"Creating ReplayGem at death position: {lastDeath.DeathPosition}", "ReplaySystemManager");
+            // Clean up any existing gem first (should not exist, but safety check)
+            CleanupCurrentGem();
+            
+            Log.Debug($"Creating ReplayGem at LAST death position: {lastDeath.DeathPosition} (DeathId: {lastDeath.DeathId}, Sequence: {lastDeath.DeathSequence})", "ReplaySystemManager");
             CreateReplayGem(lastDeath.DeathPosition);
-            Log.Replay($"ReplayGem created at game start from previous death at {lastDeath.DeathPosition}", "ReplaySystemManager");
+            Log.Replay($"ReplayGem created on game restart at LAST death position {lastDeath.DeathPosition}", "ReplaySystemManager");
+        }
+        else
+        {
+            Log.Debug("No previous deaths found, not creating ReplayGem", "ReplaySystemManager");
         }
         
         Log.Replay($"Game restarted - recorder reset, death records preserved ({_deathRecords.Count} deaths)", "ReplaySystemManager");
@@ -143,6 +148,7 @@ public partial class ReplaySystemManager : Node
     private void SaveDeathRecord(Vector2 deathPosition)
     {
         _currentDeathId = GenerateDeathId();
+        // FIXED: Use _deathRecords.Count as the next sequence (0, 1, 2, etc.)
         var record = new DeathRecord(_currentDeathId, deathPosition, _deathRecords.Count)
         {
             PlayerFrames = _recorder.GetPlayerFrames(),
@@ -152,7 +158,7 @@ public partial class ReplaySystemManager : Node
         _deathRecords[_currentDeathId] = record;
 
         var stats = _recorder.GetStats();
-        Log.Debug($"SaveDeathRecord - New death ID: {_currentDeathId} at {deathPosition}, DeathTime: {record.DeathTime}, DeathSequence: {record.DeathSequence}, Total deaths: {_deathRecords.Count}", "ReplaySystemManager");
+        Log.Debug($"SaveDeathRecord - New death ID: {_currentDeathId} at {deathPosition}, DeathTime: {record.DeathTime}, DeathSequence: {record.DeathSequence}, Total deaths: {_deathRecords.Count + 1}", "ReplaySystemManager");
         Log.Replay($"Death record saved: {record.TotalFrames} frames, {stats.duration:F1}s duration at position {deathPosition}", "ReplaySystemManager");
     }    private string GenerateDeathId()
     {

@@ -116,6 +116,7 @@ public static class ReplayEntityFactory
         
         // Set position before adding to tree
         gem.GlobalPosition = position;
+        Log.Debug($"ReplayEntityFactory: Set gem GlobalPosition to {position}", "ReplayEntityFactory");
         
         // Use call_deferred to avoid physics flush conflicts
         parent.CallDeferred(Node.MethodName.AddChild, gem);
