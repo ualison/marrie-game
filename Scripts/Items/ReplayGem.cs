@@ -172,7 +172,7 @@ public partial class ReplayGem : Node2D
     #region Replay System - ORIGINAL LOGIC PRESERVED
     private void StartReplay()
     {
-        // Initialize replay with data validation - ORIGINAL METHOD
+        // Initialize replay with data validation - FIXED: Ensure recording is always resumed
         Log.Replay("=== StartReplay called ===", "ReplayGem");
 
         // Pause recording immediately to prevent interference
@@ -182,10 +182,22 @@ public partial class ReplayGem : Node2D
         }
 
         var deathRecord = GetDeathRecord();
-        if (deathRecord == null) return;
+        if (deathRecord == null) 
+        {
+            // Resume recording if death record is null
+            if (ReplayRecorder.Instance != null)
+            {
+                ReplayRecorder.Instance.ResumeRecording();
+            }
+            return;
+        }
 
         var playerFrames = deathRecord.PlayerFrames;
-        if (!ValidateFrameData(playerFrames)) return;
+        if (!ValidateFrameData(playerFrames)) 
+        {
+            // Recording is already resumed in ValidateFrameData for empty frames
+            return;
+        }
 
         // Clean up existing ghosts and start new replay - ORIGINAL FLOW
         CleanupGhost();
@@ -206,12 +218,17 @@ public partial class ReplayGem : Node2D
 
     private bool ValidateFrameData(System.Collections.Generic.List<ReplayFrame> playerFrames)
     {
-        // Validate frame data before starting replay - ORIGINAL METHOD
+        // Validate frame data before starting replay - FIXED: Handle empty frames gracefully
         Log.Replay($"Player frames count: {playerFrames.Count}", "ReplayGem");
 
         if (playerFrames.Count == 0)
         {
             Log.Warning("No player frames to replay", "ReplayGem");
+            // Resume recording immediately if no frames to replay
+            if (ReplayRecorder.Instance != null)
+            {
+                ReplayRecorder.Instance.ResumeRecording();
+            }
             return false;
         }
 
@@ -376,9 +393,11 @@ public partial class ReplayGem : Node2D
 
     private void RestartRecording()
     {
-        // Restart recording after replay - ORIGINAL METHOD
+        // Restart recording after replay - FIXED: Ensure recording is fully restarted
         if (ReplayRecorder.Instance != null)
         {
+            ReplayRecorder.Instance.ResumeRecording();
+            ReplayRecorder.Instance.RefreshCharacterReferences();
             ReplayRecorder.Instance.InitializeRecording();
         }
     }
@@ -705,10 +724,18 @@ public partial class ReplayGem : Node2D
 
     private void EnsureRecordingResumed()
     {
-        // Ensure recording is resumed if cleanup is called directly - ORIGINAL METHOD
+        // Ensure recording is resumed if cleanup is called directly - FIXED: Force restart if needed
         if (ReplayRecorder.Instance != null)
         {
             ReplayRecorder.Instance.ResumeRecording();
+            
+            // If recording is not actually running, force restart
+            if (!ReplayRecorder.Instance.IsRecording)
+            {
+                Log.Warning("Recording was not active, forcing restart", "ReplayGem");
+                ReplayRecorder.Instance.RefreshCharacterReferences();
+                ReplayRecorder.Instance.InitializeRecording();
+            }
         }
     }
 

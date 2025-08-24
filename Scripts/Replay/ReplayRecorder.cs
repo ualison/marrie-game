@@ -20,6 +20,7 @@ public partial class ReplayRecorder : Node
 
     #region Properties
     public bool IsRecording { get; private set; }
+    public bool IsPausedForReplay => _isPausedForReplay;
     public bool HasRecordedData => _playerFrames.Count > 0 || _monsterFrames.Count > 0;
     #endregion
 
@@ -142,7 +143,7 @@ public partial class ReplayRecorder : Node
             _playerWasMoving = true;
         }
         
-        Log.Replay($"Started recording - Player: {_player != null}", "ReplayRecorder");
+        Log.Replay($"Started recording - Player: {_player != null}, IsRecording: {IsRecording}, IsPausedForReplay: {_isPausedForReplay}", "ReplayRecorder");
     }
 
     public void StopRecording()
@@ -170,7 +171,7 @@ public partial class ReplayRecorder : Node
     public void ResumeRecording()
     {
         _isPausedForReplay = false;
-        Log.Replay("Recording resumed", "ReplayRecorder");
+        Log.Replay($"Recording resumed - IsRecording: {IsRecording}, IsPausedForReplay: {_isPausedForReplay}", "ReplayRecorder");
     }
     #endregion
 

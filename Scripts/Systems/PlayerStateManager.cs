@@ -126,8 +126,15 @@ public partial class PlayerStateManager : Node
     {
         if (IsPlayerDead) return;
         
-        // Don't allow death during replay
-        if (ReplayRecorder.Instance != null && ReplayRecorder.Instance.IsRecording == false)
+        // Debug logging for replay state
+        bool recorderExists = ReplayRecorder.Instance != null;
+        bool isPausedForReplay = recorderExists && ReplayRecorder.Instance.IsPausedForReplay;
+        bool isRecording = recorderExists && ReplayRecorder.Instance.IsRecording;
+        
+        Log.Debug($"Death handler - Recorder exists: {recorderExists}, IsPausedForReplay: {isPausedForReplay}, IsRecording: {isRecording}", "PlayerStateManager");
+        
+        // Don't allow death during replay - FIXED: Check for replay pause specifically
+        if (ReplayRecorder.Instance != null && ReplayRecorder.Instance.IsPausedForReplay)
         {
             Log.Replay("Ignoring player death during replay", "PlayerStateManager");
             return;
