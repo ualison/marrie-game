@@ -1,7 +1,7 @@
 using Godot;
 
 // Main character controller handling movement, damage, and visual feedback
-public partial class Player : CharacterBody2D
+public partial class Player : CharacterBody2D, IPausable, IResettable
 {
     #region Exported Properties
     [Export] public float Speed = 120.0f;
@@ -331,7 +331,7 @@ private void StartBlinkEffect()
 
 private void ProcessDamageFromEnemy(Node2D enemy)
 {
-    if (enemy is FollowerMonster follower && !follower.CanTakeDamage())
+    if (enemy is Monster monster && monster.EnableFollowerBehavior && !monster.CanTakeDamage())
         return;
 
     if (TakeDamage(1))
@@ -360,7 +360,9 @@ private void ProcessDamageFromEnemy(Node2D enemy)
         Velocity = Vector2.Zero;
 
         ApplyDeathVisuals();
-        GameManager.Instance?.PlayerDied(GlobalPosition);
+        
+        // Notify death through event system instead of direct GameManager call
+        GameEvents.OnPlayerDied(GlobalPosition, _playerLife?.CurrentHealth ?? 0);
     }
 
     private void ApplyDeathVisuals()
@@ -425,5 +427,10 @@ private void ResetSpriteDirection()
     }
 
     public bool IsPaused() => _isPaused; // Check if player is paused
+    
+    // IPausable interface implementation  
+    bool IPausable.IsPaused => _isPaused;
+    public void Pause() => PausePlayer();
+    public void Resume() => ResumePlayer();
     #endregion
 }

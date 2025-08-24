@@ -9,7 +9,7 @@ public partial class EnemyManager : Node
     #endregion
 
     #region Enemy Tracking
-    private List<FollowerMonster> _followerMonsters = new();
+    private List<Monster> _followerMonsters = new();
     private List<Monster> _regularMonsters = new();
     #endregion
 
@@ -43,30 +43,30 @@ public partial class EnemyManager : Node
 
     private void FindFollowerMonsters()
     {
-        // Find all FollowerMonster nodes
+        // Find all Monster nodes with follower behavior enabled
         _followerMonsters.Clear();
         var enemies = GetTree().GetNodesInGroup("enemies");
         
         foreach (Node enemy in enemies)
         {
-            if (enemy is FollowerMonster follower)
+            if (enemy is Monster monster && monster.EnableFollowerBehavior)
             {
-                _followerMonsters.Add(follower);
+                _followerMonsters.Add(monster);
             }
         }
     }
 
     private void FindRegularMonsters()
     {
-        // Find all regular Monster nodes
+        // Find all regular Monster nodes (without follower behavior)
         _regularMonsters.Clear();
         var enemies = GetTree().GetNodesInGroup("enemies");
         
         foreach (Node enemy in enemies)
         {
-            if (enemy is Monster regular && enemy is not FollowerMonster)
+            if (enemy is Monster monster && !monster.EnableFollowerBehavior)
             {
-                _regularMonsters.Add(regular);
+                _regularMonsters.Add(monster);
             }
         }
     }
@@ -115,33 +115,36 @@ public partial class EnemyManager : Node
     #endregion
 
     #region Enemy Spawning
-    public FollowerMonster SpawnFollowerMonster(Vector2 position, PackedScene followerScene = null)
+    public Monster SpawnFollowerMonster(Vector2 position, PackedScene followerScene = null)
     {
         // Spawn a new follower monster at position
         if (followerScene == null)
         {
-            followerScene = GD.Load<PackedScene>("res://Prefabs/FollowerMonster.tscn");
+            followerScene = GD.Load<PackedScene>("res://Prefabs/Monster.tscn");
         }
 
         if (followerScene == null)
         {
-            GD.PrintErr("EnemyManager: Could not load FollowerMonster scene");
+            GD.PrintErr("EnemyManager: Could not load Monster scene");
             return null;
         }
 
-        var follower = followerScene.Instantiate() as FollowerMonster;
+        var follower = followerScene.Instantiate() as Monster;
         if (follower == null)
         {
-            GD.PrintErr("EnemyManager: Failed to instantiate FollowerMonster");
+            GD.PrintErr("EnemyManager: Failed to instantiate Monster");
             return null;
         }
+
+        // Enable follower behavior
+        follower.EnableFollowerBehavior = true;
 
         // Add to scene and track
         GetTree().CurrentScene.AddChild(follower);
         follower.GlobalPosition = position;
         _followerMonsters.Add(follower);
 
-        GD.Print($"EnemyManager: Spawned FollowerMonster at {position}");
+        GD.Print($"EnemyManager: Spawned Monster with follower behavior at {position}");
         return follower;
     }
     #endregion
@@ -161,7 +164,7 @@ public partial class EnemyManager : Node
         GD.Print("EnemyManager: Game restarted, resetting all enemies");
     }
 
-    private void ResetAllEnemies()
+    public void ResetAllEnemies()
     {
         // Reset all follower monsters to initial state
         foreach (var follower in _followerMonsters)

@@ -7,6 +7,7 @@ public partial class GhostMonster : CharacterBody2D
     #region Constants and Configuration
     private static readonly Color GHOST_TINT = new(1.0f, 0.5f, 0.5f, 0.7f);
     private const float ALPHA_TOLERANCE = 0.01f; // Avoid unnecessary updates
+    private const float SMOOTH_SPEED = 10.0f; // Position interpolation speed for smooth movement
     #endregion
 
     #region State Variables
@@ -29,6 +30,15 @@ public partial class GhostMonster : CharacterBody2D
     private bool _lastFlipState = false;
     private string _lastAnimation = "";
     private Vector2 _lastPosition = Vector2.Zero;
+    private Tween _currentFadeTween; // Track fade transitions
+    
+    // State-based behavior (replaces alpha detection)
+    private bool _isCurrentlyFullyVisible = true;
+    private string _currentMonsterState = "";
+    
+    // Movement smoothing
+    private Vector2 _currentPosition;
+    private Vector2 _targetPosition;
     #endregion
 
     #region Initialization
@@ -47,12 +57,13 @@ public partial class GhostMonster : CharacterBody2D
         if (!_isReplaying || _replayFrames == null) return;
 
         float elapsedTime = Time.GetTicksMsec() / 1000.0f - _replayStartTime;
-        var targetFrame = FindFrameAtTime(elapsedTime); // Use same method as GhostPlayer
+        var targetFrame = FindFrameAtTime(elapsedTime);
 
-        if (targetFrame != null)
+        if (targetFrame.HasValue)
         {
-            GlobalPosition = targetFrame.Position;
-            ApplyFrameToGhostOptimized(targetFrame);
+            // Always update target position from replay data
+            _targetPosition = targetFrame.Value.Position;
+            ApplyFrameToGhostOptimized(targetFrame.Value);
         }
         else if (_currentFrameIndex >= _replayFrames.Count)
         {
@@ -60,9 +71,34 @@ public partial class GhostMonster : CharacterBody2D
             GD.Print("GhostMonster: Replay completed");
             return;
         }
+
+        // Handle movement based on state (like Monster with follower behavior)
+        if (_isCurrentlyFullyVisible)
+        {
+            // Normal smooth interpolation when fully visible
+            _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * (float)delta);
+        }
+        else
+        {
+            // During fade transitions, handle position updates more carefully
+            var distance = _currentPosition.DistanceTo(_targetPosition);
+            
+            if (distance > 100f) // Large position change (repositioning during fade)
+            {
+                // Teleport during invisible phase (like Monster repositioning)
+                _currentPosition = _targetPosition;
+            }
+            else if (distance > 1.0f)
+            {
+                // Small adjustments - use slower movement during fades
+                _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * 0.2f * (float)delta);
+            }
+        }
+        
+        GlobalPosition = _currentPosition;
     }
     // Use the same frame finder as GhostPlayer
-    private ReplayFrame FindFrameAtTime(float time)
+    private ReplayFrame? FindFrameAtTime(float time)
     {
         for (int i = _currentFrameIndex; i < _replayFrames.Count; i++)
         {
@@ -77,7 +113,7 @@ public partial class GhostMonster : CharacterBody2D
     #endregion
 
     #region Optimized Frame Processing
-    private ReplayFrame FindFrameAtTimeOptimized(float time)
+    private ReplayFrame? FindFrameAtTimeOptimized(float time)
     {
         // Optimized: Don't search from beginning every time
         // Most of the time we just need the next frame
@@ -104,14 +140,8 @@ public partial class GhostMonster : CharacterBody2D
 
         if (_activeSprite != null)
         {
-            // Only update alpha if it changed significantly
-            float finalAlpha = frame.Alpha * GHOST_TINT.A;
-            if (Mathf.Abs(_lastAlpha - finalAlpha) > ALPHA_TOLERANCE)
-            {
-                _activeSprite.Visible = frame.Alpha > 0.0f;
-                _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, finalAlpha);
-                _lastAlpha = finalAlpha;
-            }
+            // Use state-driven behavior instead of alpha detection
+            HandleStateBasedBehavior(frame);
 
             // Only update sprite flip if it changed
             if (_lastFlipState != frame.SpriteFlip)
@@ -135,6 +165,56 @@ public partial class GhostMonster : CharacterBody2D
             }
         }
     }
+
+    private void HandleStateBasedBehavior(ReplayFrame frame)
+    {
+        // Extract state information from frame
+        string newMonsterState = frame.MonsterState;
+        bool newIsFullyVisible = frame.IsFullyVisible;
+        float finalAlpha = frame.Alpha * GHOST_TINT.A;
+
+        // Detect state transitions
+        bool stateChanged = newMonsterState != _currentMonsterState;
+        bool visibilityChanged = newIsFullyVisible != _isCurrentlyFullyVisible;
+
+        if (stateChanged || visibilityChanged)
+        {
+            // Log position changes during transitions for debugging
+            float distance = _currentPosition.DistanceTo(frame.Position);
+            if (distance > 50f) // Log significant position changes
+            {
+                GD.Print($"GhostMonster: Large position change during transition - Distance: {distance:F1}, From: {_currentPosition} To: {frame.Position}");
+            }
+            
+            HandleStateTransition(newMonsterState, newIsFullyVisible, frame);
+        }
+
+        // Update current alpha
+        if (Mathf.Abs(_lastAlpha - finalAlpha) > ALPHA_TOLERANCE)
+        {
+            _activeSprite.Visible = frame.Alpha > 0.0f;
+            _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, finalAlpha);
+            _lastAlpha = finalAlpha;
+        }
+
+        // Update state tracking
+        _currentMonsterState = newMonsterState;
+        _isCurrentlyFullyVisible = newIsFullyVisible;
+    }
+
+    private void HandleStateTransition(string newState, bool newIsFullyVisible, ReplayFrame frame)
+    {
+        // Log state transitions for debugging
+        if (!newIsFullyVisible && _isCurrentlyFullyVisible)
+        {
+            GD.Print($"GhostMonster: Starting fade transition - State: {newState} (movement will slow down)");
+        }
+        else if (newIsFullyVisible && !_isCurrentlyFullyVisible)
+        {
+            GD.Print($"GhostMonster: Ending fade transition - State: {newState} (resuming normal movement)");
+        }
+    }
+
     #endregion
 
     #region Replay Control
@@ -157,16 +237,23 @@ public partial class GhostMonster : CharacterBody2D
         _lastFlipState = false;
         _lastAnimation = "";
         _lastPosition = Vector2.Zero;
+        
+        // Reset state tracking
+        _currentFadeTween?.Kill();
+        _isCurrentlyFullyVisible = true;
+        _currentMonsterState = "";
 
         // Start at first frame position
         GlobalPosition = frames[0].Position;
+        _currentPosition = GlobalPosition;
+        _targetPosition = GlobalPosition;
         _lastPosition = GlobalPosition;
 
         // Show the CharacterBody2D but start sprite hidden
         Show();
         if (_activeSprite != null)
         {
-            _activeSprite.Visible = false;
+            _activeSprite.Visible = true;
             _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, 0);
         }
 
@@ -176,6 +263,9 @@ public partial class GhostMonster : CharacterBody2D
     public void StopReplay()
     {
         _isReplaying = false;
+        _currentFadeTween?.Kill();
+        _isCurrentlyFullyVisible = true;
+        _currentMonsterState = "";
         GD.Print("GhostMonster: Replay stopped");
     }
 

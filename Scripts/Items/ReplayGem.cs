@@ -1,5 +1,6 @@
 using Godot;
 using System.Collections.Generic;
+using System.Linq;
 
 // Replay gem that appears at death location and allows ghost replay functionality
 public partial class ReplayGem : Node2D
@@ -193,14 +194,14 @@ public partial class ReplayGem : Node2D
 
     private DeathRecord GetDeathRecord()
     {
-        // Retrieve death record from GameManager - ORIGINAL METHOD
-        if (GameManager.Instance == null)
+        // Retrieve death record from ReplaySystemManager
+        if (ReplaySystemManager.Instance == null)
         {
-            GD.Print("GameManager.Instance is null - cannot get death record");
+            GD.Print("ReplaySystemManager.Instance is null - cannot get death record");
             return null;
         }
 
-        return GameManager.Instance.GetLastDeathRecord();
+        return ReplaySystemManager.Instance.GetLastDeathRecord();
     }
 
     private bool ValidateFrameData(System.Collections.Generic.List<ReplayFrame> playerFrames)
@@ -251,7 +252,7 @@ public partial class ReplayGem : Node2D
         var ghostMonster = CreateGhostMonster();
         if (ghostMonster != null)
         {
-            ghostMonster.StartReplay(monsterFrames, "FollowerMonster");
+            ghostMonster.StartReplay(monsterFrames, "Monster");
             _currentGhostMonster = ghostMonster;
             GD.Print($"Ghost monster started with {monsterFrames.Count} frames");
         }
@@ -272,10 +273,10 @@ public partial class ReplayGem : Node2D
         var monsters = GetTree().GetNodesInGroup("enemies");
         foreach (Node monster in monsters)
         {
-            if (monster is FollowerMonster follower)
+            if (monster is Monster follower && follower.EnableFollowerBehavior)
             {
                 follower.DisableForReplay();
-                GD.Print($"FollowerMonster {monster.Name} disabled for replay");
+                GD.Print($"Monster with follower behavior {monster.Name} disabled for replay");
             }
             else if (monster is Node2D monsterNode2D)
             {
@@ -360,10 +361,10 @@ public partial class ReplayGem : Node2D
         var monsters = GetTree().GetNodesInGroup("enemies");
         foreach (Node monster in monsters)
         {
-            if (monster is FollowerMonster follower)
+            if (monster is Monster follower && follower.EnableFollowerBehavior)
             {
                 follower.EnableAfterReplay();
-                GD.Print($"FollowerMonster {monster.Name} enabled after replay");
+                GD.Print($"Monster with follower behavior {monster.Name} enabled after replay");
             }
             else if (monster is Node2D monsterNode2D)
             {
@@ -555,11 +556,15 @@ public partial class ReplayGem : Node2D
 
     private GhostMonster CreateGhostMonsterProgrammatically()
     {
-        // Find the active monster (FollowerMonster first, then Monster)
-        var followerMonster = GetTree().GetFirstNodeInGroup("enemies") as FollowerMonster;
-        var regularMonster = GetTree().GetFirstNodeInGroup("enemies") as Monster;
+        // Find the active monster (Monster with follower behavior first, then regular Monster)
+        var followerMonster = GetTree().GetNodesInGroup("enemies")
+            .OfType<Monster>()
+            .FirstOrDefault(m => m.EnableFollowerBehavior);
+        var regularMonster = GetTree().GetNodesInGroup("enemies")
+            .OfType<Monster>()
+            .FirstOrDefault(m => !m.EnableFollowerBehavior);
 
-        Node2D originalMonster = followerMonster != null ? followerMonster : regularMonster;
+        Node2D originalMonster = followerMonster ?? regularMonster;
 
         if (originalMonster == null)
         {
@@ -578,7 +583,7 @@ public partial class ReplayGem : Node2D
 
     private void CopyMonsterSpriteStructure(Node originalMonster, GhostMonster ghostMonster)
     {
-        // For FollowerMonster, the sprite is either AnimatedSprite2D or found by the FindSprite() method
+        // For Monster with follower behavior, the sprite is either AnimatedSprite2D or found by the FindSprite() method
         var originalAnimSprite = originalMonster.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
 
         if (originalAnimSprite != null)
@@ -590,7 +595,7 @@ public partial class ReplayGem : Node2D
                 Animation = "idle"
             };
             ghostMonster.AddChild(ghostSprite);
-            GD.Print("Copied FollowerMonster AnimatedSprite2D structure");
+            GD.Print("Copied Monster AnimatedSprite2D structure");
             return;
         }
 

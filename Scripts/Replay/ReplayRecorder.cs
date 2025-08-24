@@ -1,44 +1,95 @@
 using Godot;
 using System.Collections.Generic;
+using System.Linq;
 
-// Movement recording system for ghost replay functionality with pause/resume support
+/// <summary>
+/// Performance-optimized replay recording system with efficient character tracking and data extraction
+/// </summary>
 public partial class ReplayRecorder : Node
 {
     #region Singleton
     public static ReplayRecorder Instance { get; private set; }
     #endregion
 
-    #region Configuration
+    #region Exported Configuration
     [Export] public float RecordInterval { get; set; } = 0.1f;
+    [Export] public string PlayerGroupName { get; set; } = "player";
+    [Export] public string EnemyGroupName { get; set; } = "enemies";
+    [Export] public bool EnableOptimizations { get; set; } = true;
     #endregion
 
-    #region State Management
+    #region Properties
     public bool IsRecording { get; private set; }
-    private bool _isPausedForReplay = false;
-    private float _recordTimer;
-    private float _startTime;
+    public bool HasRecordedData => _playerFrames.Count > 0 || _monsterFrames.Count > 0;
     #endregion
 
-    #region Frame Storage
+    #region Private State
+    private bool _isPausedForReplay;
+    private float _recordTimer;
+    private float _elapsedRecordingTime;
+
     private readonly List<ReplayFrame> _playerFrames = new();
     private readonly List<ReplayFrame> _monsterFrames = new();
-    #endregion
 
-    #region Character References
+    // Cached references for performance
     private Player _player;
-    private FollowerMonster _followerMonster;
     private Monster _monster;
+
+    // Performance optimization tracking
+    private Vector2 _lastPlayerPosition;
+    private bool _playerWasMoving = true;
+    private int _frameSkipCounter = 0;
+    private const float MIN_MOVEMENT_THRESHOLD = 0.5f;
+    
+    // Discovery retry system
+    private SceneTreeTimer _discoveryTimer;
     #endregion
 
-    #region Initialization
+    #region Godot Lifecycle
     public override void _Ready()
     {
         Instance = this;
         ProcessMode = ProcessModeEnum.Always;
         
-        CallDeferred(nameof(InitializeRecording));
+        // Add to group for discovery
+        AddToGroup("replay_recorder");
+        
+        // Use CallDeferred for proper initialization order
+        CallDeferred(MethodName.InitializeRecording);
     }
 
+    public override void _Process(double delta)
+    {
+        if (!IsRecording || _isPausedForReplay) 
+            return;
+
+        var deltaFloat = (float)delta;
+        _recordTimer += deltaFloat;
+        _elapsedRecordingTime += deltaFloat;
+
+        if (_recordTimer >= RecordInterval)
+        {
+            if (ShouldCaptureFrame())
+            {
+                CaptureCurrentFrame();
+            }
+            _recordTimer = 0.0f;
+        }
+    }
+
+    public override void _ExitTree()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+        
+        // Clear cache on exit
+        CharacterDataExtractor.ClearCache();
+    }
+    #endregion
+
+    #region Initialization
     public void InitializeRecording()
     {
         DiscoverCharacters();
@@ -49,58 +100,30 @@ public partial class ReplayRecorder : Node
         }
         else
         {
-            // Retry if player not found
-            GetTree().CreateTimer(0.1f).Timeout += InitializeRecording;
+            // Retry character discovery
+            ScheduleDiscoveryRetry();
         }
+    }
+
+    private void ScheduleDiscoveryRetry()
+    {
+        // SceneTreeTimer doesn't have Kill method, just create new one
+        _discoveryTimer = GetTree().CreateTimer(0.1f);
+        _discoveryTimer.Timeout += InitializeRecording;
     }
 
     private void DiscoverCharacters()
     {
-        _player = GetTree().GetFirstNodeInGroup("player") as Player;
+        // Use more specific discovery with null-conditional operators
+        _player = GetTree().GetFirstNodeInGroup(PlayerGroupName) as Player;
         
-        // Look for both monster types
-        _followerMonster = GetTree().GetFirstNodeInGroup("enemies") as FollowerMonster;
-        if (_followerMonster == null)
-        {
-            _monster = GetTree().GetFirstNodeInGroup("enemies") as Monster;
-        }
+        // Find Monster with follower behavior enabled
+        var enemies = GetTree().GetNodesInGroup(EnemyGroupName);
+        _monster = enemies.OfType<Monster>().FirstOrDefault(m => m.EnableFollowerBehavior) ?? 
+                   enemies.OfType<Monster>().FirstOrDefault();
 
-        GD.Print($"ReplayRecorder discovered - Player: {_player != null}, FollowerMonster: {_followerMonster != null}, Monster: {_monster != null}");
-    }
-    #endregion
-
-    #region Core Recording Loop
-    public override void _Process(double delta)
-    {
-        if (!IsRecording || _isPausedForReplay) return;
-
-        _recordTimer += (float)delta;
-
-        if (_recordTimer >= RecordInterval)
-        {
-            CaptureCurrentFrame();
-            _recordTimer = 0.0f;
-        }
-    }
-
-    private void CaptureCurrentFrame()
-    {
-        float currentTime = Time.GetTicksMsec() / 1000.0f - _startTime;
-
-        // Record player
-        if (_player != null)
-        {
-            var frame = CreateFrameForCharacter(_player, currentTime);
-            _playerFrames.Add(frame);
-        }
-
-        // Record monster (prioritize FollowerMonster)
-        Node2D activeMonster = _followerMonster != null ? _followerMonster : _monster;
-        if (activeMonster != null)
-        {
-            var frame = CreateFrameForCharacter(activeMonster, currentTime);
-            _monsterFrames.Add(frame);
-        }
+        GD.Print($"ReplayRecorder discovered - Player: {_player != null}, " +
+                 $"Monster: {_monster != null}, FollowerBehavior: {_monster?.EnableFollowerBehavior}");
     }
     #endregion
 
@@ -110,7 +133,14 @@ public partial class ReplayRecorder : Node
         ClearRecording();
         IsRecording = true;
         _recordTimer = 0f;
-        _startTime = Time.GetTicksMsec() / 1000.0f;
+        _elapsedRecordingTime = 0f;
+        
+        // Initialize movement tracking for optimizations
+        if (_player != null)
+        {
+            _lastPlayerPosition = _player.GlobalPosition;
+            _playerWasMoving = true;
+        }
         
         GD.Print($"ReplayRecorder: Started recording - Player: {_player != null}");
     }
@@ -126,6 +156,9 @@ public partial class ReplayRecorder : Node
         _playerFrames.Clear();
         _monsterFrames.Clear();
         _recordTimer = 0f;
+        _elapsedRecordingTime = 0f;
+        _frameSkipCounter = 0;
+        CharacterDataExtractor.ClearCache();
     }
 
     public void PauseRecording()
@@ -141,92 +174,83 @@ public partial class ReplayRecorder : Node
     }
     #endregion
 
-    #region Data Access
-    public List<ReplayFrame> GetPlayerFrames() => new(_playerFrames);
-    public List<ReplayFrame> GetMonsterFrames() => new(_monsterFrames);
-    public bool HasRecordedData() => _playerFrames.Count > 0 || _monsterFrames.Count > 0;
-    #endregion
-
-    #region Frame Creation
-    private ReplayFrame CreateFrameForCharacter(Node2D character, float timestamp)
+    #region Frame Capture with Optimizations
+    private bool ShouldCaptureFrame()
     {
-        bool isVisible = true;
-        float alpha = 1.0f;
-        
-        // Record alpha for FollowerMonster to capture fade transitions
-        if (character is FollowerMonster follower)
+        if (!EnableOptimizations) return true;
+
+        // Check if player moved significantly
+        if (_player != null)
         {
-            isVisible = follower.IsVisible();
+            var currentPos = _player.GlobalPosition;
+            var distance = currentPos.DistanceTo(_lastPlayerPosition);
             
-            // Get actual sprite alpha - this captures fade state accurately
-            var spriteNode = follower.GetNodeOrNull<Node2D>("AnimatedSprite2D") 
-                          ?? follower.GetNodeOrNull<Node2D>("MonsterSprite");
-            if (spriteNode != null)
+            if (distance < MIN_MOVEMENT_THRESHOLD)
             {
-                alpha = spriteNode.Modulate.A;
+                // Skip frames when not moving, but capture every 10th frame for safety
+                _frameSkipCounter++;
+                if (_frameSkipCounter < 10)
+                {
+                    return false;
+                }
+                _frameSkipCounter = 0;
+            }
+            else
+            {
+                _lastPlayerPosition = currentPos;
+                _frameSkipCounter = 0;
             }
         }
-        // For Player, keep simple - no fade effects needed
-        else if (character is Player)
-        {
-            isVisible = true;
-            alpha = 1.0f;
-        }
-        
-        return new ReplayFrame
-        {
-            Timestamp = timestamp,
-            Position = character.GlobalPosition,
-            Rotation = character.GlobalRotation,
-            Animation = ExtractCurrentAnimation(character),
-            SpriteFlip = ExtractSpriteFlip(character),
-            IsVisible = isVisible,
-            Alpha = alpha
-        };
+
+        return true;
     }
 
-    private string ExtractCurrentAnimation(Node2D character)
+    private void CaptureCurrentFrame()
     {
-        var animSprite = character.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
-        return animSprite?.IsPlaying() == true ? animSprite.Animation : "idle";
-    }
+        var currentTime = _elapsedRecordingTime;
 
-    private bool ExtractSpriteFlip(Node2D character)
-    {
-        Node2D sprite = null;
-        
-        // For FollowerMonster, check the _spriteNode which could be AnimatedSprite2D or MonsterSprite
-        if (character is FollowerMonster)
+        // Record player state using optimized extractor
+        if (_player != null)
         {
-            sprite = character.GetNodeOrNull<Node2D>("AnimatedSprite2D")
-                ?? character.GetNodeOrNull<Node2D>("MonsterSprite");
-        }
-        // For Monster, check MonsterSprite
-        else if (character is Monster)
-        {
-            sprite = character.GetNodeOrNull<Node2D>("MonsterSprite")
-                ?? character.GetNodeOrNull<Node2D>("Sprite2D");
-        }
-        // For Player, check the usual suspects
-        else
-        {
-            sprite = character.GetNodeOrNull<Node2D>("AnimatedSprite2D")
-                ?? character.GetNodeOrNull<Node2D>("MarrieSprite")
-                ?? character.GetNodeOrNull<Node2D>("Sprite2D");
+            var frame = CharacterDataExtractor.ExtractFrame(_player, currentTime);
+            _playerFrames.Add(frame);
         }
 
-        // Return true if sprite is flipped (negative X scale)
-        return sprite?.Scale.X < 0;
+        // Record monster state
+        if (_monster != null)
+        {
+            var frame = CharacterDataExtractor.ExtractFrame(_monster, currentTime);
+            _monsterFrames.Add(frame);
+        }
     }
     #endregion
 
-    #region Cleanup
-    public override void _ExitTree()
+    #region Data Access
+    /// <summary>
+    /// Returns a copy of recorded player frames
+    /// </summary>
+    public List<ReplayFrame> GetPlayerFrames() => new(_playerFrames);
+
+    /// <summary>
+    /// Returns a copy of recorded monster frames  
+    /// </summary>
+    public List<ReplayFrame> GetMonsterFrames() => new(_monsterFrames);
+
+    /// <summary>
+    /// Forces character rediscovery (useful after scene changes)
+    /// </summary>
+    public void RefreshCharacterReferences()
     {
-        if (Instance == this)
-        {
-            Instance = null;
-        }
+        DiscoverCharacters();
+        CharacterDataExtractor.ClearCache();
+    }
+
+    /// <summary>
+    /// Gets recording statistics for debugging
+    /// </summary>
+    public (int playerFrames, int monsterFrames, float recordingTime, int cacheSize) GetRecordingStats()
+    {
+        return (_playerFrames.Count, _monsterFrames.Count, _elapsedRecordingTime, CharacterDataExtractor.GetCacheSize());
     }
     #endregion
 }

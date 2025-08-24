@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3 uid="uid://djryvxjy0bkfe"]
 
-[ext_resource type="Script" uid="uid://btffpyyyisset" path="res://Scripts/Enemy/FollowerMonster.cs" id="1_x8qak"]
+[ext_resource type="Script" uid="uid://c0o15dmumujxy" path="res://Scripts/Enemy/Monster.cs" id="1_x8qak"]
 [ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monsterv3.png" id="2_x8qak"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wqfq0"]
@@ -14,14 +14,14 @@ size = Vector2(262, 365)
 [node name="CharacterBody2D" type="CharacterBody2D" parent="."]
 position = Vector2(0, 4)
 script = ExtResource("1_x8qak")
-FollowDistance = 200.0
+EnableFollowerBehavior = true
 MinSpawnDistance = 100.0
-WalkSpeed = 30.0
+WalkSpeed = 35.0
 InitialWaitTime = 5.0
-MinVisibleTime = 3.0
-MaxVisibleTime = 4.0
+MinVisibleTime = 5.0
+MaxVisibleTime = 5.0
 MinHiddenTime = 3.0
-MaxHiddenTime = 4.0
+MaxHiddenTime = 5.0
 
 [node name="DamageArea" type="Area2D" parent="CharacterBody2D"]
 position = Vector2(0, -4)

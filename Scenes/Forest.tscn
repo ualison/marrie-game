@@ -21,6 +21,7 @@ follow_viewport_enabled = true
 [node name="LifeBarUI" parent="Interface" instance=ExtResource("7_gfl13")]
 offset_left = -564.0
 offset_top = -316.0
+metadata/_edit_use_anchors_ = true
 
 [node name="GameOverScreenUI" parent="Interface" instance=ExtResource("8_4xied")]
 visible = false

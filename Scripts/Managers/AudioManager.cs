@@ -193,7 +193,7 @@ public partial class AudioManager : AudioStreamPlayer2D
     #endregion
 
     #region Public API
-    public bool IsPlaying() => Playing;
+
     public bool IsPaused() => _isMusicPaused;
     public float GetCurrentVolume() => VolumeDb;
     public AudioStream GetCurrentMusic() => BackgroundMusic;

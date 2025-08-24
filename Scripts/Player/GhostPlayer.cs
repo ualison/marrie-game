@@ -51,11 +51,11 @@ public partial class GhostPlayer : CharacterBody2D
         float elapsedTime = Time.GetTicksMsec() / 1000.0f - _replayStartTime;
         var targetFrame = FindFrameAtTime(elapsedTime);
 
-        if (targetFrame != null)
+        if (targetFrame.HasValue)
         {
             // Update target position and apply frame data
-            _targetPosition = targetFrame.Position;
-            ApplyFrameToGhost(targetFrame);
+            _targetPosition = targetFrame.Value.Position;
+            ApplyFrameToGhost(targetFrame.Value);
         }
         else if (_currentFrameIndex >= _replayFrames.Count)
         {
@@ -139,14 +139,15 @@ public partial class GhostPlayer : CharacterBody2D
             if (distance > MIN_MOVEMENT)
             {
                 // Movement detected - add frame with compressed timestamp
-                var newFrame = new ReplayFrame
-                {
-                    Timestamp = frame.Timestamp - timeCompression,
-                    Position = frame.Position,
-                    Rotation = frame.Rotation,
-                    Animation = frame.Animation,
-                    SpriteFlip = frame.SpriteFlip
-                };
+                var newFrame = new ReplayFrame(
+                    frame.Timestamp - timeCompression,
+                    frame.Position,
+                    frame.Rotation,
+                    frame.Animation,
+                    frame.SpriteFlip,
+                    frame.IsVisible,
+                    frame.Alpha
+                );
                 filtered.Add(newFrame);
                 lastPos = frame.Position;
             }
@@ -160,7 +161,7 @@ public partial class GhostPlayer : CharacterBody2D
         return filtered;
     }
 
-    private ReplayFrame FindFrameAtTime(float time)
+    private ReplayFrame? FindFrameAtTime(float time)
     {
         // Find frame that should be playing at current time
         for (int i = _currentFrameIndex; i < _replayFrames.Count; i++)
