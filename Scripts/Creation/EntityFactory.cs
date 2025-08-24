@@ -1,16 +1,16 @@
 using Godot;
 
 /// <summary>
-/// Simple factory for the few entities you actually create dynamically
-/// No overengineering - just centralized creation logic
+/// Entity creation services for dynamic game objects
+/// Handles instantiation of replay gems and ghost entities
 /// </summary>
-public static class EntityCreator
+public static class EntityFactory
 {
     private static PackedScene _replayGemScene;
     private static PackedScene _ghostPlayerScene;
     private static PackedScene _ghostMonsterScene;
     
-    // Lazy load scenes
+    #region Scene Loading
     private static PackedScene GetReplayGemScene()
     {
         if (_replayGemScene == null)
@@ -27,14 +27,14 @@ public static class EntityCreator
                 if (ResourceLoader.Exists(path))
                 {
                     _replayGemScene = GD.Load<PackedScene>(path);
-                    GD.Print($"EntityCreator: Loaded ReplayGem scene from {path}");
+                    GD.Print($"EntityFactory: Loaded ReplayGem scene from {path}");
                     break;
                 }
             }
             
             if (_replayGemScene == null)
             {
-                GD.PrintErr("EntityCreator: Could not find ReplayGem.tscn in any expected location");
+                GD.PrintErr("EntityFactory: Could not find ReplayGem.tscn in any expected location");
             }
         }
         return _replayGemScene;
@@ -57,27 +57,29 @@ public static class EntityCreator
         }
         return _ghostMonsterScene;
     }
+    #endregion
     
+    #region Entity Creation
     public static ReplayGem CreateReplayGem(Vector2 position, Node parent)
     {
         var scene = GetReplayGemScene();
         if (scene == null)
         {
-            GD.PrintErr("EntityCreator: CRITICAL - Could not load ReplayGem scene from any path!");
+            GD.PrintErr("EntityFactory: CRITICAL - Could not load ReplayGem scene!");
             return null;
         }
         
         var gem = scene.Instantiate() as ReplayGem;
         if (gem == null)
         {
-            GD.PrintErr("EntityCreator: CRITICAL - ReplayGem scene did not instantiate as ReplayGem class!");
+            GD.PrintErr("EntityFactory: CRITICAL - ReplayGem scene did not instantiate properly!");
             return null;
         }
         
         parent.AddChild(gem);
         gem.GlobalPosition = position;
         GameEvents.OnReplayGemCreated(position);
-        GD.Print($"EntityCreator: Successfully created ReplayGem from PackedScene at {position}");
+        GD.Print($"EntityFactory: Created ReplayGem at {position}");
         
         return gem;
     }
@@ -133,7 +135,9 @@ public static class EntityCreator
         
         return ghost;
     }
+    #endregion
     
+    #region Programmatic Creation Fallbacks
     private static GhostPlayer CreateGhostPlayerProgrammatically(Node parent)
     {
         var ghost = new GhostPlayer { Name = "GhostPlayer" };
@@ -202,4 +206,5 @@ public static class EntityCreator
             ghost.AddChild(ghostSprite);
         }
     }
+    #endregion
 }

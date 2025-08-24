@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Interfaces;
 
 // Player health management with invulnerability periods and event notifications
 public partial class PlayerLife : Node, IHealthSystem

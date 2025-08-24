@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Interfaces;
 
 // Main character controller handling movement, damage, and visual feedback
 public partial class Player : CharacterBody2D, IPausable, IResettable

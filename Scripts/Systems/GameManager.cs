@@ -8,11 +8,10 @@ using System.Linq;
 /// SOLID Compliance:
 /// - Single Responsibility: Only orchestrates between other managers
 /// - Open/Closed: Extensible through events, no need to modify existing code
-/// - Liskov Substitution: Implements IGameStateManager correctly
 /// - Interface Segregation: Uses focused interfaces
 /// - Dependency Inversion: Depends on abstractions (events) not implementations
 /// </summary>
-public partial class GameManager : Node, IGameStateManager
+public partial class GameManager : Node
 {
     public static GameManager Instance { get; private set; }
     
@@ -45,13 +44,9 @@ public partial class GameManager : Node, IGameStateManager
     private void InitializeManagers()
     {
         // Ensure all managers exist as children
-        EnsureManagerExists<SceneLifecycleManager>();
         EnsureManagerExists<PlayerStateManager>();
         EnsureManagerExists<UIManager>();
         EnsureManagerExists<ReplaySystemManager>();
-        
-        // Performance Monitor is a static class - just enable it
-        PerformanceMonitor.Enable();
         
         GD.Print("GameManager: All managers initialized");
     }
@@ -105,7 +100,7 @@ public partial class GameManager : Node, IGameStateManager
         GD.Print("GameManager: Game restart coordination complete");
     }
     
-    #region IGameStateManager Implementation
+    #region Game State Management
     public bool IsGameOver => !IsGameActive;
     
     public void PauseGame()

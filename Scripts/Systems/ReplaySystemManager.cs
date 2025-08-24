@@ -248,8 +248,8 @@ public partial class ReplaySystemManager : Node
         
         if (ReplayGemScene != null)
         {
-            // Create new gem using EntityCreator
-            _currentReplayGem = EntityCreator.CreateReplayGem(position, GetTree().CurrentScene);
+            // Create new gem using EntityFactory
+            _currentReplayGem = EntityFactory.CreateReplayGem(position, GetTree().CurrentScene);
             
             if (_currentReplayGem != null)
             {
