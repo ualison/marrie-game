@@ -147,7 +147,7 @@ public partial class PlayerStateManager : Node
         // Notify other systems
         Log.System("Firing PlayerDied event", "PlayerStateManager");
         PlayerDied?.Invoke(deathPosition, _playerLife?.CurrentHealth ?? 0);
-        GameEvents.OnPlayerDied(deathPosition, _playerLife?.CurrentHealth ?? 0);
+        GameEventSystem.OnPlayerDied(deathPosition, _playerLife?.CurrentHealth ?? 0);
     }
     
     public void RespawnPlayer()

@@ -20,6 +20,7 @@ public partial class ReplayGem : Node2D
     private bool _playerNearby = false;
     private GhostPlayer _currentGhost;
     private GhostMonster _currentGhostMonster;
+    private ManagedTimer _replayCleanupTimer; // IMPROVED: Managed timer for better cleanup
 
     private List<Node2D> _hiddenMonsters = new(); // Track which monsters we hid
     #endregion
@@ -88,12 +89,7 @@ public partial class ReplayGem : Node2D
 
     private void HandleReplayActivation()
     {
-        // Stop recording before starting replay to prevent interference
-        if (ReplayRecorder.Instance != null)
-        {
-            ReplayRecorder.Instance.StopRecording();
-        }
-
+        // Start replay immediately - recording will be paused during entity pausing
         StartReplay();
     }
     #endregion
@@ -101,7 +97,8 @@ public partial class ReplayGem : Node2D
     #region Gem Visibility Control
     public void ShowGem(Vector2 position)
     {
-        // Display gem at specified position
+        // Display gem at specified position with debug logging
+        Log.Debug($"ShowGem called with position: {position}, current position: {GlobalPosition}", "ReplayGem");
         GlobalPosition = position;
         Show();
 
@@ -172,36 +169,30 @@ public partial class ReplayGem : Node2D
     #region Replay System - ORIGINAL LOGIC PRESERVED
     private void StartReplay()
     {
-        // Initialize replay with data validation - FIXED: Ensure recording is always resumed
+        // Initialize replay with data validation
         Log.Replay("=== StartReplay called ===", "ReplayGem");
-
-        // Pause recording immediately to prevent interference
-        if (ReplayRecorder.Instance != null)
-        {
-            ReplayRecorder.Instance.PauseRecording();
-        }
 
         var deathRecord = GetDeathRecord();
         if (deathRecord == null) 
         {
-            // Resume recording if death record is null
-            if (ReplayRecorder.Instance != null)
-            {
-                ReplayRecorder.Instance.ResumeRecording();
-            }
+            Log.Warning("No death record available for replay", "ReplayGem");
             return;
         }
+
+        Log.Replay($"Using death record: {deathRecord.DeathId} at {deathRecord.DeathPosition} with {deathRecord.PlayerFrames.Count} player frames, {deathRecord.MonsterFrames.Count} monster frames", "ReplayGem");
 
         var playerFrames = deathRecord.PlayerFrames;
         if (!ValidateFrameData(playerFrames)) 
         {
-            // Recording is already resumed in ValidateFrameData for empty frames
             return;
         }
 
-        // Clean up existing ghosts and start new replay - ORIGINAL FLOW
+        // FIXED: Clean up existing ghosts and start new replay immediately without delay
+        Log.Debug("Starting cleanup before ghost creation...", "ReplayGem");
         CleanupGhost();
-        GetTree().CreateTimer(0.1f).Timeout += () => CreateAndStartGhost(playerFrames, deathRecord.MonsterFrames);
+        Log.Debug("Cleanup complete, starting ghost creation immediately...", "ReplayGem");
+        // Start ghost creation immediately instead of using timer
+        CreateAndStartGhost(playerFrames, deathRecord.MonsterFrames);
     }
 
     private DeathRecord GetDeathRecord()
@@ -218,17 +209,13 @@ public partial class ReplayGem : Node2D
 
     private bool ValidateFrameData(System.Collections.Generic.List<ReplayFrame> playerFrames)
     {
-        // Validate frame data before starting replay - FIXED: Handle empty frames gracefully
+        // Validate frame data before starting replay - FIXED: Don't resume recording here
         Log.Replay($"Player frames count: {playerFrames.Count}", "ReplayGem");
 
         if (playerFrames.Count == 0)
         {
             Log.Warning("No player frames to replay", "ReplayGem");
-            // Resume recording immediately if no frames to replay
-            if (ReplayRecorder.Instance != null)
-            {
-                ReplayRecorder.Instance.ResumeRecording();
-            }
+            // FIXED: Don't resume recording here - will be handled in cleanup
             return false;
         }
 
@@ -238,24 +225,29 @@ public partial class ReplayGem : Node2D
     private void CreateAndStartGhost(System.Collections.Generic.List<ReplayFrame> playerFrames,
                                     System.Collections.Generic.List<ReplayFrame> monsterFrames)
     {
-        // Create and start ghost - ORIGINAL METHOD NAME AND FLOW
+        // FIXED: Pause entities FIRST, then create ghosts to avoid recording frozen state
+        Log.Debug("CreateAndStartGhost called - pausing entities first...", "ReplayGem");
+        PauseAndHideOriginalEntities();
+
+        Log.Debug("Entities paused, now creating ghost player...", "ReplayGem");
         var ghostPlayer = CreateGhostPlayer();
 
         if (ghostPlayer != null)
         {
-            Log.Replay("Starting ghost replay...", "ReplayGem");
+            Log.Replay("Ghost player created successfully, starting replay setup...", "ReplayGem");
 
-            PauseAndHideOriginalEntities();
             StartGhostReplay(ghostPlayer, playerFrames);
             HideGemDuringReplay();
 
             // NEW: Add monster ghost if data available
             if (monsterFrames != null && monsterFrames.Count > 0)
             {
+                Log.Debug("Creating monster ghost...", "ReplayGem");
                 CreateAndStartMonsterGhost(monsterFrames);
             }
 
             ScheduleReplayCleanup(playerFrames);
+            Log.Debug("Ghost creation and setup complete!", "ReplayGem");
         }
         else
         {
@@ -277,6 +269,13 @@ public partial class ReplayGem : Node2D
 
     private void PauseAndHideOriginalEntities()
     {
+        // FIXED: Pause recording FIRST to avoid recording the freeze process
+        if (ReplayRecorder.Instance != null)
+        {
+            ReplayRecorder.Instance.PauseRecording();
+            Log.Debug("Recording paused before freezing entities", "ReplayGem");
+        }
+
         // Pause and hide the original player during replay
         var player = GetTree().GetFirstNodeInGroup("player") as Player;
         if (player != null)
@@ -322,15 +321,19 @@ public partial class ReplayGem : Node2D
 
     private void ScheduleReplayCleanup(System.Collections.Generic.List<ReplayFrame> frames)
     {
-        // Schedule cleanup when replay completes - ORIGINAL METHOD
+        // Schedule cleanup when replay completes using managed timer
         if (frames.Count == 0) return;
+
+        // Cancel any existing cleanup timer
+        _replayCleanupTimer?.Cancel();
 
         float replayDuration = frames[frames.Count - 1].Timestamp + 2.0f; // Extra time for fade out
 
-        GetTree().CreateTimer(replayDuration).Timeout += () =>
+        // IMPROVED: Use managed timer for proper cleanup
+        _replayCleanupTimer = this.CreateManagedTimer(replayDuration, () =>
         {
             CleanupAfterReplay();
-        };
+        });
     }
 
     private void CleanupAfterReplay()
@@ -338,15 +341,22 @@ public partial class ReplayGem : Node2D
         // Restore game state after replay ends
         FadeOutGhosts();
 
-        // Wait for fade out to complete before restoring entities
-        GetTree().CreateTimer(0.6f).Timeout += () =>
+        // Wait for fade out to complete before restoring entities using managed timer
+        this.CreateManagedTimer(0.6f, () =>
         {
             CleanupGhost();
             ResumeAndShowOriginalEntities();
-            RestartRecording();
+            
+            // FIXED: Add small delay before restarting recording to ensure entities are fully active
+            this.CreateManagedTimer(0.1f, () =>
+            {
+                RestartRecording();
+                Log.Replay("Recording restarted after ensuring all entities are active", "ReplayGem");
+            });
+            
             ShowGemAfterReplay();
-            Log.Replay("Replay completed - all entities restored and recording restarted", "ReplayGem");
-        };
+            Log.Replay("Replay completed - all entities restored", "ReplayGem");
+        });
     }
 
     private void FadeOutGhosts()
@@ -393,12 +403,29 @@ public partial class ReplayGem : Node2D
 
     private void RestartRecording()
     {
-        // Restart recording after replay - FIXED: Ensure recording is fully restarted
+        // FIXED: Only restart recording after entities are fully restored
         if (ReplayRecorder.Instance != null)
         {
-            ReplayRecorder.Instance.ResumeRecording();
-            ReplayRecorder.Instance.RefreshCharacterReferences();
-            ReplayRecorder.Instance.InitializeRecording();
+            // Double-check that player is properly resumed
+            var player = GetTree().GetFirstNodeInGroup("player") as Player;
+            if (player != null && player.IsPaused())
+            {
+                Log.Warning("Player still paused - forcing resume before restarting recording", "ReplayGem");
+                player.ResumePlayer();
+                player.Show();
+            }
+
+            if (!ReplayRecorder.Instance.IsRecording)
+            {
+                Log.Debug("Recording was stopped, restarting fresh recording", "ReplayGem");
+                ReplayRecorder.Instance.RefreshCharacterCache();
+                ReplayRecorder.Instance.StartRecording(); // Actually start recording again
+            }
+            else if (ReplayRecorder.Instance.IsPausedForReplay)
+            {
+                Log.Debug("Recording was paused, resuming recording", "ReplayGem");
+                ReplayRecorder.Instance.ResumeRecording(); // Just unpause if it was only paused
+            }
         }
     }
 
@@ -656,49 +683,105 @@ public partial class ReplayGem : Node2D
 
     private void CleanupCurrentGhost()
     {
-        // Clean up tracked ghost reference - ORIGINAL METHOD
+        // Clean up tracked ghost reference with safe immediate removal
         if (_currentGhost != null && IsInstanceValid(_currentGhost))
         {
             _currentGhost.StopReplay();
-            _currentGhost.QueueFree();
+            
+            // FIXED: Safe immediate cleanup - remove from parent and defer destruction
+            if (_currentGhost.GetParent() != null)
+            {
+                _currentGhost.GetParent().RemoveChild(_currentGhost);
+                _currentGhost.CallDeferred("queue_free");
+            }
+            else
+            {
+                _currentGhost.QueueFree();
+            }
             _currentGhost = null;
-            Log.Debug("Current ghost cleaned up", "ReplayGem");
+            Log.Debug("Current ghost cleaned up safely", "ReplayGem");
         }
     }
 
     private void CleanupCurrentGhostMonster()
     {
-        // Clean up tracked monster ghost reference
+        // Clean up tracked monster ghost reference with safe immediate removal
         if (_currentGhostMonster != null && IsInstanceValid(_currentGhostMonster))
         {
             _currentGhostMonster.StopReplay();
-            _currentGhostMonster.QueueFree();
+            
+            // FIXED: Safe immediate cleanup - remove from parent and defer destruction
+            if (_currentGhostMonster.GetParent() != null)
+            {
+                _currentGhostMonster.GetParent().RemoveChild(_currentGhostMonster);
+                _currentGhostMonster.CallDeferred("queue_free");
+            }
+            else
+            {
+                _currentGhostMonster.QueueFree();
+            }
             _currentGhostMonster = null;
-            Log.Debug("Current ghost monster cleaned up", "ReplayGem");
+            Log.Debug("Current ghost monster cleaned up safely", "ReplayGem");
         }
     }
 
     private void CleanupAllGhosts()
     {
-        // Clean up any other ghost players that might exist - ORIGINAL METHOD EXPANDED
+        // FIXED: Safe cleanup of all ghost entities with proper error handling
         var allGhosts = GetTree().GetNodesInGroup("ghost_player");
         foreach (Node ghost in allGhosts)
         {
             if (IsInstanceValid(ghost))
             {
-                ghost.QueueFree();
+                try
+                {
+                    // Safe immediate removal to prevent conflicts
+                    if (ghost.GetParent() != null)
+                    {
+                        ghost.GetParent().RemoveChild(ghost);
+                        ghost.CallDeferred("queue_free");
+                    }
+                    else
+                    {
+                        ghost.QueueFree();
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Warning($"Error cleaning up ghost player: {ex.Message}", "ReplayGem");
+                    ghost.QueueFree(); // Fallback cleanup
+                }
             }
         }
 
-        // Added monster cleanup
+        // FIXED: Safe cleanup of ghost monsters with proper error handling
         var allGhostMonsters = GetTree().GetNodesInGroup("ghost_monster");
         foreach (Node ghost in allGhostMonsters)
         {
             if (IsInstanceValid(ghost))
             {
-                ghost.QueueFree();
+                try
+                {
+                    // Safe immediate removal to prevent conflicts
+                    if (ghost.GetParent() != null)
+                    {
+                        ghost.GetParent().RemoveChild(ghost);
+                        ghost.CallDeferred("queue_free");
+                    }
+                    else
+                    {
+                        ghost.QueueFree();
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Warning($"Error cleaning up ghost monster: {ex.Message}", "ReplayGem");
+                    ghost.QueueFree(); // Fallback cleanup
+                }
             }
         }
+        
+        Log.Debug("All ghosts cleaned up safely", "ReplayGem");
     }
 
     private void EnsureEntitiesResumed()
@@ -724,24 +807,38 @@ public partial class ReplayGem : Node2D
 
     private void EnsureRecordingResumed()
     {
-        // Ensure recording is resumed if cleanup is called directly - FIXED: Force restart if needed
+        // FIXED: Only resume recording after ensuring entities are in normal state
+        // This prevents recording of frozen/paused states during replay
         if (ReplayRecorder.Instance != null)
         {
-            ReplayRecorder.Instance.ResumeRecording();
+            // Check if player is properly resumed before resuming recording
+            var player = GetTree().GetFirstNodeInGroup("player") as Player;
+            if (player != null && player.IsPaused())
+            {
+                Log.Warning("Player still paused - not resuming recording yet", "ReplayGem");
+                return;
+            }
+
+            if (ReplayRecorder.Instance.IsPausedForReplay)
+            {
+                ReplayRecorder.Instance.ResumeRecording();
+                Log.Debug("Recording resumed after ensuring player is active", "ReplayGem");
+            }
             
             // If recording is not actually running, force restart
             if (!ReplayRecorder.Instance.IsRecording)
             {
                 Log.Warning("Recording was not active, forcing restart", "ReplayGem");
-                ReplayRecorder.Instance.RefreshCharacterReferences();
-                ReplayRecorder.Instance.InitializeRecording();
+                ReplayRecorder.Instance.RefreshCharacterCache();
+                ReplayRecorder.Instance.StartRecording();
             }
         }
     }
 
     public override void _ExitTree()
     {
-        // Clean up when gem is removed from scene - ORIGINAL METHOD
+        // Clean up when gem is removed from scene with proper timer cleanup
+        _replayCleanupTimer?.Cancel();
         CleanupGhost();
     }
     #endregion

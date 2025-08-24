@@ -231,7 +231,7 @@ public partial class UIManager : Node
         HideGameOverUI();
         
         // Notify game restart
-        GameEvents.OnGameRestart();
+        GameEventSystem.OnGameRestart();
     }
     
     public GameOverUI GetGameOverUI() => _gameOverUI;

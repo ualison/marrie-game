@@ -1,10 +1,10 @@
 using Godot;
 
 /// <summary>
-/// Entity creation services for dynamic game objects
-/// Handles instantiation of replay gems and ghost entities
+/// Factory for creating replay-related entities
+/// Handles instantiation of replay gems, ghost players, and ghost monsters
 /// </summary>
-public static class EntityFactory
+public static class ReplayEntityFactory
 {
     private static PackedScene _replayGemScene;
     private static PackedScene _ghostPlayerScene;
@@ -24,17 +24,27 @@ public static class EntityFactory
             
             foreach (string path in possiblePaths)
             {
-                if (ResourceLoader.Exists(path))
+                try
                 {
-                    _replayGemScene = GD.Load<PackedScene>(path);
-                    Log.Debug($"EntityFactory: Loaded ReplayGem scene from {path}", "EntityFactory");
-                    break;
+                    if (ResourceLoader.Exists(path))
+                    {
+                        _replayGemScene = GD.Load<PackedScene>(path);
+                        if (_replayGemScene != null)
+                        {
+                            Log.Debug($"ReplayEntityFactory: Loaded ReplayGem scene from {path}", "ReplayEntityFactory");
+                            break;
+                        }
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Error($"ReplayEntityFactory: Failed to load scene from {path}: {ex.Message}", "ReplayEntityFactory");
                 }
             }
             
             if (_replayGemScene == null)
             {
-                Log.Error("EntityFactory: Could not find ReplayGem.tscn in any expected location", "EntityFactory");
+                Log.Error("ReplayEntityFactory: Could not find ReplayGem.tscn in any expected location", "ReplayEntityFactory");
             }
         }
         return _replayGemScene;
@@ -44,7 +54,21 @@ public static class EntityFactory
     {
         if (_ghostPlayerScene == null)
         {
-            _ghostPlayerScene = GD.Load<PackedScene>("res://Prefabs/GhostPlayer.tscn");
+            try
+            {
+                if (ResourceLoader.Exists("res://Prefabs/GhostPlayer.tscn"))
+                {
+                    _ghostPlayerScene = GD.Load<PackedScene>("res://Prefabs/GhostPlayer.tscn");
+                    if (_ghostPlayerScene != null)
+                    {
+                        Log.Debug("ReplayEntityFactory: Loaded GhostPlayer scene", "ReplayEntityFactory");
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error($"ReplayEntityFactory: Failed to load GhostPlayer scene: {ex.Message}", "ReplayEntityFactory");
+            }
         }
         return _ghostPlayerScene;
     }
@@ -53,7 +77,21 @@ public static class EntityFactory
     {
         if (_ghostMonsterScene == null)
         {
-            _ghostMonsterScene = GD.Load<PackedScene>("res://Prefabs/GhostMonster.tscn");
+            try
+            {
+                if (ResourceLoader.Exists("res://Prefabs/GhostMonster.tscn"))
+                {
+                    _ghostMonsterScene = GD.Load<PackedScene>("res://Prefabs/GhostMonster.tscn");
+                    if (_ghostMonsterScene != null)
+                    {
+                        Log.Debug("ReplayEntityFactory: Loaded GhostMonster scene", "ReplayEntityFactory");
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error($"ReplayEntityFactory: Failed to load GhostMonster scene: {ex.Message}", "ReplayEntityFactory");
+            }
         }
         return _ghostMonsterScene;
     }
@@ -65,21 +103,29 @@ public static class EntityFactory
         var scene = GetReplayGemScene();
         if (scene == null)
         {
-            Log.Error("EntityFactory: CRITICAL - Could not load ReplayGem scene!", "EntityFactory");
+            Log.Error("ReplayEntityFactory: CRITICAL - Could not load ReplayGem scene!", "ReplayEntityFactory");
             return null;
         }
         
         var gem = scene.Instantiate() as ReplayGem;
         if (gem == null)
         {
-            Log.Error("EntityFactory: CRITICAL - ReplayGem scene did not instantiate properly!", "EntityFactory");
+            Log.Error("ReplayEntityFactory: CRITICAL - ReplayGem scene did not instantiate properly!", "ReplayEntityFactory");
             return null;
         }
         
-        parent.AddChild(gem);
+        // Set position before adding to tree
         gem.GlobalPosition = position;
-        GameEvents.OnReplayGemCreated(position);
-        Log.Debug($"EntityFactory: Created ReplayGem at {position}", "EntityFactory");
+        
+        // Use call_deferred to avoid physics flush conflicts
+        parent.CallDeferred(Node.MethodName.AddChild, gem);
+        
+        // Show the gem after it's added to the tree
+        gem.CallDeferred(nameof(ReplayGem.ShowGem), position);
+        
+        // Fire event immediately since we just want to notify
+        GameEventSystem.OnReplayGemCreated(position);
+        Log.Debug($"ReplayEntityFactory: Created ReplayGem at {position} - showing deferred", "ReplayEntityFactory");
         
         return gem;
     }
@@ -102,7 +148,7 @@ public static class EntityFactory
         
         if (ghost != null)
         {
-            parent.AddChild(ghost);
+            parent.CallDeferred(Node.MethodName.AddChild, ghost);
             ghost.GlobalPosition = position;
             ghost.AddToGroup("ghost_player");
         }
@@ -128,7 +174,7 @@ public static class EntityFactory
         
         if (ghost != null)
         {
-            parent.AddChild(ghost);
+            parent.CallDeferred(Node.MethodName.AddChild, ghost);
             ghost.GlobalPosition = position;
             ghost.AddToGroup("ghost_monster");
         }

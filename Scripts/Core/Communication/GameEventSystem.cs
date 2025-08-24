@@ -2,10 +2,10 @@ using Godot;
 using System;
 
 /// <summary>
-/// Event system for decoupling game components
-/// Provides type-safe communication between systems
+/// Central event system for game-wide communication
+/// Provides type-safe messaging between game systems and components
 /// </summary>
-public static class GameEvents
+public static class GameEventSystem
 {
     // Player Events
     public static event Action<Vector2, int> PlayerDied;

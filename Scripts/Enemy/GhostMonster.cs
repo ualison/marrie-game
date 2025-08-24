@@ -13,7 +13,7 @@ public partial class GhostMonster : CharacterBody2D
     #region State Variables
     private List<ReplayFrame> _replayFrames;
     private int _currentFrameIndex;
-    private float _replayStartTime;
+    private float _elapsedTime; // FIXED: Use delta-based timing for better sync
     private bool _isReplaying;
     private string _monsterType;
     #endregion
@@ -56,14 +56,48 @@ public partial class GhostMonster : CharacterBody2D
     {
         if (!_isReplaying || _replayFrames == null) return;
 
-        float elapsedTime = Time.GetTicksMsec() / 1000.0f - _replayStartTime;
-        var targetFrame = FindFrameAtTime(elapsedTime);
+        // FIXED: Use delta-based timing for consistent synchronization
+        _elapsedTime += (float)delta;
+        var targetFrame = FindFrameAtTime(_elapsedTime);
 
         if (targetFrame.HasValue)
         {
             // Always update target position from replay data
             _targetPosition = targetFrame.Value.Position;
             ApplyFrameToGhostOptimized(targetFrame.Value);
+            
+            // FIXED: For immediate response, set position directly for first few frames
+            if (_elapsedTime < 0.2f) // First 200ms for immediate response
+            {
+                _currentPosition = _targetPosition;
+                GlobalPosition = _currentPosition;
+            }
+            else
+            {
+                // Handle movement based on state (like Monster with follower behavior)
+                if (_isCurrentlyFullyVisible)
+                {
+                    // Normal smooth interpolation when fully visible
+                    _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * (float)delta);
+                }
+                else
+                {
+                    // During fade transitions, handle position updates more carefully
+                    var distance = _currentPosition.DistanceTo(_targetPosition);
+                    
+                    if (distance > 100f) // Large position change (repositioning during fade)
+                    {
+                        // Teleport during invisible phase (like Monster repositioning)
+                        _currentPosition = _targetPosition;
+                    }
+                    else if (distance > 1.0f)
+                    {
+                        // Small adjustments - use slower movement during fades
+                        _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * 0.2f * (float)delta);
+                    }
+                }
+                GlobalPosition = _currentPosition;
+            }
         }
         else if (_currentFrameIndex >= _replayFrames.Count)
         {
@@ -71,35 +105,28 @@ public partial class GhostMonster : CharacterBody2D
             Log.Replay("GhostMonster: Replay completed", "GhostMonster");
             return;
         }
-
-        // Handle movement based on state (like Monster with follower behavior)
-        if (_isCurrentlyFullyVisible)
-        {
-            // Normal smooth interpolation when fully visible
-            _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * (float)delta);
-        }
         else
         {
-            // During fade transitions, handle position updates more carefully
-            var distance = _currentPosition.DistanceTo(_targetPosition);
-            
-            if (distance > 100f) // Large position change (repositioning during fade)
+            // Continue movement even when no new frame is found
+            if (_isCurrentlyFullyVisible)
             {
-                // Teleport during invisible phase (like Monster repositioning)
-                _currentPosition = _targetPosition;
+                _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * (float)delta);
             }
-            else if (distance > 1.0f)
-            {
-                // Small adjustments - use slower movement during fades
-                _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * 0.2f * (float)delta);
-            }
+            GlobalPosition = _currentPosition;
         }
-        
-        GlobalPosition = _currentPosition;
     }
-    // Use the same frame finder as GhostPlayer
+    #endregion
+
+    #region Frame Processing
     private ReplayFrame? FindFrameAtTime(float time)
     {
+        // Handle negative time (should show first frame immediately)
+        if (time <= 0f && _replayFrames.Count > 0)
+        {
+            _currentFrameIndex = 0;
+            return _replayFrames[0];
+        }
+        
         for (int i = _currentFrameIndex; i < _replayFrames.Count; i++)
         {
             if (_replayFrames[i].Timestamp >= time)
@@ -108,6 +135,13 @@ public partial class GhostMonster : CharacterBody2D
                 return _replayFrames[i];
             }
         }
+        
+        // If no frame found for current time, return the last frame we should have played
+        if (_currentFrameIndex > 0 && _currentFrameIndex < _replayFrames.Count)
+        {
+            return _replayFrames[_currentFrameIndex];
+        }
+        
         return null;
     }
     #endregion
@@ -229,7 +263,7 @@ public partial class GhostMonster : CharacterBody2D
         _replayFrames = frames;
         _monsterType = monsterType;
         _currentFrameIndex = 0;
-        _replayStartTime = Time.GetTicksMsec() / 1000.0f;
+        _elapsedTime = 0f; // FIXED: Start from zero with delta-based timing
         _isReplaying = true;
 
         // Reset performance cache
@@ -243,21 +277,27 @@ public partial class GhostMonster : CharacterBody2D
         _isCurrentlyFullyVisible = true;
         _currentMonsterState = "";
 
-        // Start at first frame position
-        GlobalPosition = frames[0].Position;
+        // FIXED: Start at first frame position and immediately apply first frame
+        var firstFrame = frames[0];
+        GlobalPosition = firstFrame.Position;
         _currentPosition = GlobalPosition;
         _targetPosition = GlobalPosition;
         _lastPosition = GlobalPosition;
 
-        // Show the CharacterBody2D but start sprite hidden
+        // FIXED: Show the ghost immediately with proper initial state instead of hidden
         Show();
         if (_activeSprite != null)
         {
             _activeSprite.Visible = true;
-            _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, 0);
+            // Start with first frame's alpha instead of 0 to eliminate delay
+            var initialAlpha = firstFrame.Alpha * GHOST_TINT.A;
+            _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, initialAlpha);
         }
 
-        Log.Replay($"GhostMonster: Started optimized replay with {frames.Count} frames", "GhostMonster");
+        // Apply first frame immediately to show correct initial state
+        ApplyFrameToGhostOptimized(firstFrame);
+
+        Log.Replay($"GhostMonster: Started optimized replay with {frames.Count} frames - immediate start at {firstFrame.Position}", "GhostMonster");
     }
 
     public void StopReplay()

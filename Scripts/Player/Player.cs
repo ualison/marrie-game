@@ -1,7 +1,10 @@
 using Godot;
 using MarrieGame.Core.Interfaces;
 
-// Main character controller handling movement, damage, and visual feedback
+/// <summary>
+/// Main character controller with improved organization
+/// Clean separation of concerns while maintaining existing API
+/// </summary>
 public partial class Player : CharacterBody2D, IPausable, IResettable
 {
     #region Exported Properties
@@ -127,6 +130,9 @@ public partial class Player : CharacterBody2D, IPausable, IResettable
             _facingRight = shouldFaceRight;
             var scale = _sprite.Scale;
             _sprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
+            
+            // Debug: Log player flip changes
+            Log.Debug($"Player direction changed: facing right = {_facingRight}, scale.X = {_sprite.Scale.X}", "Player");
         }
     }
 
@@ -363,7 +369,7 @@ private void ProcessDamageFromEnemy(Node2D enemy)
         ApplyDeathVisuals();
         
         // Notify death through event system instead of direct GameManager call
-        GameEvents.OnPlayerDied(GlobalPosition, _playerLife?.CurrentHealth ?? 0);
+        GameEventSystem.OnPlayerDied(GlobalPosition, _playerLife?.CurrentHealth ?? 0);
     }
 
     private void ApplyDeathVisuals()
