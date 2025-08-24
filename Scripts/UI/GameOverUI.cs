@@ -145,7 +145,7 @@ public partial class GameOverUI : Control
         }
         else
         {
-            GD.PrintErr("GameOverUI not in tree - cannot emit RestartRequested signal");
+            Log.Error("GameOverUI not in tree - cannot emit RestartRequested signal", "GameOverUI");
         }
     }
 
@@ -160,11 +160,11 @@ public partial class GameOverUI : Control
     private void LogDiscoveredElements()
     {
         // Log discovered UI elements for debugging
-        GD.Print("GameOverUI elements discovered:");
-        GD.Print($"- GameOverLabel: {(_gameOverLabel != null ? "✓" : "✗")}");
-        GD.Print($"- SubMessageLabel: {(_subMessageLabel != null ? "✓" : "✗")}");
-        GD.Print($"- RestartButton: {(_restartButton != null ? "✓" : "✗")}");
-        GD.Print($"- QuitButton: {(_quitButton != null ? "✓" : "✗")}");
+        Log.Debug("GameOverUI elements discovered:", "GameOverUI");
+        Log.Debug($"- GameOverLabel: {(_gameOverLabel != null ? "✓" : "✗")}", "GameOverUI");
+        Log.Debug($"- SubMessageLabel: {(_subMessageLabel != null ? "✓" : "✗")}", "GameOverUI");
+        Log.Debug($"- RestartButton: {(_restartButton != null ? "✓" : "✗")}", "GameOverUI");
+        Log.Debug($"- QuitButton: {(_quitButton != null ? "✓" : "✗")}", "GameOverUI");
     }
     #endregion
 }

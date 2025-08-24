@@ -45,7 +45,7 @@ public partial class AudioManager : AudioStreamPlayer2D
             PlayBackgroundMusic();
         }
 
-        GD.Print("AudioManager initialized");
+        Log.Audio("AudioManager initialized", "AudioManager");
     }
 
     private void SetupAudioConfiguration()
@@ -68,17 +68,17 @@ public partial class AudioManager : AudioStreamPlayer2D
         if (Stream is AudioStreamOggVorbis oggStream)
         {
             oggStream.Loop = true;
-            GD.Print("Background music: OGG looping enabled");
+            Log.Audio("Background music: OGG looping enabled", "AudioManager");
         }
         else if (Stream is AudioStreamWav wavStream)
         {
             wavStream.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
-            GD.Print("Background music: WAV looping enabled");
+            Log.Audio("Background music: WAV looping enabled", "AudioManager");
         }
         else if (Stream is AudioStreamMP3 mp3Stream)
         {
             mp3Stream.Loop = true;
-            GD.Print("Background music: MP3 looping enabled");
+            Log.Audio("Background music: MP3 looping enabled", "AudioManager");
         }
     }
     #endregion
@@ -94,11 +94,11 @@ public partial class AudioManager : AudioStreamPlayer2D
             Stop(); // Ensure we start from beginning
             Play();
             _isMusicPaused = false;
-            GD.Print("Background music started");
+            Log.Audio("Background music started", "AudioManager");
         }
         else
         {
-            GD.PrintErr("No background music assigned to AudioManager");
+            Log.Error("No background music assigned to AudioManager", "AudioManager");
         }
     }
 
@@ -107,7 +107,7 @@ public partial class AudioManager : AudioStreamPlayer2D
         // Stop background music
         Stop();
         _isMusicPaused = false;
-        GD.Print("Background music stopped");
+        Log.Audio("Background music stopped", "AudioManager");
     }
 
     public void PauseBackgroundMusic()
@@ -117,7 +117,7 @@ public partial class AudioManager : AudioStreamPlayer2D
         {
             StreamPaused = true;
             _isMusicPaused = true;
-            GD.Print("Background music paused");
+            Log.Audio("Background music paused", "AudioManager");
         }
     }
 
@@ -128,7 +128,7 @@ public partial class AudioManager : AudioStreamPlayer2D
         {
             StreamPaused = false;
             _isMusicPaused = false;
-            GD.Print("Background music resumed");
+            Log.Audio("Background music resumed", "AudioManager");
         }
     }
 
@@ -140,7 +140,7 @@ public partial class AudioManager : AudioStreamPlayer2D
             Stop();
             Play();
             _isMusicPaused = false;
-            GD.Print("Background music restarted from beginning");
+            Log.Audio("Background music restarted from beginning", "AudioManager");
         }
     }
 
@@ -170,7 +170,7 @@ public partial class AudioManager : AudioStreamPlayer2D
         MusicVolume = volumeDb;
         VolumeDb = volumeDb;
         _originalVolume = volumeDb;
-        GD.Print($"Music volume set to {volumeDb} dB");
+        Log.Audio($"Music volume set to {volumeDb} dB", "AudioManager");
     }
 
     public void FadeOut(float duration = 1.0f)
@@ -203,12 +203,12 @@ public partial class AudioManager : AudioStreamPlayer2D
     public void LogStatus()
     {
         // Debug logging for audio state
-        GD.Print("=== AudioManager Status ===");
-        GD.Print($"Playing: {Playing}");
-        GD.Print($"Paused: {_isMusicPaused}");
-        GD.Print($"Volume: {VolumeDb} dB");
-        GD.Print($"Current Music: {BackgroundMusic?.ResourcePath ?? "None"}");
-        GD.Print($"Stream: {Stream?.ResourcePath ?? "None"}");
+        Log.Debug("=== AudioManager Status ===", "AudioManager");
+        Log.Debug($"Playing: {Playing}", "AudioManager");
+        Log.Debug($"Paused: {_isMusicPaused}", "AudioManager");
+        Log.Debug($"Volume: {VolumeDb} dB", "AudioManager");
+        Log.Debug($"Current Music: {BackgroundMusic?.ResourcePath ?? "None"}", "AudioManager");
+        Log.Debug($"Stream: {Stream?.ResourcePath ?? "None"}", "AudioManager");
     }
     #endregion
 

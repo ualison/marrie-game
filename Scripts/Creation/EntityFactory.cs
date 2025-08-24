@@ -27,14 +27,14 @@ public static class EntityFactory
                 if (ResourceLoader.Exists(path))
                 {
                     _replayGemScene = GD.Load<PackedScene>(path);
-                    GD.Print($"EntityFactory: Loaded ReplayGem scene from {path}");
+                    Log.Debug($"EntityFactory: Loaded ReplayGem scene from {path}", "EntityFactory");
                     break;
                 }
             }
             
             if (_replayGemScene == null)
             {
-                GD.PrintErr("EntityFactory: Could not find ReplayGem.tscn in any expected location");
+                Log.Error("EntityFactory: Could not find ReplayGem.tscn in any expected location", "EntityFactory");
             }
         }
         return _replayGemScene;
@@ -65,21 +65,21 @@ public static class EntityFactory
         var scene = GetReplayGemScene();
         if (scene == null)
         {
-            GD.PrintErr("EntityFactory: CRITICAL - Could not load ReplayGem scene!");
+            Log.Error("EntityFactory: CRITICAL - Could not load ReplayGem scene!", "EntityFactory");
             return null;
         }
         
         var gem = scene.Instantiate() as ReplayGem;
         if (gem == null)
         {
-            GD.PrintErr("EntityFactory: CRITICAL - ReplayGem scene did not instantiate properly!");
+            Log.Error("EntityFactory: CRITICAL - ReplayGem scene did not instantiate properly!", "EntityFactory");
             return null;
         }
         
         parent.AddChild(gem);
         gem.GlobalPosition = position;
         GameEvents.OnReplayGemCreated(position);
-        GD.Print($"EntityFactory: Created ReplayGem at {position}");
+        Log.Debug($"EntityFactory: Created ReplayGem at {position}", "EntityFactory");
         
         return gem;
     }

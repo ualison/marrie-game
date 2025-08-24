@@ -47,7 +47,7 @@ public partial class GhostMonster : CharacterBody2D
         SetupGhostVisuals();
         DisableCollisions();
         Hide();
-        GD.Print($"GhostMonster ready: {Name}");
+        Log.Debug($"GhostMonster ready: {Name}", "GhostMonster");
     }
     #endregion
 
@@ -68,7 +68,7 @@ public partial class GhostMonster : CharacterBody2D
         else if (_currentFrameIndex >= _replayFrames.Count)
         {
             _isReplaying = false;
-            GD.Print("GhostMonster: Replay completed");
+            Log.Replay("GhostMonster: Replay completed", "GhostMonster");
             return;
         }
 
@@ -183,7 +183,7 @@ public partial class GhostMonster : CharacterBody2D
             float distance = _currentPosition.DistanceTo(frame.Position);
             if (distance > 50f) // Log significant position changes
             {
-                GD.Print($"GhostMonster: Large position change during transition - Distance: {distance:F1}, From: {_currentPosition} To: {frame.Position}");
+                Log.Debug($"GhostMonster: Large position change during transition - Distance: {distance:F1}, From: {_currentPosition} To: {frame.Position}", "GhostMonster");
             }
             
             HandleStateTransition(newMonsterState, newIsFullyVisible, frame);
@@ -207,11 +207,11 @@ public partial class GhostMonster : CharacterBody2D
         // Log state transitions for debugging
         if (!newIsFullyVisible && _isCurrentlyFullyVisible)
         {
-            GD.Print($"GhostMonster: Starting fade transition - State: {newState} (movement will slow down)");
+            Log.Debug($"GhostMonster: Starting fade transition - State: {newState} (movement will slow down)", "GhostMonster");
         }
         else if (newIsFullyVisible && !_isCurrentlyFullyVisible)
         {
-            GD.Print($"GhostMonster: Ending fade transition - State: {newState} (resuming normal movement)");
+            Log.Debug($"GhostMonster: Ending fade transition - State: {newState} (resuming normal movement)", "GhostMonster");
         }
     }
 
@@ -222,7 +222,7 @@ public partial class GhostMonster : CharacterBody2D
     {
         if (frames == null || frames.Count == 0)
         {
-            GD.Print("GhostMonster: No frames to replay");
+            Log.Warning("GhostMonster: No frames to replay", "GhostMonster");
             return;
         }
 
@@ -257,7 +257,7 @@ public partial class GhostMonster : CharacterBody2D
             _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, 0);
         }
 
-        GD.Print($"GhostMonster: Started optimized replay with {frames.Count} frames");
+        Log.Replay($"GhostMonster: Started optimized replay with {frames.Count} frames", "GhostMonster");
     }
 
     public void StopReplay()
@@ -266,7 +266,7 @@ public partial class GhostMonster : CharacterBody2D
         _currentFadeTween?.Kill();
         _isCurrentlyFullyVisible = true;
         _currentMonsterState = "";
-        GD.Print("GhostMonster: Replay stopped");
+        Log.Replay("GhostMonster: Replay stopped", "GhostMonster");
     }
 
     public void FadeOutAndDestroy()
@@ -281,7 +281,7 @@ public partial class GhostMonster : CharacterBody2D
         tween.TweenProperty(_activeSprite, "modulate:a", 0.0f, 0.5f);
         tween.TweenCallback(Callable.From(() =>
         {
-            GD.Print("Ghost monster faded out and destroyed");
+            Log.Debug("Ghost monster faded out and destroyed", "GhostMonster");
             QueueFree();
         }));
     }
@@ -303,7 +303,7 @@ public partial class GhostMonster : CharacterBody2D
         if (_animatedSprite != null)
         {
             _activeSprite = _animatedSprite;
-            GD.Print("GhostMonster: Found AnimatedSprite2D");
+            Log.Debug("GhostMonster: Found AnimatedSprite2D", "GhostMonster");
             return;
         }
 
@@ -314,11 +314,11 @@ public partial class GhostMonster : CharacterBody2D
         if (_sprite != null)
         {
             _activeSprite = _sprite;
-            GD.Print($"GhostMonster: Found sprite: {_sprite.Name}");
+            Log.Debug($"GhostMonster: Found sprite: {_sprite.Name}", "GhostMonster");
         }
         else
         {
-            GD.Print("GhostMonster: No sprite found, creating fallback");
+            Log.Warning("GhostMonster: No sprite found, creating fallback", "GhostMonster");
             CreateFallbackVisual();
         }
     }

@@ -37,10 +37,24 @@ public partial class ReplaySystemManager : Node
             
             // Listen to game events
             GameEvents.GameRestart += OnGameRestart;
+            
+            // Also try immediate discovery as a fallback
+            CallDeferred(nameof(InitializeDirectly));
         }
         else
         {
             QueueFree();
+        }
+    }
+    
+    private void InitializeDirectly()
+    {
+        // Fallback initialization in case SceneReady doesn't fire
+        if (_replayRecorder == null)
+        {
+            Log.System("Attempting direct initialization as fallback", "ReplaySystemManager");
+            DiscoverReplayComponents();
+            InitializeReplaySystem();
         }
     }
     
@@ -52,15 +66,39 @@ public partial class ReplaySystemManager : Node
         // Also try to discover components immediately if they weren't found
         if (_replayRecorder == null)
         {
-            // Retry discovery after a short delay
-            GetTree().CreateTimer(0.1f).Timeout += () => {
+            // Retry discovery after a short delay with multiple attempts
+            RetryDiscovery(1);
+        }
+    }
+    
+    private void RetryDiscovery(int attemptNumber)
+    {
+        const int maxAttempts = 5;
+        const float retryDelay = 0.2f;
+        
+        if (attemptNumber > maxAttempts)
+        {
+            Log.Error($"Failed to discover ReplayRecorder after {maxAttempts} attempts!", "ReplaySystemManager");
+            return;
+        }
+        
+        GetTree().CreateTimer(retryDelay * attemptNumber).Timeout += () => {
+            if (_replayRecorder == null)
+            {
+                DiscoverReplayComponents();
+                Log.System($"Retry discovery attempt {attemptNumber} - ReplayRecorder: {_replayRecorder != null}", "ReplaySystemManager");
+                
                 if (_replayRecorder == null)
                 {
-                    DiscoverReplayComponents();
-                    GD.Print($"ReplaySystemManager: Retry discovery - ReplayRecorder: {_replayRecorder != null}");
+                    RetryDiscovery(attemptNumber + 1);
                 }
-            };
-        }
+                else
+                {
+                    Log.System($"Successfully discovered ReplayRecorder on attempt {attemptNumber}", "ReplaySystemManager");
+                    InitializeReplaySystem();
+                }
+            }
+        };
     }
     
     private void DiscoverReplayComponents()
@@ -71,15 +109,17 @@ public partial class ReplaySystemManager : Node
         // If instance is null, try to find it in the scene tree
         if (_replayRecorder == null)
         {
-            GD.Print("ReplaySystemManager: ReplayRecorder.Instance is null, searching scene tree...");
+            Log.System("ReplayRecorder.Instance is null, searching scene tree...", "ReplaySystemManager");
+            
+            // First try the specific group
             var recorderNodes = GetTree().GetNodesInGroup("replay_recorder");
             if (recorderNodes.Count > 0)
             {
                 _replayRecorder = recorderNodes[0] as ReplayRecorder;
-                GD.Print($"ReplaySystemManager: Found ReplayRecorder in scene tree: {_replayRecorder != null}");
+                Log.System($"Found ReplayRecorder in replay_recorder group: {_replayRecorder != null}", "ReplaySystemManager");
             }
             
-            // Last resort: search all nodes
+            // If still not found, try broader search
             if (_replayRecorder == null)
             {
                 var allNodes = GetTree().GetNodesInGroup("replay");
@@ -88,11 +128,33 @@ public partial class ReplaySystemManager : Node
                     if (node is ReplayRecorder recorder)
                     {
                         _replayRecorder = recorder;
-                        GD.Print("ReplaySystemManager: Found ReplayRecorder via comprehensive search");
+                        Log.System("Found ReplayRecorder via replay group search", "ReplaySystemManager");
                         break;
                     }
                 }
             }
+            
+            // Last resort: search all nodes by type
+            if (_replayRecorder == null)
+            {
+                _replayRecorder = GetTree().GetFirstNodeInGroup("replay_recorder") as ReplayRecorder;
+                if (_replayRecorder == null)
+                {
+                    // Manual search through scene tree
+                    _replayRecorder = FindReplayRecorderInTree(GetTree().CurrentScene);
+                }
+                if (_replayRecorder != null)
+                {
+                    Log.System("Found ReplayRecorder via comprehensive tree search", "ReplaySystemManager");
+                }
+            }
+        }
+        
+        // Validate the found recorder
+        if (_replayRecorder != null && !IsInstanceValid(_replayRecorder))
+        {
+            Log.Error("Found ReplayRecorder but it's not valid!", "ReplaySystemManager");
+            _replayRecorder = null;
         }
         
         // Load replay gem scene if not set - try multiple paths
@@ -108,34 +170,44 @@ public partial class ReplaySystemManager : Node
             
             foreach (var path in possiblePaths)
             {
-                GD.Print($"ReplaySystemManager: Checking path: {path}");
                 if (ResourceLoader.Exists(path))
                 {
                     ReplayGemScene = GD.Load<PackedScene>(path);
                     if (ReplayGemScene != null)
                     {
-                        GD.Print($"ReplaySystemManager: Successfully loaded ReplayGem scene from {path}");
+                        Log.System($"Successfully loaded ReplayGem scene from {path}", "ReplaySystemManager");
                         break;
                     }
                     else
                     {
-                        GD.PrintErr($"ReplaySystemManager: Path exists but failed to load as PackedScene: {path}");
+                        Log.Error($"Path exists but failed to load as PackedScene: {path}", "ReplaySystemManager");
                     }
-                }
-                else
-                {
-                    GD.Print($"ReplaySystemManager: Path does not exist: {path}");
                 }
             }
             
             if (ReplayGemScene == null)
             {
-                GD.PrintErr("ReplaySystemManager: CRITICAL - Could not find ReplayGem.tscn in any expected location");
-                GD.Print("ReplaySystemManager: Checked paths: " + string.Join(", ", possiblePaths));
+                Log.Critical("Could not find ReplayGem.tscn in any expected location", "ReplaySystemManager");
+                Log.Debug("Checked paths: " + string.Join(", ", possiblePaths), "ReplaySystemManager");
             }
         }
         
-        GD.Print($"ReplaySystemManager: ReplayRecorder found: {_replayRecorder != null}, ReplayGem scene: {ReplayGemScene != null}");
+        Log.System($"Discovery complete - ReplayRecorder: {_replayRecorder != null}, ReplayGem scene: {ReplayGemScene != null}", "ReplaySystemManager");
+    }
+    
+    private ReplayRecorder FindReplayRecorderInTree(Node node)
+    {
+        if (node is ReplayRecorder recorder)
+            return recorder;
+            
+        foreach (Node child in node.GetChildren())
+        {
+            var result = FindReplayRecorderInTree(child);
+            if (result != null)
+                return result;
+        }
+        
+        return null;
     }
     
     private void InitializeReplaySystem()
@@ -143,26 +215,49 @@ public partial class ReplaySystemManager : Node
         if (_replayRecorder != null)
         {
             _replayRecorder.StartRecording();
-            GD.Print("ReplaySystemManager: Started recording");
+            Log.System("Started recording", "ReplaySystemManager");
         }
     }
     
     private void OnPlayerDied(Vector2 deathPosition, int remainingHealth)
     {
+        // Use new logging system with fallback
         Log.Replay($"Player died - capturing replay data at {deathPosition} (Health: {remainingHealth})", "ReplaySystemManager");
         
-        // Ensure we have a valid recorder reference
+        // Ensure we have a valid recorder reference with more aggressive discovery
         if (_replayRecorder == null)
         {
             Log.Error("ReplayRecorder is null, attempting immediate discovery", "ReplaySystemManager");
+            
             DiscoverReplayComponents();
+            
+            // If still null after discovery, try more aggressive searching
+            if (_replayRecorder == null)
+            {
+                // Force a more thorough search
+                var allRecorders = new System.Collections.Generic.List<ReplayRecorder>();
+                FindAllNodesOfType(GetTree().CurrentScene, typeof(ReplayRecorder), allRecorders);
+                
+                if (allRecorders.Count > 0)
+                {
+                    _replayRecorder = allRecorders[0];
+                    Log.System("Found ReplayRecorder through aggressive search", "ReplaySystemManager");
+                }
+            }
         }
         
         // Check frame counts before capturing
         if (_replayRecorder != null)
         {
-            var stats = _replayRecorder.GetRecordingStats();
-            Log.Replay($"Recording stats before capture - Player: {stats.playerFrames}, Monster: {stats.monsterFrames}", "ReplaySystemManager");
+            try
+            {
+                var stats = _replayRecorder.GetRecordingStats();
+                Log.Replay($"Recording stats before capture - Player: {stats.playerFrames}, Monster: {stats.monsterFrames}", "ReplaySystemManager");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error($"Error getting recording stats: {ex.Message}", "ReplaySystemManager");
+            }
         }
         else
         {
@@ -176,7 +271,20 @@ public partial class ReplaySystemManager : Node
         StopRecording();
         
         // DON'T spawn replay gem immediately - only after restart
-        GD.Print($"ReplaySystemManager: Player died at {deathPosition}, gem will appear after restart");
+        Log.Replay($"Player died at {deathPosition}, gem will appear after restart", "ReplaySystemManager");
+    }
+    
+    private void FindAllNodesOfType(Node node, System.Type type, System.Collections.Generic.List<ReplayRecorder> results)
+    {
+        if (node.GetType() == type || node.GetType().IsSubclassOf(type))
+        {
+            results.Add(node as ReplayRecorder);
+        }
+        
+        foreach (Node child in node.GetChildren())
+        {
+            FindAllNodesOfType(child, type, results);
+        }
     }
     
     private void StoreDeathRecord(Vector2 deathPosition)
@@ -188,26 +296,26 @@ public partial class ReplaySystemManager : Node
         // Get replay frames from recorder
         if (_replayRecorder != null)
         {
-            GD.Print("ReplaySystemManager: About to get frames from recorder...");
+            Log.Replay("About to get frames from recorder...", "ReplaySystemManager");
             var playerFrames = _replayRecorder.GetPlayerFrames();
             var monsterFrames = _replayRecorder.GetMonsterFrames();
             
-            GD.Print($"ReplaySystemManager: Retrieved {playerFrames?.Count ?? 0} player frames and {monsterFrames?.Count ?? 0} monster frames");
+            Log.Replay($"Retrieved {playerFrames?.Count ?? 0} player frames and {monsterFrames?.Count ?? 0} monster frames", "ReplaySystemManager");
             
             deathRecord.PlayerFrames = playerFrames ?? new System.Collections.Generic.List<ReplayFrame>();
             deathRecord.MonsterFrames = monsterFrames ?? new System.Collections.Generic.List<ReplayFrame>();
             
-            GD.Print($"ReplaySystemManager: Assigned frames to death record - Player: {deathRecord.PlayerFrames.Count}, Monster: {deathRecord.MonsterFrames.Count}");
+            Log.Replay($"Assigned frames to death record - Player: {deathRecord.PlayerFrames.Count}, Monster: {deathRecord.MonsterFrames.Count}", "ReplaySystemManager");
         }
         else
         {
-            GD.PrintErr("ReplaySystemManager: _replayRecorder is null!");
+            Log.Error("_replayRecorder is null!", "ReplaySystemManager");
             deathRecord.PlayerFrames = new System.Collections.Generic.List<ReplayFrame>();
             deathRecord.MonsterFrames = new System.Collections.Generic.List<ReplayFrame>();
         }
         
         _deathRecords[_currentDeathId] = deathRecord;
-        GD.Print($"ReplaySystemManager: Stored death record {_currentDeathId}");
+        Log.Replay($"Stored death record {_currentDeathId}", "ReplaySystemManager");
     }
     
     public DeathRecord GetLastDeathRecord()
@@ -216,7 +324,7 @@ public partial class ReplaySystemManager : Node
         if (!string.IsNullOrEmpty(_currentDeathId) && _deathRecords.ContainsKey(_currentDeathId))
         {
             var record = _deathRecords[_currentDeathId];
-            GD.Print($"ReplaySystemManager: Found death record {_currentDeathId} with {record.PlayerFrames?.Count ?? 0} player frames and {record.MonsterFrames?.Count ?? 0} monster frames");
+            Log.Replay($"Found death record {_currentDeathId} with {record.PlayerFrames?.Count ?? 0} player frames and {record.MonsterFrames?.Count ?? 0} monster frames", "ReplaySystemManager");
             return record;
         }
         
@@ -226,12 +334,12 @@ public partial class ReplaySystemManager : Node
             var lastRecord = _deathRecords.Values.LastOrDefault();
             if (lastRecord != null)
             {
-                GD.Print($"ReplaySystemManager: Using fallback - found death record with {lastRecord.PlayerFrames?.Count ?? 0} player frames");
+                Log.Replay($"Using fallback - found death record with {lastRecord.PlayerFrames?.Count ?? 0} player frames", "ReplaySystemManager");
                 return lastRecord;
             }
         }
         
-        GD.PrintErr($"ReplaySystemManager: No death record found - _currentDeathId: '{_currentDeathId}', total records: {_deathRecords.Count}");
+        Log.Error($"No death record found - _currentDeathId: '{_currentDeathId}', total records: {_deathRecords.Count}", "ReplaySystemManager");
         return null;
     }
     
@@ -255,16 +363,16 @@ public partial class ReplaySystemManager : Node
             {
                 // Ensure the gem is visible after creation
                 _currentReplayGem.ShowGem(position);
-                GD.Print($"ReplaySystemManager: Spawned replay gem at {position}");
+                Log.System($"Spawned replay gem at {position}", "ReplaySystemManager");
             }
             else
             {
-                GD.PrintErr("ReplaySystemManager: Failed to create replay gem from scene!");
+                Log.Error("Failed to create replay gem from scene!", "ReplaySystemManager");
             }
         }
         else
         {
-            GD.PrintErr("ReplaySystemManager: ReplayGem scene could not be loaded - this should not happen!");
+            Log.Error("ReplayGem scene could not be loaded - this should not happen!", "ReplaySystemManager");
         }
     }
     
@@ -274,7 +382,7 @@ public partial class ReplaySystemManager : Node
         {
             _currentReplayGem.QueueFree();
             _currentReplayGem = null;
-            GD.Print("ReplaySystemManager: Removed previous replay gem");
+            Log.System("Removed previous replay gem", "ReplaySystemManager");
         }
     }
     
@@ -283,20 +391,20 @@ public partial class ReplaySystemManager : Node
         if (_replayRecorder != null)
         {
             _replayRecorder.StopRecording();
-            GD.Print("ReplaySystemManager: Stopped recording");
+            Log.System("Stopped recording", "ReplaySystemManager");
         }
     }
     
     private void OnGameRestart()
     {
-        GD.Print("ReplaySystemManager: Game restarting");
+        Log.System("Game restarting", "ReplaySystemManager");
         
         // Store the last death position for respawning gem after restart
         Vector2 lastDeathPosition = Vector2.Zero;
         if (!string.IsNullOrEmpty(_currentDeathId) && _deathRecords.ContainsKey(_currentDeathId))
         {
             lastDeathPosition = _deathRecords[_currentDeathId].DeathPosition;
-            GD.Print($"ReplaySystemManager: Storing last death position: {lastDeathPosition}");
+            Log.System($"Storing last death position: {lastDeathPosition}", "ReplaySystemManager");
         }
         
         // Remove current replay gem
@@ -311,7 +419,7 @@ public partial class ReplaySystemManager : Node
             // Wait a bit for the scene to settle after restart
             GetTree().CreateTimer(0.5f).Timeout += () => {
                 SpawnReplayGem(lastDeathPosition);
-                GD.Print($"ReplaySystemManager: Respawned replay gem at {lastDeathPosition} after restart");
+                Log.System($"Respawned replay gem at {lastDeathPosition} after restart", "ReplaySystemManager");
             };
         }
         
@@ -319,7 +427,7 @@ public partial class ReplaySystemManager : Node
         if (_replayRecorder != null)
         {
             _replayRecorder.StartRecording();
-            GD.Print("ReplaySystemManager: Restarted recording for new game");
+            Log.System("Restarted recording for new game", "ReplaySystemManager");
         }
     }
     
@@ -329,12 +437,12 @@ public partial class ReplaySystemManager : Node
         // The ReplayRecorder provides frame data, but doesn't control playback
         if (_replayRecorder != null && _replayRecorder.HasRecordedData)
         {
-            GD.Print("ReplaySystemManager: Replay data available");
+            Log.System("Replay data available", "ReplaySystemManager");
             RemoveCurrentReplayGem();
         }
         else
         {
-            GD.PrintErr("ReplaySystemManager: Cannot start replay - no recorded data!");
+            Log.Error("Cannot start replay - no recorded data!", "ReplaySystemManager");
         }
     }
     

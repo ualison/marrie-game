@@ -38,7 +38,7 @@ public partial class EnemyManager : Node
         FindFollowerMonsters();
         FindRegularMonsters();
         
-        GD.Print($"EnemyManager: Found {_followerMonsters.Count} follower monsters, {_regularMonsters.Count} regular monsters");
+        Log.System($"Found {_followerMonsters.Count} follower monsters, {_regularMonsters.Count} regular monsters", "EnemyManager");
     }
 
     private void FindFollowerMonsters()
@@ -83,7 +83,7 @@ public partial class EnemyManager : Node
                 follower.ForceHide();
             }
         }
-        GD.Print("All follower monsters hidden");
+        Log.System("All follower monsters hidden", "EnemyManager");
     }
 
     public void ShowAllFollowers()
@@ -96,7 +96,7 @@ public partial class EnemyManager : Node
                 follower.ForceShow();
             }
         }
-        GD.Print("All follower monsters shown");
+        Log.System("All follower monsters shown", "EnemyManager");
     }
 
     public int GetVisibleFollowerCount()
@@ -125,14 +125,14 @@ public partial class EnemyManager : Node
 
         if (followerScene == null)
         {
-            GD.PrintErr("EnemyManager: Could not load Monster scene");
+            Log.Error("Could not load Monster scene", "EnemyManager");
             return null;
         }
 
         var follower = followerScene.Instantiate() as Monster;
         if (follower == null)
         {
-            GD.PrintErr("EnemyManager: Failed to instantiate Monster");
+            Log.Error("Failed to instantiate Monster", "EnemyManager");
             return null;
         }
 
@@ -144,7 +144,7 @@ public partial class EnemyManager : Node
         follower.GlobalPosition = position;
         _followerMonsters.Add(follower);
 
-        GD.Print($"EnemyManager: Spawned Monster with follower behavior at {position}");
+        Log.System($"Spawned Monster with follower behavior at {position}", "EnemyManager");
         return follower;
     }
     #endregion
@@ -154,14 +154,14 @@ public partial class EnemyManager : Node
     {
         // Handle player death - could pause all enemies or trigger special behavior
         HideAllFollowers();
-        GD.Print("EnemyManager: Player died, hiding all followers");
+        Log.System("Player died, hiding all followers", "EnemyManager");
     }
 
     public void OnGameRestart()
     {
         // Reset all enemies to their initial states for new game
         ResetAllEnemies();
-        GD.Print("EnemyManager: Game restarted, resetting all enemies");
+        Log.System("Game restarted, resetting all enemies", "EnemyManager");
     }
 
     public void ResetAllEnemies()
@@ -181,21 +181,21 @@ public partial class EnemyManager : Node
             if (IsInstanceValid(monster))
             {
                 // Regular monsters don't have Reset method yet, but could be added
-                GD.Print($"Regular monster {monster.Name} - reset not implemented");
+                Log.Warning($"Regular monster {monster.Name} - reset not implemented", "EnemyManager");
             }
         }
 
-        GD.Print($"Reset {_followerMonsters.Count} follower monsters");
+        Log.System($"Reset {_followerMonsters.Count} follower monsters", "EnemyManager");
     }
     #endregion
 
     #region Debug
     public void LogEnemyStatus()
     {
-        GD.Print("=== Enemy Manager Status ===");
-        GD.Print($"Follower Monsters: {_followerMonsters.Count}");
-        GD.Print($"Regular Monsters: {_regularMonsters.Count}");
-        GD.Print($"Visible Followers: {GetVisibleFollowerCount()}");
+        Log.Debug("=== Enemy Manager Status ===", "EnemyManager");
+        Log.Debug($"Follower Monsters: {_followerMonsters.Count}", "EnemyManager");
+        Log.Debug($"Regular Monsters: {_regularMonsters.Count}", "EnemyManager");
+        Log.Debug($"Visible Followers: {GetVisibleFollowerCount()}", "EnemyManager");
     }
     #endregion
 

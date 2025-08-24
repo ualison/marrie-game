@@ -48,7 +48,7 @@ public partial class SceneLifecycleManager : Node
     {
         if (node == GetTree().CurrentScene)
         {
-            GD.Print($"=== Scene reloaded: {node.Name} ===");
+            Log.System($"Scene reloaded: {node.Name}", "SceneLifecycleManager");
             
             // Wait for scene to be fully ready
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -62,15 +62,15 @@ public partial class SceneLifecycleManager : Node
     
     private void HandleSceneReload()
     {
-        GD.Print($"=== Scene reloaded: {GetTree().CurrentScene?.Name} ===");
+        Log.System($"Scene reloaded: {GetTree().CurrentScene?.Name}", "SceneLifecycleManager");
         CallDeferred(nameof(NotifySceneReady));
     }
     
     private void NotifySceneReady()
     {
-        GD.Print("SceneLifecycleManager: Firing SceneReady event");
+        Log.System("Firing SceneReady event", "SceneLifecycleManager");
         SceneReady?.Invoke();
-        GD.Print("SceneLifecycleManager: SceneReady event fired");
+        Log.System("SceneReady event fired", "SceneLifecycleManager");
     }
     
     public override void _ExitTree()

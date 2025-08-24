@@ -66,7 +66,8 @@ public partial class GameManager : Node
     {
         Log.StartTimer("ManagerInitialization");
         
-        // Ensure all managers exist as children
+        // Ensure all managers exist as children - order matters!
+        EnsureManagerExists<SceneLifecycleManager>();  // First - needed for scene events
         EnsureManagerExists<PlayerStateManager>();
         EnsureManagerExists<UIManager>();
         EnsureManagerExists<ReplaySystemManager>();

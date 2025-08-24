@@ -35,18 +35,18 @@ public partial class UIManager : Node
     
     private void TryImmediateInitialization()
     {
-        GD.Print("UIManager: Attempting immediate initialization");
+        Log.System("Attempting immediate initialization", "UIManager");
         DiscoverUIComponents();
         ConnectUIEvents();
         SubscribeToPlayerEvents();
         
         if (_gameOverUI != null)
         {
-            GD.Print("UIManager: Immediate initialization successful");
+            Log.System("Immediate initialization successful", "UIManager");
         }
         else
         {
-            GD.Print("UIManager: Immediate initialization failed, waiting for SceneReady");
+            Log.System("Immediate initialization failed, waiting for SceneReady", "UIManager");
         }
     }
     
@@ -63,11 +63,11 @@ public partial class UIManager : Node
         if (PlayerStateManager.Instance != null)
         {
             PlayerStateManager.PlayerDied += OnPlayerDied;
-            GD.Print("UIManager: Subscribed to PlayerStateManager.PlayerDied");
+            Log.System("Subscribed to PlayerStateManager.PlayerDied", "UIManager");
         }
         else
         {
-            GD.PrintErr("UIManager: PlayerStateManager.Instance is null!");
+            Log.Error("PlayerStateManager.Instance is null!", "UIManager");
         }
     }
     
@@ -76,14 +76,14 @@ public partial class UIManager : Node
         _gameOverUI = GetTree().GetFirstNodeInGroup("game_over_ui") as GameOverUI;
         _lifeBarUI = GetTree().GetFirstNodeInGroup("life_bar_ui") as LifeBarUI;
         
-        GD.Print($"UIManager: GameOverUI found: {_gameOverUI != null}, LifeBarUI found: {_lifeBarUI != null}");
+        Log.System($"GameOverUI found: {_gameOverUI != null}, LifeBarUI found: {_lifeBarUI != null}", "UIManager");
         
         // Debug: List all nodes in the game_over_ui group
         var gameOverNodes = GetTree().GetNodesInGroup("game_over_ui");
-        GD.Print($"UIManager: Found {gameOverNodes.Count} nodes in 'game_over_ui' group");
+        Log.System($"Found {gameOverNodes.Count} nodes in 'game_over_ui' group", "UIManager");
         foreach (Node node in gameOverNodes)
         {
-            GD.Print($"  - {node.Name} ({node.GetType().Name})");
+            Log.Debug($"  - {node.Name} ({node.GetType().Name})", "UIManager");
         }
         
         // If not found by group, try to find by common names
@@ -97,7 +97,7 @@ public partial class UIManager : Node
                 if (node is GameOverUI gameOverUI)
                 {
                     _gameOverUI = gameOverUI;
-                    GD.Print($"UIManager: Found GameOverUI by name search: {name}");
+                    Log.System($"Found GameOverUI by name search: {name}", "UIManager");
                     break;
                 }
             }
@@ -113,7 +113,7 @@ public partial class UIManager : Node
                 if (gameOverNode is GameOverUI gameOverUI)
                 {
                     _gameOverUI = gameOverUI;
-                    GD.Print($"UIManager: Found GameOverUI at Interface/GameOverScr");
+                    Log.System("Found GameOverUI at Interface/GameOverScr", "UIManager");
                 }
             }
         }
@@ -128,7 +128,7 @@ public partial class UIManager : Node
                 if (lifeBarNode is LifeBarUI lifeBarUI)
                 {
                     _lifeBarUI = lifeBarUI;
-                    GD.Print($"UIManager: Found LifeBarUI at Interface/LifeBarUI");
+                    Log.System("Found LifeBarUI at Interface/LifeBarUI", "UIManager");
                 }
             }
         }
@@ -139,12 +139,12 @@ public partial class UIManager : Node
             _gameOverUI = FindNodeByType<GameOverUI>(GetTree().CurrentScene);
             if (_gameOverUI != null)
             {
-                GD.Print($"UIManager: Found GameOverUI by recursive search: {_gameOverUI.Name}");
+                Log.System($"Found GameOverUI by recursive search: {_gameOverUI.Name}", "UIManager");
             }
         }
         
         // Final status
-        GD.Print($"UIManager: Final result - GameOverUI: {_gameOverUI?.Name ?? "null"}, LifeBarUI: {_lifeBarUI?.Name ?? "null"}");
+        Log.System($"Final result - GameOverUI: {_gameOverUI?.Name ?? "null"}, LifeBarUI: {_lifeBarUI?.Name ?? "null"}", "UIManager");
     }
     
     private T FindNodeByType<T>(Node startNode) where T : class
@@ -177,7 +177,7 @@ public partial class UIManager : Node
     
     private void OnPlayerDied(Vector2 deathPosition, int remainingHealth)
     {
-        GD.Print($"UIManager: Received player death event at {deathPosition}");
+        Log.UI($"Received player death event at {deathPosition}", "UIManager");
         
         // Wait 1 second before showing game over UI
         GetTree().CreateTimer(1.0f).Timeout += () => ShowGameOverUIWithFade();
@@ -187,7 +187,7 @@ public partial class UIManager : Node
     {
         if (_gameOverUI != null)
         {
-            GD.Print("UIManager: Showing GameOverUI with fade transition");
+            Log.UI("Showing GameOverUI with fade transition", "UIManager");
             
             // Start invisible and fade in
             _gameOverUI.Modulate = new Color(1, 1, 1, 0);
@@ -196,11 +196,11 @@ public partial class UIManager : Node
             // Create fade-in tween
             var tween = CreateTween();
             tween.TweenProperty(_gameOverUI, "modulate:a", 1.0f, 0.5f);
-            tween.TweenCallback(Callable.From(() => GD.Print("UIManager: Fade-in complete")));
+            tween.TweenCallback(Callable.From(() => Log.UI("Fade-in complete", "UIManager")));
         }
         else
         {
-            GD.PrintErr("UIManager: Cannot show game over - GameOverUI not found!");
+            Log.Error("Cannot show game over - GameOverUI not found!", "UIManager");
         }
     }
     
@@ -220,14 +220,14 @@ public partial class UIManager : Node
             tween.TweenCallback(Callable.From(() => {
                 _gameOverUI.Hide();
                 _gameOverUI.Modulate = new Color(1, 1, 1, 1); // Reset for next time
-                GD.Print("UIManager: GameOverUI hidden with fade-out");
+                Log.UI("GameOverUI hidden with fade-out", "UIManager");
             }));
         }
     }
     
     private void OnRestartRequested()
     {
-        GD.Print("UIManager: Restart requested via GameOverUI");
+        Log.UI("Restart requested via GameOverUI", "UIManager");
         HideGameOverUI();
         
         // Notify game restart

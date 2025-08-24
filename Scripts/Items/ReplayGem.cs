@@ -34,7 +34,7 @@ public partial class ReplayGem : Node2D
         HideInitially();
         EnableInputProcessing();
 
-        GD.Print("ReplayGem ready - hidden until activated");
+        Log.Replay("ReplayGem ready - hidden until activated", "ReplayGem");
     }
 
     private void InitializeComponents()
@@ -116,7 +116,7 @@ public partial class ReplayGem : Node2D
         }
 
         _detectionArea.SetDeferred("monitoring", true);
-        GD.Print($"ReplayGem shown at {position}, scale={Scale}");
+        Log.Replay($"ReplayGem shown at {position}, scale={Scale}", "ReplayGem");
     }
 
     public void HideGem()
@@ -150,7 +150,7 @@ public partial class ReplayGem : Node2D
             {
                 _promptLabel.Show();
             }
-            GD.Print("Player nearby - showing prompt");
+            Log.UI("Player nearby - showing prompt", "ReplayGem");
         }
     }
 
@@ -164,7 +164,7 @@ public partial class ReplayGem : Node2D
             {
                 _promptLabel.Hide();
             }
-            GD.Print("Player left - hiding prompt");
+            Log.UI("Player left - hiding prompt", "ReplayGem");
         }
     }
     #endregion
@@ -173,7 +173,7 @@ public partial class ReplayGem : Node2D
     private void StartReplay()
     {
         // Initialize replay with data validation - ORIGINAL METHOD
-        GD.Print("=== StartReplay called ===");
+        Log.Replay("=== StartReplay called ===", "ReplayGem");
 
         // Pause recording immediately to prevent interference
         if (ReplayRecorder.Instance != null)
@@ -197,7 +197,7 @@ public partial class ReplayGem : Node2D
         // Retrieve death record from ReplaySystemManager
         if (ReplaySystemManager.Instance == null)
         {
-            GD.Print("ReplaySystemManager.Instance is null - cannot get death record");
+            Log.Error("ReplaySystemManager.Instance is null - cannot get death record", "ReplayGem");
             return null;
         }
 
@@ -207,11 +207,11 @@ public partial class ReplayGem : Node2D
     private bool ValidateFrameData(System.Collections.Generic.List<ReplayFrame> playerFrames)
     {
         // Validate frame data before starting replay - ORIGINAL METHOD
-        GD.Print($"Player frames count: {playerFrames.Count}");
+        Log.Replay($"Player frames count: {playerFrames.Count}", "ReplayGem");
 
         if (playerFrames.Count == 0)
         {
-            GD.Print("No player frames to replay");
+            Log.Warning("No player frames to replay", "ReplayGem");
             return false;
         }
 
@@ -226,7 +226,7 @@ public partial class ReplayGem : Node2D
 
         if (ghostPlayer != null)
         {
-            GD.Print("Starting ghost replay...");
+            Log.Replay("Starting ghost replay...", "ReplayGem");
 
             PauseAndHideOriginalEntities();
             StartGhostReplay(ghostPlayer, playerFrames);
@@ -242,7 +242,7 @@ public partial class ReplayGem : Node2D
         }
         else
         {
-            GD.Print("FAILED: Could not create ghost player");
+            Log.Error("FAILED: Could not create ghost player", "ReplayGem");
         }
     }
 
@@ -254,7 +254,7 @@ public partial class ReplayGem : Node2D
         {
             ghostMonster.StartReplay(monsterFrames, "Monster");
             _currentGhostMonster = ghostMonster;
-            GD.Print($"Ghost monster started with {monsterFrames.Count} frames");
+            Log.Replay($"Ghost monster started with {monsterFrames.Count} frames", "ReplayGem");
         }
     }
 
@@ -266,7 +266,7 @@ public partial class ReplayGem : Node2D
         {
             player.PausePlayer();
             player.Hide();
-            GD.Print("Player paused and hidden for replay");
+            Log.Replay("Player paused and hidden for replay", "ReplayGem");
         }
 
         // Disable all monsters during replay
@@ -276,12 +276,12 @@ public partial class ReplayGem : Node2D
             if (monster is Monster follower && follower.EnableFollowerBehavior)
             {
                 follower.DisableForReplay();
-                GD.Print($"Monster with follower behavior {monster.Name} disabled for replay");
+                Log.Replay($"Monster with follower behavior {monster.Name} disabled for replay", "ReplayGem");
             }
             else if (monster is Node2D monsterNode2D)
             {
                 monsterNode2D.Hide();
-                GD.Print($"Monster {monster.Name} hidden for replay");
+                Log.Replay($"Monster {monster.Name} hidden for replay", "ReplayGem");
             }
         }
     }
@@ -328,7 +328,7 @@ public partial class ReplayGem : Node2D
             ResumeAndShowOriginalEntities();
             RestartRecording();
             ShowGemAfterReplay();
-            GD.Print("Replay completed - all entities restored and recording restarted");
+            Log.Replay("Replay completed - all entities restored and recording restarted", "ReplayGem");
         };
     }
 
@@ -354,7 +354,7 @@ public partial class ReplayGem : Node2D
         {
             player.ResumePlayer();
             player.Show();
-            GD.Print("Player resumed and shown after replay");
+            Log.Replay("Player resumed and shown after replay", "ReplayGem");
         }
 
         // Re-enable all monsters after replay
@@ -364,12 +364,12 @@ public partial class ReplayGem : Node2D
             if (monster is Monster follower && follower.EnableFollowerBehavior)
             {
                 follower.EnableAfterReplay();
-                GD.Print($"Monster with follower behavior {monster.Name} enabled after replay");
+                Log.Replay($"Monster with follower behavior {monster.Name} enabled after replay", "ReplayGem");
             }
             else if (monster is Node2D monsterNode2D)
             {
                 monsterNode2D.Show();
-                GD.Print($"Monster {monster.Name} shown after replay");
+                Log.Replay($"Monster {monster.Name} shown after replay", "ReplayGem");
             }
         }
     }
@@ -424,7 +424,7 @@ public partial class ReplayGem : Node2D
         {
             GetTree().CurrentScene.AddChild(ghost);
             ghost.AddToGroup("ghost_player");
-            GD.Print("Created ghost from scene file");
+            Log.Debug("Created ghost from scene file", "ReplayGem");
         }
         else
         {
@@ -440,7 +440,7 @@ public partial class ReplayGem : Node2D
         var originalPlayer = GetTree().GetFirstNodeInGroup("player") as Player;
         if (originalPlayer == null)
         {
-            GD.PrintErr("Cannot create ghost - no original player found");
+            Log.Error("Cannot create ghost - no original player found", "ReplayGem");
             return null;
         }
 
@@ -449,7 +449,7 @@ public partial class ReplayGem : Node2D
         CopySpriteStructure(originalPlayer, ghost);
         AddGhostToScene(ghost);
 
-        GD.Print("Created ghost programmatically");
+        Log.Debug("Created ghost programmatically", "ReplayGem");
         return ghost;
     }
 
@@ -469,7 +469,7 @@ public partial class ReplayGem : Node2D
         }
 
         // IMPORTANT: Only copy visual components, no collision or interaction components
-        GD.Print("Ghost player created with visual components only - no collision/damage");
+        Log.Debug("Ghost player created with visual components only - no collision/damage", "ReplayGem");
     }
 
     private void CreateGhostAnimatedSprite(AnimatedSprite2D originalAnimSprite, GhostPlayer ghost)
@@ -483,7 +483,7 @@ public partial class ReplayGem : Node2D
         };
 
         ghost.AddChild(ghostSprite);
-        GD.Print("Copied AnimatedSprite2D structure to ghost");
+        Log.Debug("Copied AnimatedSprite2D structure to ghost", "ReplayGem");
     }
 
     private void CreateGhostStaticSprite(Node originalPlayer, GhostPlayer ghost)
@@ -501,7 +501,7 @@ public partial class ReplayGem : Node2D
             };
 
             ghost.AddChild(ghostSprite);
-            GD.Print("Copied Sprite2D structure to ghost");
+            Log.Debug("Copied Sprite2D structure to ghost", "ReplayGem");
         }
     }
 
@@ -544,7 +544,7 @@ public partial class ReplayGem : Node2D
         {
             GetTree().CurrentScene.AddChild(ghost);
             ghost.AddToGroup("ghost_monster");
-            GD.Print("Created ghost monster from scene file");
+            Log.Debug("Created ghost monster from scene file", "ReplayGem");
         }
         else
         {
@@ -568,7 +568,7 @@ public partial class ReplayGem : Node2D
 
         if (originalMonster == null)
         {
-            GD.Print("Cannot create ghost monster - no original monster found");
+            Log.Warning("Cannot create ghost monster - no original monster found", "ReplayGem");
             return null;
         }
 
@@ -577,7 +577,7 @@ public partial class ReplayGem : Node2D
         CopyMonsterSpriteStructure(originalMonster, ghostMonster);
         AddGhostMonsterToScene(ghostMonster);
 
-        GD.Print($"Created ghost monster programmatically from {originalMonster.GetType().Name}");
+        Log.Debug($"Created ghost monster programmatically from {originalMonster.GetType().Name}", "ReplayGem");
         return ghostMonster;
     }
 
@@ -595,7 +595,7 @@ public partial class ReplayGem : Node2D
                 Animation = "idle"
             };
             ghostMonster.AddChild(ghostSprite);
-            GD.Print("Copied Monster AnimatedSprite2D structure");
+            Log.Debug("Copied Monster AnimatedSprite2D structure", "ReplayGem");
             return;
         }
 
@@ -609,11 +609,11 @@ public partial class ReplayGem : Node2D
                 Texture = originalSprite.Texture
             };
             ghostMonster.AddChild(ghostSprite);
-            GD.Print("Copied Monster MonsterSprite structure");
+            Log.Debug("Copied Monster MonsterSprite structure", "ReplayGem");
             return;
         }
 
-        GD.PrintErr("Could not find monster sprite - will use fallback red square");
+        Log.Error("Could not find monster sprite - will use fallback red square", "ReplayGem");
     }
 
     private void AddGhostMonsterToScene(GhostMonster ghostMonster)
@@ -643,7 +643,7 @@ public partial class ReplayGem : Node2D
             _currentGhost.StopReplay();
             _currentGhost.QueueFree();
             _currentGhost = null;
-            GD.Print("Current ghost cleaned up");
+            Log.Debug("Current ghost cleaned up", "ReplayGem");
         }
     }
 
@@ -655,7 +655,7 @@ public partial class ReplayGem : Node2D
             _currentGhostMonster.StopReplay();
             _currentGhostMonster.QueueFree();
             _currentGhostMonster = null;
-            GD.Print("Current ghost monster cleaned up");
+            Log.Debug("Current ghost monster cleaned up", "ReplayGem");
         }
     }
 

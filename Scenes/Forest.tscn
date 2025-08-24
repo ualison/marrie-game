@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=16 format=3 uid="uid://bnv528gs1hngu"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
@@ -11,6 +11,10 @@
 [ext_resource type="Texture2D" uid="uid://c3wsakw3ln5j3" path="res://Art/Tree2.png" id="8_j3sk6"]
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
 [ext_resource type="Script" uid="uid://ce4epv6lyxy1x" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
+[ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
+[ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="12_r6l07"]
+[ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
+[ext_resource type="Script" uid="uid://c1di2ygv6aj3b" path="res://Scripts/Systems/ReplaySystemManager.cs" id="14_r6l07"]
 
 [node name="ForestScene" type="Node2D"]
 
@@ -94,10 +98,22 @@ layout_mode = 1
 
 [node name="Managers" type="Node" parent="GameSystems"]
 
+[node name="SceneLifecycleManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("11_r6l07")
+
+[node name="PlayerStateManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("12_r6l07")
+
+[node name="UIManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("13_r6l07")
+
 [node name="EnemyManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("7_r6l07")
 
 [node name="ReplaySystem" type="Node" parent="GameSystems"]
+
+[node name="ReplaySystemManager" type="Node" parent="GameSystems/ReplaySystem"]
+script = ExtResource("14_r6l07")
 
 [node name="ReplayRecorder" type="Node" parent="GameSystems/ReplaySystem"]
 script = ExtResource("10_r6l07")

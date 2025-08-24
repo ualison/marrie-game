@@ -122,8 +122,8 @@ public partial class ReplayRecorder : Node
         _monster = enemies.OfType<Monster>().FirstOrDefault(m => m.EnableFollowerBehavior) ?? 
                    enemies.OfType<Monster>().FirstOrDefault();
 
-        GD.Print($"ReplayRecorder discovered - Player: {_player != null}, " +
-                 $"Monster: {_monster != null}, FollowerBehavior: {_monster?.EnableFollowerBehavior}");
+        Log.Replay($"ReplayRecorder discovered - Player: {_player != null}, " +
+                 $"Monster: {_monster != null}, FollowerBehavior: {_monster?.EnableFollowerBehavior}", "ReplayRecorder");
     }
     #endregion
 
@@ -142,13 +142,13 @@ public partial class ReplayRecorder : Node
             _playerWasMoving = true;
         }
         
-        GD.Print($"ReplayRecorder: Started recording - Player: {_player != null}");
+        Log.Replay($"Started recording - Player: {_player != null}", "ReplayRecorder");
     }
 
     public void StopRecording()
     {
         IsRecording = false;
-        GD.Print($"Recording stopped. Player: {_playerFrames.Count}, Monster: {_monsterFrames.Count} frames");
+        Log.Replay($"Recording stopped. Player: {_playerFrames.Count}, Monster: {_monsterFrames.Count} frames", "ReplayRecorder");
     }
 
     public void ClearRecording()
@@ -164,13 +164,13 @@ public partial class ReplayRecorder : Node
     public void PauseRecording()
     {
         _isPausedForReplay = true;
-        GD.Print("Recording paused for replay");
+        Log.Replay("Recording paused for replay", "ReplayRecorder");
     }
 
     public void ResumeRecording()
     {
         _isPausedForReplay = false;
-        GD.Print("Recording resumed");
+        Log.Replay("Recording resumed", "ReplayRecorder");
     }
     #endregion
 

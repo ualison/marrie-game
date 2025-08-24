@@ -99,7 +99,7 @@ public partial class Monster : CharacterBody2D
 
         if (_spriteNode == null)
         {
-            GD.PrintErr("Monster: No sprite component found!");
+            Log.Error("Monster: No sprite component found!", "Monster");
         }
     }
 
@@ -163,7 +163,7 @@ public partial class Monster : CharacterBody2D
         if (ShowForTesting)
         {
             Show();
-            GD.Print("Monster: Ready for contact damage");
+            Log.Debug("Monster: Ready for contact damage", "Monster");
         }
         else
         {
@@ -211,7 +211,7 @@ public partial class Monster : CharacterBody2D
             }
         };
         
-        GD.Print("Monster enabled after replay - will resume normal behavior in 3 seconds");
+        Log.Debug("Monster enabled after replay - will resume normal behavior in 3 seconds", "Monster");
     }
 
     public override void _PhysicsProcess(double delta)
@@ -295,7 +295,7 @@ public partial class Monster : CharacterBody2D
         _stateTimer.WaitTime = InitialWaitTime;
         _stateTimer.Start();
 
-        GD.Print($"Monster waiting at scene position {_initialPosition} for {InitialWaitTime} seconds - fully visible");
+        Log.Debug($"Monster waiting at scene position {_initialPosition} for {InitialWaitTime} seconds - fully visible", "Monster");
     }
 
     private void StartFollowing()
@@ -392,7 +392,7 @@ public partial class Monster : CharacterBody2D
         var scale = _spriteNode.Scale;
         _spriteNode.Scale = new Vector2(shouldFaceLeft ? -Mathf.Abs(scale.X) : Mathf.Abs(scale.X), scale.Y);
 
-        GD.Print($"Monster facing player: {(shouldFaceLeft ? "left (flipped)" : "right (normal)")}");
+        Log.Debug($"Monster facing player: {(shouldFaceLeft ? "left (flipped)" : "right (normal)")}", "Monster");
     }
 
     private void PositionBehindPlayerOnGround()
@@ -411,7 +411,7 @@ public partial class Monster : CharacterBody2D
         GlobalPosition = targetPosition;
         Velocity = Vector2.Zero;
 
-        GD.Print($"Monster positioned on {(_shouldSpawnOnRight ? "right" : "left")} side at distance {safeDistance}");
+        Log.Debug($"Monster positioned on {(_shouldSpawnOnRight ? "right" : "left")} side at distance {safeDistance}", "Monster");
     }
     #endregion
 
@@ -430,7 +430,7 @@ public partial class Monster : CharacterBody2D
         _currentTween.TweenCallback(Callable.From(() =>
         {
             _isFullyVisible = true;
-            GD.Print("Monster fade in complete - fully visible");
+            Log.Debug("Monster fade in complete - fully visible", "Monster");
         }));
     }
 
@@ -449,7 +449,7 @@ public partial class Monster : CharacterBody2D
         _currentTween.TweenCallback(Callable.From(() =>
         {
             _spriteNode.Visible = false;
-            GD.Print("Monster fade out complete - fully hidden");
+            Log.Debug("Monster fade out complete - fully hidden", "Monster");
         }));
     }
 
@@ -512,19 +512,19 @@ public partial class Monster : CharacterBody2D
         _stateTimer.WaitTime = InitialWaitTime;
         _stateTimer.Start();
 
-        GD.Print($"Monster reset to initial position {_initialPosition}");
+        Log.Debug($"Monster reset to initial position {_initialPosition}", "Monster");
     }
 
     private void OnPlayerEntered(Node2D body)
     {
-        GD.Print($"Monster {Name} collision with {body.Name} - IsGhost: {body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster")}");
+        Log.Debug($"Monster {Name} collision with {body.Name} - IsGhost: {body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster")}", "Monster");
 
         if (body is Player player && !player.GetLifeSystem()?.IsDead == true)
         {
             // Check if we can damage based on behavior mode
             if (EnableFollowerBehavior && !CanTakeDamage()) return;
             
-            GD.Print($"Monster {Name} attempting damage to player");
+            Log.Debug($"Monster {Name} attempting damage to player", "Monster");
             if (player.TakeDamage(DamageAmount))
             {
                 PlayDamageEffect();
