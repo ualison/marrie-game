@@ -15,6 +15,7 @@ public partial class ReplaySystemManager : Node
     #region Components
     private ReplayRecorder _recorder;
     private ReplayGem _currentGem;
+    private ReplayOrchestrator _orchestrator;
     #endregion
 
     #region Death Records
@@ -68,6 +69,17 @@ public partial class ReplaySystemManager : Node
             GetTree().CurrentScene.AddChild(_recorder);
             Log.System("Created ReplayRecorder", "ReplaySystemManager");
         }
+
+        // Find or create orchestrator
+        _orchestrator = ReplayOrchestrator.Instance;
+        
+        if (_orchestrator == null)
+        {
+            // Create orchestrator if it doesn't exist
+            _orchestrator = new ReplayOrchestrator { Name = "ReplayOrchestrator" };
+            GetTree().CurrentScene.AddChild(_orchestrator);
+            Log.System("Created ReplayOrchestrator", "ReplaySystemManager");
+        }
         
         Log.System("ReplaySystemManager initialized", "ReplaySystemManager");
     }
@@ -89,18 +101,19 @@ public partial class ReplaySystemManager : Node
         _recorder.StopRecording();
         SaveDeathRecord(deathPosition);
         
-        // FIXED: Don't create gem immediately - wait for next game reload/restart
-#if DEBUG
-        Log.Debug($"Death recorded at {deathPosition} - gem will appear on next reload", "ReplaySystemManager");
-#endif
-        
         Log.Replay($"Player death recorded at {deathPosition} (Total deaths: {_deathRecords.Count})", "ReplaySystemManager");
     }
 
     private void OnGameRestart()
     {
         // Clean up current replay visuals and gems
-        CleanupCurrentReplay();
+        CleanupCurrentGem();
+        
+        // Stop any ongoing replays through orchestrator
+        if (_orchestrator != null)
+        {
+            _orchestrator.StopReplay();
+        }
         
         // Use consistent method to get the most recent death record
         DeathRecord lastDeath = GetLastDeathRecord();
@@ -152,9 +165,6 @@ public partial class ReplaySystemManager : Node
         _deathRecords[_currentDeathId] = record;
 
         var stats = _recorder.GetStats();
-#if DEBUG
-        Log.Debug($"SaveDeathRecord - New death ID: {_currentDeathId} at {deathPosition}, DeathTime: {record.DeathTime}, DeathSequence: {record.DeathSequence}, Total deaths: {_deathRecords.Count + 1}", "ReplaySystemManager");
-#endif
         Log.Replay($"Death record saved: {record.TotalFrames} frames, {stats.duration:F1}s duration at position {deathPosition}", "ReplaySystemManager");
     }    private string GenerateDeathId()
     {
@@ -200,102 +210,6 @@ public partial class ReplaySystemManager : Node
     }
     #endregion
 
-    #region Replay Playback
-    private void StartReplay(DeathRecord record)
-    {
-        Log.Replay($"Starting replay: {record}", "ReplaySystemManager");
-        
-        // Pause current recording
-        if (_recorder != null)
-        {
-            _recorder.PauseRecording();
-        }
-        
-        // Pause player
-        var player = GetTree().GetFirstNodeInGroup("player") as Player;
-        player?.PausePlayer();
-        
-        // Create and start ghost replays
-        if (record.IsPlayerDataAvailable())
-        {
-            CreateGhostPlayer(record);
-        }
-        
-        if (record.IsMonsterDataAvailable())
-        {
-            CreateGhostMonster(record);
-        }
-        
-        // Set timer to end replay
-        var replayDuration = record.RecordingDuration + 1f; // Add buffer
-        GetTree().CreateTimer(replayDuration).Timeout += EndReplay;
-    }
-
-    private void CreateGhostPlayer(DeathRecord record)
-    {
-        var ghost = ReplayEntityFactory.CreateGhostPlayer(record.DeathPosition, GetTree().CurrentScene);
-        if (ghost != null)
-        {
-            ghost.StartReplay(record.PlayerFrames);
-            Log.Replay("Ghost player started", "ReplaySystemManager");
-        }
-    }
-
-    private void CreateGhostMonster(DeathRecord record)
-    {
-        var ghost = ReplayEntityFactory.CreateGhostMonster(record.DeathPosition, GetTree().CurrentScene);
-        if (ghost != null)
-        {
-            ghost.StartReplay(record.MonsterFrames);
-            Log.Replay("Ghost monster started", "ReplaySystemManager");
-        }
-    }
-
-    private void EndReplay()
-    {
-        // Resume player
-        var player = GetTree().GetFirstNodeInGroup("player") as Player;
-        player?.ResumePlayer();
-        
-        // Resume recording
-        if (_recorder != null)
-        {
-            _recorder.ResumeRecording();
-        }
-        
-        // Clean up ghosts (they should auto-cleanup when replay ends)
-        var ghosts = GetTree().GetNodesInGroup("ghost_player");
-        ghosts.AddRange(GetTree().GetNodesInGroup("ghost_monster"));
-        
-        foreach (Node ghost in ghosts)
-        {
-            if (IsInstanceValid(ghost))
-            {
-                ghost.QueueFree();
-            }
-        }
-        
-        Log.Replay("Replay ended", "ReplaySystemManager");
-    }
-
-    private void CleanupCurrentReplay()
-    {
-        CleanupCurrentGem();
-        
-        // Stop any ongoing replay
-        var ghosts = GetTree().GetNodesInGroup("ghost_player");
-        ghosts.AddRange(GetTree().GetNodesInGroup("ghost_monster"));
-        
-        foreach (Node ghost in ghosts)
-        {
-            if (IsInstanceValid(ghost))
-            {
-                ghost.QueueFree();
-            }
-        }
-    }
-    #endregion
-
     #region Public API (for ReplayGem to call)
     public bool HasReplayData()
     {
@@ -330,17 +244,6 @@ public partial class ReplaySystemManager : Node
         
         Log.Warning("No death records available", "ReplaySystemManager");
         return null;
-    }
-
-    public void StartReplayFromGem(DeathRecord record)
-    {
-        if (record == null)
-        {
-            Log.Warning("Cannot start replay - no death record provided", "ReplaySystemManager");
-            return;
-        }
-
-        StartReplay(record);
     }
     #endregion
 }

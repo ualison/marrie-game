@@ -49,6 +49,27 @@ public partial class GhostMonster : CharacterBody2D
         Hide();
         Log.Debug($"GhostMonster ready: {Name}", "GhostMonster");
     }
+
+    public void _on_ghost_setup_complete(Vector2 position)
+    {
+        // Called after the ghost is added to scene and sprites are ready
+        GlobalPosition = position;
+        AddToGroup("ghost_monster");
+        
+        // Refresh sprite discovery since factory may have added sprites after _Ready
+        SetupGhostVisuals();
+        
+        Log.Debug($"Ghost monster setup complete at position {position}", "GhostMonster");
+        Log.Debug($"Ghost monster children count: {GetChildCount()}, Active sprite: {_activeSprite?.Name ?? "null"}", "GhostMonster");
+        
+        // Force visibility for debugging
+        Show();
+        if (_activeSprite != null)
+        {
+            _activeSprite.Show();
+            Log.Debug($"Ghost monster sprite shown: {_activeSprite.Name}, Visible: {_activeSprite.Visible}, Modulate: {_activeSprite.Modulate}", "GhostMonster");
+        }
+    }
     #endregion
 
     #region Core Update Loop - OPTIMIZED

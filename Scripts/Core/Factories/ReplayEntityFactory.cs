@@ -157,11 +157,30 @@ public static class ReplayEntityFactory
             ghost = CreateGhostPlayerProgrammatically(parent);
         }
         
+        // ONLY copy sprites if we had to fall back to programmatic creation
         if (ghost != null)
         {
+            // Only copy sprites if we created the ghost programmatically (scene loading failed)
+            if (scene == null)
+            {
+                var originalPlayer = parent.GetTree().GetFirstNodeInGroup("player") as Player;
+                if (originalPlayer != null)
+                {
+                    CopyPlayerSprite(originalPlayer, ghost);
+                }
+            }
+            
+            // Add ghost to scene first
             parent.CallDeferred(Node.MethodName.AddChild, ghost);
-            ghost.GlobalPosition = position;
-            ghost.AddToGroup("ghost_player");
+            
+            // Use a timer to call setup after the ghost is properly added
+            var timer = parent.GetTree().CreateTimer(0.01f);
+            timer.Timeout += () => {
+                if (GodotObject.IsInstanceValid(ghost))
+                {
+                    ghost._on_ghost_setup_complete(position);
+                }
+            };
         }
         
         return ghost;
@@ -183,11 +202,30 @@ public static class ReplayEntityFactory
             ghost = CreateGhostMonsterProgrammatically(parent);
         }
         
+        // ONLY copy sprites if we had to fall back to programmatic creation
         if (ghost != null)
         {
+            // Only copy sprites if we created the ghost programmatically (scene loading failed)
+            if (scene == null)
+            {
+                var originalMonster = parent.GetTree().GetFirstNodeInGroup("enemies") as Monster;
+                if (originalMonster != null)
+                {
+                    CopyMonsterSprite(originalMonster, ghost);
+                }
+            }
+            
+            // Add ghost to scene first
             parent.CallDeferred(Node.MethodName.AddChild, ghost);
-            ghost.GlobalPosition = position;
-            ghost.AddToGroup("ghost_monster");
+            
+            // Use a timer to call setup after the ghost is properly added
+            var timer = parent.GetTree().CreateTimer(0.01f);
+            timer.Timeout += () => {
+                if (GodotObject.IsInstanceValid(ghost))
+                {
+                    ghost._on_ghost_setup_complete(position);
+                }
+            };
         }
         
         return ghost;
@@ -199,13 +237,7 @@ public static class ReplayEntityFactory
     {
         var ghost = new GhostPlayer { Name = "GhostPlayer" };
         
-        // Copy sprite from original player
-        var originalPlayer = parent.GetTree().GetFirstNodeInGroup("player") as Player;
-        if (originalPlayer != null)
-        {
-            CopyPlayerSprite(originalPlayer, ghost);
-        }
-        
+        // Note: Sprite copying is now done in the main CreateGhostPlayer method
         return ghost;
     }
     
@@ -213,13 +245,7 @@ public static class ReplayEntityFactory
     {
         var ghost = new GhostMonster { Name = "GhostMonster" };
         
-        // Copy sprite from original monster
-        var originalMonster = parent.GetTree().GetFirstNodeInGroup("enemies") as Monster;
-        if (originalMonster != null)
-        {
-            CopyMonsterSprite(originalMonster, ghost);
-        }
-        
+        // Note: Sprite copying is now done in the main CreateGhostMonster method
         return ghost;
     }
     
@@ -232,7 +258,13 @@ public static class ReplayEntityFactory
             {
                 Name = "AnimatedSprite2D",
                 SpriteFrames = originalSprite.SpriteFrames,
-                Animation = "idle"
+                Animation = "idle",
+                Scale = originalSprite.Scale,
+                Position = originalSprite.Position,
+                Rotation = originalSprite.Rotation,
+                FlipH = originalSprite.FlipH,
+                FlipV = originalSprite.FlipV,
+                Offset = originalSprite.Offset
             };
             ghost.AddChild(ghostSprite);
         }
@@ -248,7 +280,13 @@ public static class ReplayEntityFactory
             var ghostSprite = new Sprite2D
             {
                 Name = "MonsterSprite",
-                Texture = sprite2D.Texture
+                Texture = sprite2D.Texture,
+                Scale = sprite2D.Scale,
+                Position = sprite2D.Position,
+                Rotation = sprite2D.Rotation,
+                FlipH = sprite2D.FlipH,
+                FlipV = sprite2D.FlipV,
+                Offset = sprite2D.Offset
             };
             ghost.AddChild(ghostSprite);
         }
@@ -258,7 +296,13 @@ public static class ReplayEntityFactory
             {
                 Name = "AnimatedSprite2D",
                 SpriteFrames = animSprite.SpriteFrames,
-                Animation = "idle"
+                Animation = "idle",
+                Scale = animSprite.Scale,
+                Position = animSprite.Position,
+                Rotation = animSprite.Rotation,
+                FlipH = animSprite.FlipH,
+                FlipV = animSprite.FlipV,
+                Offset = animSprite.Offset
             };
             ghost.AddChild(ghostSprite);
         }

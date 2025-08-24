@@ -39,6 +39,27 @@ public partial class GhostPlayer : CharacterBody2D
 
         Log.Replay($"GhostPlayer ready: {Name}, Parent: {GetParent()?.Name}", "GhostPlayer");
     }
+
+    public void _on_ghost_setup_complete(Vector2 position)
+    {
+        // Called after the ghost is added to scene and sprites are ready
+        GlobalPosition = position;
+        AddToGroup("ghost_player");
+        
+        // Refresh sprite discovery since factory may have added sprites after _Ready
+        SetupGhostVisuals();
+        
+        Log.Replay($"Ghost setup complete at position {position}", "GhostPlayer");
+        Log.Replay($"Ghost children count: {GetChildCount()}, Active sprite: {_activeSprite?.Name ?? "null"}", "GhostPlayer");
+        
+        // Force visibility for debugging
+        Show();
+        if (_activeSprite != null)
+        {
+            _activeSprite.Show();
+            Log.Replay($"Ghost sprite shown: {_activeSprite.Name}, Visible: {_activeSprite.Visible}, Modulate: {_activeSprite.Modulate}", "GhostPlayer");
+        }
+    }
     #endregion
 
     #region Core Update Loop
@@ -121,6 +142,7 @@ public partial class GhostPlayer : CharacterBody2D
 
         Show();
         Log.Replay($"Started replay with {filteredFrames.Count} filtered frames (was {frames.Count}) - immediate start at {firstFrame.Position}", "GhostPlayer");
+        Log.Replay($"Ghost visible after StartReplay: {Visible}, Active sprite: {_activeSprite?.Name ?? "null"}, Sprite visible: {_activeSprite?.Visible ?? false}", "GhostPlayer");
     }
 
     public void StopReplay()

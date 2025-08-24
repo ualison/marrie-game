@@ -74,7 +74,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="LifeBarUI" parent="UserInterface/HUD" instance=ExtResource("7_gfl13")]
+[node name="LifeBar" parent="UserInterface/HUD" instance=ExtResource("7_gfl13")]
 offset_left = -564.0
 offset_top = -316.0
 metadata/_edit_use_anchors_ = true
