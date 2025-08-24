@@ -202,13 +202,15 @@ public partial class AudioManager : AudioStreamPlayer2D
     #region Debug
     public void LogStatus()
     {
-        // Debug logging for audio state
+        // Only log audio status in debug builds
+        #if DEBUG
         Log.Debug("=== AudioManager Status ===", "AudioManager");
         Log.Debug($"Playing: {Playing}", "AudioManager");
         Log.Debug($"Paused: {_isMusicPaused}", "AudioManager");
         Log.Debug($"Volume: {VolumeDb} dB", "AudioManager");
         Log.Debug($"Current Music: {BackgroundMusic?.ResourcePath ?? "None"}", "AudioManager");
         Log.Debug($"Stream: {Stream?.ResourcePath ?? "None"}", "AudioManager");
+        #endif
     }
     #endregion
 

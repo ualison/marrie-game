@@ -130,9 +130,6 @@ public partial class Player : CharacterBody2D, IPausable, IResettable
             _facingRight = shouldFaceRight;
             var scale = _sprite.Scale;
             _sprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
-            
-            // Debug: Log player flip changes
-            Log.Debug($"Player direction changed: facing right = {_facingRight}, scale.X = {_sprite.Scale.X}", "Player");
         }
     }
 
@@ -411,7 +408,6 @@ private void ResetSpriteDirection()
     {
         var scale = _sprite.Scale;
         _sprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
-        Log.Debug($"Player sprite direction reset - facing right: {_facingRight}", "Player");
     }
     else
     {

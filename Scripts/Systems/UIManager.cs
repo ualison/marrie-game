@@ -83,7 +83,9 @@ public partial class UIManager : Node
         Log.System($"Found {gameOverNodes.Count} nodes in 'game_over_ui' group", "UIManager");
         foreach (Node node in gameOverNodes)
         {
+            #if DEBUG
             Log.Debug($"  - {node.Name} ({node.GetType().Name})", "UIManager");
+            #endif
         }
         
         // If not found by group, try to find by common names

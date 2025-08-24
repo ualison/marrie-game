@@ -31,7 +31,9 @@ public static class ReplayEntityFactory
                         _replayGemScene = GD.Load<PackedScene>(path);
                         if (_replayGemScene != null)
                         {
+#if DEBUG
                             Log.Debug($"ReplayEntityFactory: Loaded ReplayGem scene from {path}", "ReplayEntityFactory");
+#endif
                             break;
                         }
                     }
@@ -61,7 +63,9 @@ public static class ReplayEntityFactory
                     _ghostPlayerScene = GD.Load<PackedScene>("res://Prefabs/GhostPlayer.tscn");
                     if (_ghostPlayerScene != null)
                     {
+#if DEBUG
                         Log.Debug("ReplayEntityFactory: Loaded GhostPlayer scene", "ReplayEntityFactory");
+#endif
                     }
                 }
             }
@@ -84,7 +88,9 @@ public static class ReplayEntityFactory
                     _ghostMonsterScene = GD.Load<PackedScene>("res://Prefabs/GhostMonster.tscn");
                     if (_ghostMonsterScene != null)
                     {
+#if DEBUG
                         Log.Debug("ReplayEntityFactory: Loaded GhostMonster scene", "ReplayEntityFactory");
+#endif
                     }
                 }
             }
@@ -116,7 +122,9 @@ public static class ReplayEntityFactory
         
         // Set position before adding to tree
         gem.GlobalPosition = position;
+#if DEBUG
         Log.Debug($"ReplayEntityFactory: Set gem GlobalPosition to {position}", "ReplayEntityFactory");
+#endif
         
         // Use call_deferred to avoid physics flush conflicts
         parent.CallDeferred(Node.MethodName.AddChild, gem);
@@ -126,7 +134,9 @@ public static class ReplayEntityFactory
         
         // Fire event immediately since we just want to notify
         GameEventSystem.OnReplayGemCreated(position);
+#if DEBUG
         Log.Debug($"ReplayEntityFactory: Created ReplayGem at {position} - showing deferred", "ReplayEntityFactory");
+#endif
         
         return gem;
     }

@@ -160,11 +160,13 @@ public partial class GameOverUI : Control
     private void LogDiscoveredElements()
     {
         // Log discovered UI elements for debugging
+        #if DEBUG
         Log.Debug("GameOverUI elements discovered:", "GameOverUI");
         Log.Debug($"- GameOverLabel: {(_gameOverLabel != null ? "✓" : "✗")}", "GameOverUI");
         Log.Debug($"- SubMessageLabel: {(_subMessageLabel != null ? "✓" : "✗")}", "GameOverUI");
         Log.Debug($"- RestartButton: {(_restartButton != null ? "✓" : "✗")}", "GameOverUI");
         Log.Debug($"- QuitButton: {(_quitButton != null ? "✓" : "✗")}", "GameOverUI");
+        #endif
     }
     #endregion
 }

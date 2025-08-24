@@ -120,12 +120,24 @@ public partial class ReplayRecorder : Node
         {
             _playerSprite = FindSpriteInCharacter(_cachedPlayer);
             _playerVisual = _playerSprite ?? FindVisualInCharacter(_cachedPlayer);
+            
+            // Only warn if no visual component found at all
+            if (_playerSprite == null && _playerVisual == null)
+            {
+                Log.Warning($"No visual component (AnimatedSprite2D or Sprite2D) found for player {_cachedPlayer.Name}", "ReplayRecorder");
+            }
         }
 
         if (_cachedMonster != null)
         {
             _monsterSprite = FindSpriteInCharacter(_cachedMonster);
             _monsterVisual = _monsterSprite ?? FindVisualInCharacter(_cachedMonster);
+            
+            // Only warn if no visual component found at all
+            if (_monsterSprite == null && _monsterVisual == null)
+            {
+                Log.Warning($"No visual component (AnimatedSprite2D or Sprite2D) found for monster {_cachedMonster.Name}", "ReplayRecorder");
+            }
         }
     }
 
@@ -138,20 +150,7 @@ public partial class ReplayRecorder : Node
                     character.FindChild("AnimatedSprite2D", recursive: false) as AnimatedSprite2D ??
                     character.FindChild("MarrieSprite", recursive: false) as AnimatedSprite2D;
         
-        if (sprite != null)
-        {
-            Log.Debug($"Found AnimatedSprite2D for {character.Name}: {sprite.Name}, Scale: {sprite.Scale}", "ReplayRecorder");
-        }
-        else
-        {
-            Log.Warning($"No AnimatedSprite2D found for {character.Name}", "ReplayRecorder");
-            // List available children for debugging
-            foreach (Node child in character.GetChildren())
-            {
-                Log.Debug($"  Available child: {child.Name} ({child.GetType().Name})", "ReplayRecorder");
-            }
-        }
-        
+        // Don't warn here - we'll check for fallback visuals in FindVisualInCharacter
         return sprite;
     }
 
@@ -165,15 +164,7 @@ public partial class ReplayRecorder : Node
                     character.FindChild("Sprite2D", recursive: false) as Node2D ??
                     character.FindChild("MonsterSprite", recursive: false) as Node2D;
         
-        if (visual != null)
-        {
-            Log.Debug($"Found Sprite2D for {character.Name}: {visual.Name}, Scale: {visual.Scale}", "ReplayRecorder");
-        }
-        else
-        {
-            Log.Warning($"No Sprite2D found for {character.Name}", "ReplayRecorder");
-        }
-        
+        // Warning handled at higher level in RefreshCharacterCache
         return visual;
     }
     #endregion
@@ -325,13 +316,6 @@ public partial class ReplayRecorder : Node
             try
             {
                 bool scaleFlip = visual.Scale.X < 0;
-                
-                // Debug logging for non-animated sprites
-                if (EnableDebugLogging)
-                {
-                    Log.Debug($"Player visual flip detected: ScaleFlip={scaleFlip}, Scale.X={visual.Scale.X:F3}", "ReplayRecorder");
-                }
-                
                 return scaleFlip;
             }
             catch (System.Exception ex)

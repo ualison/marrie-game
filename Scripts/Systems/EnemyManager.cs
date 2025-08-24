@@ -192,10 +192,12 @@ public partial class EnemyManager : Node
     #region Debug
     public void LogEnemyStatus()
     {
+        #if DEBUG
         Log.Debug("=== Enemy Manager Status ===", "EnemyManager");
         Log.Debug($"Follower Monsters: {_followerMonsters.Count}", "EnemyManager");
         Log.Debug($"Regular Monsters: {_regularMonsters.Count}", "EnemyManager");
         Log.Debug($"Visible Followers: {GetVisibleFollowerCount()}", "EnemyManager");
+        #endif
     }
     #endregion
 

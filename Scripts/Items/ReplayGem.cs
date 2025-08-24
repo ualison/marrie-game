@@ -97,8 +97,7 @@ public partial class ReplayGem : Node2D
     #region Gem Visibility Control
     public void ShowGem(Vector2 position)
     {
-        // Display gem at specified position with debug logging
-        Log.Debug($"ShowGem called with position: {position}, current position: {GlobalPosition}", "ReplayGem");
+        // Display gem at specified position
         GlobalPosition = position;
         Show();
 
@@ -187,10 +186,8 @@ public partial class ReplayGem : Node2D
             return;
         }
 
-        // FIXED: Clean up existing ghosts and start new replay immediately without delay
-        Log.Debug("Starting cleanup before ghost creation...", "ReplayGem");
+        // Clean up existing ghosts and start new replay immediately
         CleanupGhost();
-        Log.Debug("Cleanup complete, starting ghost creation immediately...", "ReplayGem");
         // Start ghost creation immediately instead of using timer
         CreateAndStartGhost(playerFrames, deathRecord.MonsterFrames);
     }
@@ -209,13 +206,10 @@ public partial class ReplayGem : Node2D
 
     private bool ValidateFrameData(System.Collections.Generic.List<ReplayFrame> playerFrames)
     {
-        // Validate frame data before starting replay - FIXED: Don't resume recording here
-        Log.Replay($"Player frames count: {playerFrames.Count}", "ReplayGem");
-
+        // Validate frame data before starting replay
         if (playerFrames.Count == 0)
         {
             Log.Warning("No player frames to replay", "ReplayGem");
-            // FIXED: Don't resume recording here - will be handled in cleanup
             return false;
         }
 
@@ -225,11 +219,9 @@ public partial class ReplayGem : Node2D
     private void CreateAndStartGhost(System.Collections.Generic.List<ReplayFrame> playerFrames,
                                     System.Collections.Generic.List<ReplayFrame> monsterFrames)
     {
-        // FIXED: Pause entities FIRST, then create ghosts to avoid recording frozen state
-        Log.Debug("CreateAndStartGhost called - pausing entities first...", "ReplayGem");
+        // Pause entities FIRST, then create ghosts to avoid recording frozen state
         PauseAndHideOriginalEntities();
 
-        Log.Debug("Entities paused, now creating ghost player...", "ReplayGem");
         var ghostPlayer = CreateGhostPlayer();
 
         if (ghostPlayer != null)
@@ -239,15 +231,13 @@ public partial class ReplayGem : Node2D
             StartGhostReplay(ghostPlayer, playerFrames);
             HideGemDuringReplay();
 
-            // NEW: Add monster ghost if data available
+            // Add monster ghost if data available
             if (monsterFrames != null && monsterFrames.Count > 0)
             {
-                Log.Debug("Creating monster ghost...", "ReplayGem");
                 CreateAndStartMonsterGhost(monsterFrames);
             }
 
             ScheduleReplayCleanup(playerFrames);
-            Log.Debug("Ghost creation and setup complete!", "ReplayGem");
         }
         else
         {
@@ -257,7 +247,7 @@ public partial class ReplayGem : Node2D
 
     private void CreateAndStartMonsterGhost(System.Collections.Generic.List<ReplayFrame> monsterFrames)
     {
-        // NEW: Create monster ghost separately to avoid disrupting player flow
+        // Create monster ghost separately to avoid disrupting player flow
         var ghostMonster = CreateGhostMonster();
         if (ghostMonster != null)
         {
@@ -269,11 +259,10 @@ public partial class ReplayGem : Node2D
 
     private void PauseAndHideOriginalEntities()
     {
-        // FIXED: Pause recording FIRST to avoid recording the freeze process
+        // Pause recording FIRST to avoid recording the freeze process
         if (ReplayRecorder.Instance != null)
         {
             ReplayRecorder.Instance.PauseRecording();
-            Log.Debug("Recording paused before freezing entities", "ReplayGem");
         }
 
         // Pause and hide the original player during replay
@@ -417,13 +406,11 @@ public partial class ReplayGem : Node2D
 
             if (!ReplayRecorder.Instance.IsRecording)
             {
-                Log.Debug("Recording was stopped, restarting fresh recording", "ReplayGem");
                 ReplayRecorder.Instance.RefreshCharacterCache();
                 ReplayRecorder.Instance.StartRecording(); // Actually start recording again
             }
             else if (ReplayRecorder.Instance.IsPausedForReplay)
             {
-                Log.Debug("Recording was paused, resuming recording", "ReplayGem");
                 ReplayRecorder.Instance.ResumeRecording(); // Just unpause if it was only paused
             }
         }
@@ -470,7 +457,9 @@ public partial class ReplayGem : Node2D
         {
             GetTree().CurrentScene.AddChild(ghost);
             ghost.AddToGroup("ghost_player");
+#if DEBUG
             Log.Debug("Created ghost from scene file", "ReplayGem");
+#endif
         }
         else
         {
@@ -482,7 +471,7 @@ public partial class ReplayGem : Node2D
 
     private GhostPlayer CreateGhostProgrammatically()
     {
-        // Create ghost programmatically by copying original player structure - ORIGINAL METHOD
+        // Create ghost programmatically by copying original player structure
         var originalPlayer = GetTree().GetFirstNodeInGroup("player") as Player;
         if (originalPlayer == null)
         {
@@ -495,13 +484,12 @@ public partial class ReplayGem : Node2D
         CopySpriteStructure(originalPlayer, ghost);
         AddGhostToScene(ghost);
 
-        Log.Debug("Created ghost programmatically", "ReplayGem");
         return ghost;
     }
 
     private void CopySpriteStructure(Node originalPlayer, GhostPlayer ghost)
     {
-        // Copy sprite structure from original player to ghost - ORIGINAL METHOD
+        // Copy sprite structure from original player to ghost
         var originalAnimSprite = originalPlayer.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D")
                                 ?? originalPlayer.GetNodeOrNull<AnimatedSprite2D>("MarrieSprite");
 
@@ -513,9 +501,6 @@ public partial class ReplayGem : Node2D
         {
             CreateGhostStaticSprite(originalPlayer, ghost);
         }
-
-        // IMPORTANT: Only copy visual components, no collision or interaction components
-        Log.Debug("Ghost player created with visual components only - no collision/damage", "ReplayGem");
     }
 
     private void CreateGhostAnimatedSprite(AnimatedSprite2D originalAnimSprite, GhostPlayer ghost)
@@ -529,12 +514,11 @@ public partial class ReplayGem : Node2D
         };
 
         ghost.AddChild(ghostSprite);
-        Log.Debug("Copied AnimatedSprite2D structure to ghost", "ReplayGem");
     }
 
     private void CreateGhostStaticSprite(Node originalPlayer, GhostPlayer ghost)
     {
-        // Create static sprite for ghost as fallback - ORIGINAL METHOD
+        // Create static sprite for ghost as fallback
         var originalSprite2D = originalPlayer.GetNodeOrNull<Sprite2D>("Sprite2D")
                             ?? originalPlayer.GetNodeOrNull<Sprite2D>("MarrieSprite");
 
@@ -547,13 +531,12 @@ public partial class ReplayGem : Node2D
             };
 
             ghost.AddChild(ghostSprite);
-            Log.Debug("Copied Sprite2D structure to ghost", "ReplayGem");
         }
     }
 
     private void AddGhostToScene(GhostPlayer ghost)
     {
-        // Add ghost to scene and group - ORIGINAL METHOD
+        // Add ghost to scene and group
         GetTree().CurrentScene.AddChild(ghost);
         ghost.AddToGroup("ghost_player");
     }
@@ -590,7 +573,9 @@ public partial class ReplayGem : Node2D
         {
             GetTree().CurrentScene.AddChild(ghost);
             ghost.AddToGroup("ghost_monster");
+#if DEBUG
             Log.Debug("Created ghost monster from scene file", "ReplayGem");
+#endif
         }
         else
         {
@@ -641,7 +626,9 @@ public partial class ReplayGem : Node2D
                 Animation = "idle"
             };
             ghostMonster.AddChild(ghostSprite);
+#if DEBUG
             Log.Debug("Copied Monster AnimatedSprite2D structure", "ReplayGem");
+#endif
             return;
         }
 
@@ -655,7 +642,9 @@ public partial class ReplayGem : Node2D
                 Texture = originalSprite.Texture
             };
             ghostMonster.AddChild(ghostSprite);
+#if DEBUG
             Log.Debug("Copied Monster MonsterSprite structure", "ReplayGem");
+#endif
             return;
         }
 
@@ -699,7 +688,9 @@ public partial class ReplayGem : Node2D
                 _currentGhost.QueueFree();
             }
             _currentGhost = null;
+#if DEBUG
             Log.Debug("Current ghost cleaned up safely", "ReplayGem");
+#endif
         }
     }
 
@@ -710,7 +701,7 @@ public partial class ReplayGem : Node2D
         {
             _currentGhostMonster.StopReplay();
             
-            // FIXED: Safe immediate cleanup - remove from parent and defer destruction
+            // Safe immediate cleanup - remove from parent and defer destruction
             if (_currentGhostMonster.GetParent() != null)
             {
                 _currentGhostMonster.GetParent().RemoveChild(_currentGhostMonster);
@@ -721,7 +712,6 @@ public partial class ReplayGem : Node2D
                 _currentGhostMonster.QueueFree();
             }
             _currentGhostMonster = null;
-            Log.Debug("Current ghost monster cleaned up safely", "ReplayGem");
         }
     }
 
@@ -780,8 +770,6 @@ public partial class ReplayGem : Node2D
                 }
             }
         }
-        
-        Log.Debug("All ghosts cleaned up safely", "ReplayGem");
     }
 
     private void EnsureEntitiesResumed()
@@ -822,7 +810,9 @@ public partial class ReplayGem : Node2D
             if (ReplayRecorder.Instance.IsPausedForReplay)
             {
                 ReplayRecorder.Instance.ResumeRecording();
+#if DEBUG
                 Log.Debug("Recording resumed after ensuring player is active", "ReplayGem");
+#endif
             }
             
             // If recording is not actually running, force restart

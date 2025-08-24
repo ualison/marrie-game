@@ -90,7 +90,9 @@ public partial class ReplaySystemManager : Node
         SaveDeathRecord(deathPosition);
         
         // FIXED: Don't create gem immediately - wait for next game reload/restart
+#if DEBUG
         Log.Debug($"Death recorded at {deathPosition} - gem will appear on next reload", "ReplaySystemManager");
+#endif
         
         Log.Replay($"Player death recorded at {deathPosition} (Total deaths: {_deathRecords.Count})", "ReplaySystemManager");
     }
@@ -100,16 +102,13 @@ public partial class ReplaySystemManager : Node
         // Clean up current replay visuals and gems
         CleanupCurrentReplay();
         
-        Log.Debug($"OnGameRestart - Before: Current death ID: '{_currentDeathId}', Total deaths: {_deathRecords.Count}", "ReplaySystemManager");
-        
-        // FIXED: Use consistent method to get the most recent death record
+        // Use consistent method to get the most recent death record
         DeathRecord lastDeath = GetLastDeathRecord();
         
         // Set current death ID to the most recent death for ReplayGem usage
         if (lastDeath != null)
         {
             _currentDeathId = lastDeath.DeathId;
-            Log.Debug($"Set current death ID to: {_currentDeathId} (DeathTime: {lastDeath.DeathTime}, DeathSequence: {lastDeath.DeathSequence})", "ReplaySystemManager");
         }
         else
         {
@@ -124,20 +123,15 @@ public partial class ReplaySystemManager : Node
             _recorder.StartRecording(); // Start fresh recording
         }
         
-        // FIXED: Always create gem on game restart if we have previous deaths
+        // Always create gem on game restart if we have previous deaths
         // This ensures gem appears only on next reload, not during GameOver UI
         if (lastDeath != null)
         {
             // Clean up any existing gem first (should not exist, but safety check)
             CleanupCurrentGem();
             
-            Log.Debug($"Creating ReplayGem at LAST death position: {lastDeath.DeathPosition} (DeathId: {lastDeath.DeathId}, Sequence: {lastDeath.DeathSequence})", "ReplaySystemManager");
             CreateReplayGem(lastDeath.DeathPosition);
             Log.Replay($"ReplayGem created on game restart at LAST death position {lastDeath.DeathPosition}", "ReplaySystemManager");
-        }
-        else
-        {
-            Log.Debug("No previous deaths found, not creating ReplayGem", "ReplaySystemManager");
         }
         
         Log.Replay($"Game restarted - recorder reset, death records preserved ({_deathRecords.Count} deaths)", "ReplaySystemManager");
@@ -158,7 +152,9 @@ public partial class ReplaySystemManager : Node
         _deathRecords[_currentDeathId] = record;
 
         var stats = _recorder.GetStats();
+#if DEBUG
         Log.Debug($"SaveDeathRecord - New death ID: {_currentDeathId} at {deathPosition}, DeathTime: {record.DeathTime}, DeathSequence: {record.DeathSequence}, Total deaths: {_deathRecords.Count + 1}", "ReplaySystemManager");
+#endif
         Log.Replay($"Death record saved: {record.TotalFrames} frames, {stats.duration:F1}s duration at position {deathPosition}", "ReplaySystemManager");
     }    private string GenerateDeathId()
     {
@@ -321,15 +317,7 @@ public partial class ReplaySystemManager : Node
 
     public DeathRecord GetLastDeathRecord()
     {
-        Log.Debug($"GetLastDeathRecord called - Current death ID: '{_currentDeathId}', Total deaths: {_deathRecords.Count}", "ReplaySystemManager");
-        
-        // Debug: List all death records
-        foreach (var kvp in _deathRecords)
-        {
-            Log.Debug($"  Death record: {kvp.Key} at {kvp.Value.DeathPosition}, DeathTime: {kvp.Value.DeathTime}, Sequence: {kvp.Value.DeathSequence}", "ReplaySystemManager");
-        }
-        
-        // FIXED: Use death sequence to break timestamp ties, ensuring latest death is selected
+        // Use death sequence to break timestamp ties, ensuring latest death is selected
         if (_deathRecords.Count > 0)
         {
             var latestRecord = _deathRecords.Values
@@ -337,11 +325,7 @@ public partial class ReplaySystemManager : Node
                 .ThenByDescending(record => record.DeathSequence) // Break ties with sequence number
                 .FirstOrDefault();
             
-            if (latestRecord != null)
-            {
-                Log.Debug($"Using latest death record: {latestRecord.DeathId} at {latestRecord.DeathPosition} (sequence: {latestRecord.DeathSequence} from {_deathRecords.Count} total deaths)", "ReplaySystemManager");
-                return latestRecord;
-            }
+            return latestRecord;
         }
         
         Log.Warning("No death records available", "ReplaySystemManager");

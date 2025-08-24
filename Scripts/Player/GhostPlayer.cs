@@ -187,7 +187,9 @@ public partial class GhostPlayer : CharacterBody2D
             }
         }
         
+#if DEBUG
         Log.Debug($"Optimized filtering: {originalFrames.Count} -> {filtered.Count} frames", "GhostPlayer");
+#endif
         return filtered;
     }
 
@@ -279,18 +281,14 @@ public partial class GhostPlayer : CharacterBody2D
             var currentScale = _activeSprite.Scale;
             var newScaleX = frame.SpriteFlip ? -Mathf.Abs(currentScale.X) : Mathf.Abs(currentScale.X);
             
-            // Always update scale to ensure consistency (removed optimization that was causing issues)
+            // Always update scale to ensure consistency
             _activeSprite.Scale = new Vector2(newScaleX, currentScale.Y);
             
-            // Enhanced debug logging for flip changes
-            Log.Debug($"Ghost flip applied: Frame.SpriteFlip={frame.SpriteFlip}, oldScale.X={currentScale.X:F3}, newScale.X={newScaleX:F3}, Position={GlobalPosition}", "GhostPlayer");
-            
-            // FIXED: Also handle FlipH property if it's an AnimatedSprite2D
+            // Also handle FlipH property if it's an AnimatedSprite2D
             if (_animatedSprite != null)
             {
                 // Apply FlipH property directly for more accurate reproduction
                 _animatedSprite.FlipH = frame.SpriteFlip;
-                Log.Debug($"Ghost FlipH applied: {frame.SpriteFlip}", "GhostPlayer");
             }
         }
         else
@@ -317,7 +315,6 @@ public partial class GhostPlayer : CharacterBody2D
                 if (_animatedSprite.Animation != frame.Animation)
                 {
                     _animatedSprite.Play(frame.Animation);
-                    Log.Debug($"Ghost animation changed: {frame.Animation}", "GhostPlayer");
                 }
             }
         }
@@ -339,7 +336,6 @@ public partial class GhostPlayer : CharacterBody2D
         if (_animatedSprite != null)
         {
             _activeSprite = _animatedSprite;
-            Log.Debug($"Found AnimatedSprite2D: {_animatedSprite.Name}, Scale: {_animatedSprite.Scale}", "GhostPlayer");
             return;
         }
 
@@ -351,7 +347,6 @@ public partial class GhostPlayer : CharacterBody2D
         if (_sprite != null)
         {
             _activeSprite = _sprite;
-            Log.Debug($"Found Sprite2D: {_sprite.Name}, Scale: {_sprite.Scale}", "GhostPlayer");
             return;
         }
 
@@ -362,7 +357,6 @@ public partial class GhostPlayer : CharacterBody2D
         if (_animatedSprite != null)
         {
             _activeSprite = _animatedSprite;
-            Log.Debug($"Found custom AnimatedSprite2D: {_animatedSprite.Name}, Scale: {_animatedSprite.Scale}", "GhostPlayer");
         }
         else
         {
@@ -379,7 +373,6 @@ public partial class GhostPlayer : CharacterBody2D
         {
             _activeSprite.Modulate = GHOST_TINT;
             _activeSprite.Show();
-            Log.Debug($"Applied ghost effect to '{_activeSprite.Name}'", "GhostPlayer");
         }
         else
         {
@@ -405,8 +398,6 @@ public partial class GhostPlayer : CharacterBody2D
 
         AddChild(fallbackSprite);
         _activeSprite = fallbackSprite;
-
-        Log.Debug("Created fallback visual", "GhostPlayer");
     }
 
     private void DisableCollisions()
@@ -421,11 +412,13 @@ public partial class GhostPlayer : CharacterBody2D
     private void LogAvailableChildren()
     {
         // List all children for debugging sprite discovery issues
+#if DEBUG
         Log.Debug("GhostPlayer children:", "GhostPlayer");
         foreach (Node child in GetChildren())
         {
             Log.Debug($"  - {child.Name} ({child.GetType().Name})", "GhostPlayer");
         }
+#endif
     }
     #endregion
 }

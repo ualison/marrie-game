@@ -73,6 +73,7 @@ public partial class PlayerStateManager : Node
         
         Log.System($"Player found: {_player != null}, Life system: {_playerLife != null}", "PlayerStateManager");
         
+        #if DEBUG
         if (_player != null)
         {
             Log.Debug($"Player node name: {_player.Name}", "PlayerStateManager");
@@ -82,6 +83,7 @@ public partial class PlayerStateManager : Node
         {
             Log.Debug($"PlayerLife node name: {_playerLife.Name}", "PlayerStateManager");
         }
+        #endif
     }
     
     private void ConnectPlayerSystems()
@@ -92,7 +94,9 @@ public partial class PlayerStateManager : Node
             if (_playerLife.IsConnected(PlayerLife.SignalName.PlayerDied, new Callable(this, nameof(OnPlayerHealthDepleted))))
             {
                 _playerLife.PlayerDied -= OnPlayerHealthDepleted;
+#if DEBUG
                 Log.Debug("Disconnected existing PlayerDied signal", "PlayerStateManager");
+#endif
             }
             _playerLife.PlayerDied += OnPlayerHealthDepleted;
             Log.System("Connected to PlayerLife.PlayerDied signal", "PlayerStateManager");
@@ -131,7 +135,9 @@ public partial class PlayerStateManager : Node
         bool isPausedForReplay = recorderExists && ReplayRecorder.Instance.IsPausedForReplay;
         bool isRecording = recorderExists && ReplayRecorder.Instance.IsRecording;
         
+#if DEBUG
         Log.Debug($"Death handler - Recorder exists: {recorderExists}, IsPausedForReplay: {isPausedForReplay}, IsRecording: {isRecording}", "PlayerStateManager");
+#endif
         
         // Don't allow death during replay - FIXED: Check for replay pause specifically
         if (ReplayRecorder.Instance != null && ReplayRecorder.Instance.IsPausedForReplay)

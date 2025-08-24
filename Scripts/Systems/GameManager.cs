@@ -60,6 +60,11 @@ public partial class GameManager : Node
     private void LogSystemInitialized()
     {
         Log.System("Logging system initialized", "GameManager");
+        
+        // Configure logging for production performance
+        #if !DEBUG
+            Log.ReduceVerboseLogging();
+        #endif
     }
     
     private void InitializeManagers()

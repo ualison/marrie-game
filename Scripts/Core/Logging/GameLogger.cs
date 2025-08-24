@@ -37,16 +37,22 @@ namespace MarrieGame.Core.Logging
             #if DEBUG
                 _currentLogLevel = LogLevel.Debug;
             #else
-                _currentLogLevel = LogLevel.Info;
+                _currentLogLevel = LogLevel.Info; // Production: Hide debug logs
             #endif
             
-            // Initialize category filters (all enabled by default)
+            // Initialize category filters with reduced verbosity
             foreach (LogCategory category in Enum.GetValues<LogCategory>())
             {
                 _categoryFilters[category] = true;
             }
             
-            LogInfo("GameLogger initialized", "Logger");
+            // In production builds, disable excessive debug categories
+            #if !DEBUG
+                _categoryFilters[LogCategory.Debug] = false;
+                _categoryFilters[LogCategory.Performance] = false;
+            #endif
+            
+            LogInfo("GameLogger initialized with optimized settings", "Logger");
         }
         
         #region Core Logging Methods
@@ -91,22 +97,37 @@ namespace MarrieGame.Core.Logging
         
         public void LogPerformance(string message, double? executionTime = null)
         {
+            // Only log performance issues (> 16ms for 60fps)
+            if (executionTime.HasValue && executionTime.Value <= 16.0)
+                return;
+                
             var fullMessage = executionTime.HasValue 
                 ? $"{message} - Execution Time: {executionTime.Value:F2}ms"
                 : message;
-            Log(LogLevel.Debug, fullMessage, "Performance", LogCategory.Performance);
+            Log(LogLevel.Warning, fullMessage, "Performance", LogCategory.Performance);
         }
         
         public void LogReplay(string message, string replayContext = "")
         {
-            var fullMessage = string.IsNullOrEmpty(replayContext) ? message : $"[{replayContext}] {message}";
-            Log(LogLevel.Info, fullMessage, "Replay", LogCategory.Replay);
+            // Only log important replay events (start, end, errors)
+            if (message.Contains("started") || message.Contains("completed") || 
+                message.Contains("error") || message.Contains("failed") ||
+                message.Contains("record") && message.Contains("saved"))
+            {
+                var fullMessage = string.IsNullOrEmpty(replayContext) ? message : $"[{replayContext}] {message}";
+                Log(LogLevel.Info, fullMessage, "Replay", LogCategory.Replay);
+            }
         }
         
         public void LogUI(string message, string uiComponent = "")
         {
-            var fullMessage = string.IsNullOrEmpty(uiComponent) ? message : $"[{uiComponent}] {message}";
-            Log(LogLevel.Info, fullMessage, "UI", LogCategory.UI);
+            // Only log important UI events (errors, major state changes)
+            if (message.Contains("error") || message.Contains("failed") || 
+                message.Contains("connected") || message.Contains("initialized"))
+            {
+                var fullMessage = string.IsNullOrEmpty(uiComponent) ? message : $"[{uiComponent}] {message}";
+                Log(LogLevel.Info, fullMessage, "UI", LogCategory.UI);
+            }
         }
         
         public void LogAudio(string message, string audioContext = "")
@@ -153,7 +174,10 @@ namespace MarrieGame.Core.Logging
         public void SetCategoryFilter(LogCategory category, bool enabled)
         {
             _categoryFilters[category] = enabled;
-            LogInfo($"Category filter '{category}' set to: {enabled}", "Logger");
+            if (enabled)
+                LogInfo($"Category filter '{category}' enabled", "Logger");
+            else
+                LogInfo($"Category filter '{category}' disabled", "Logger");
         }
         
         public void EnableDebugMode()

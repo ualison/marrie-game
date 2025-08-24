@@ -14,9 +14,12 @@ namespace MarrieGame.Core.Logging
         void LogError(string message, string category = "Error");
         void LogCritical(string message, string category = "Critical");
         
+        // Game-specific logging (reduced scope)
         void LogGameplay(string message, string context = "");
         void LogSystem(string message, string system = "");
         void LogPerformance(string message, double? executionTime = null);
+        
+        // Feature-specific (only critical events)
         void LogReplay(string message, string replayContext = "");
         void LogUI(string message, string uiComponent = "");
         void LogAudio(string message, string audioContext = "");
@@ -37,16 +40,26 @@ namespace MarrieGame.Core.Logging
     
     public enum LogCategory
     {
+        // Standard levels
         Debug,
         Info,
         Warning,
         Error,
         Critical,
+        
+        // Game-specific categories
         Gameplay,
         System,
         Performance,
+        
+        // Feature-specific (only log important events)
         Replay,
         UI,
-        Audio
+        Audio,
+        
+        // Component-specific (reduced logging)
+        Player,
+        Enemy,
+        Scene
     }
 }
