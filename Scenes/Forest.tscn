@@ -1,6 +1,5 @@
-[gd_scene load_steps=13 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=12 format=3 uid="uid://bnv528gs1hngu"]
 
-[ext_resource type="Script" uid="uid://c8fjlyau3gnjg" path="res://Scripts/Systems/GameManager.cs" id="1_03gy3"]
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
@@ -13,76 +12,99 @@
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
 [ext_resource type="Script" uid="uid://ce4epv6lyxy1x" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
 
-[node name="Root" type="Node2D"]
+[node name="ForestScene" type="Node2D"]
 
-[node name="Interface" type="CanvasLayer" parent="."]
-follow_viewport_enabled = true
+[node name="Camera" type="Camera2D" parent="."]
 
-[node name="LifeBarUI" parent="Interface" instance=ExtResource("7_gfl13")]
-offset_left = -564.0
-offset_top = -316.0
-metadata/_edit_use_anchors_ = true
+[node name="Environment" type="Node2D" parent="."]
 
-[node name="GameOverScreenUI" parent="Interface" instance=ExtResource("8_4xied")]
-visible = false
-offset_left = -610.0
-offset_top = -337.0
-offset_right = -522.0
-offset_bottom = -296.0
-
-[node name="Level" type="Node" parent="."]
-
-[node name="BackGround" type="Sprite2D" parent="Level"]
-z_index = -3
+[node name="Background" type="Sprite2D" parent="Environment"]
+z_index = -10
 position = Vector2(-1, -5)
 scale = Vector2(0.800781, 0.688233)
 texture = ExtResource("2_8u8ny")
 
-[node name="Ground" parent="Level" instance=ExtResource("3_r6l07")]
-z_index = -2
+[node name="Ground" parent="Environment" instance=ExtResource("3_r6l07")]
+z_index = -5
 position = Vector2(6, 294)
 
-[node name="Tree1" type="Sprite2D" parent="Level"]
-z_index = 3
+[node name="Decorations" type="Node2D" parent="Environment"]
+
+[node name="TreeForeground" type="Sprite2D" parent="Environment/Decorations"]
+z_index = 5
 position = Vector2(-583, -172)
 scale = Vector2(0.669922, 0.649089)
 texture = ExtResource("7_wjun0")
 
-[node name="Tree2" type="Sprite2D" parent="Level"]
-z_index = -2
+[node name="TreeBackground" type="Sprite2D" parent="Environment/Decorations"]
+z_index = -3
 position = Vector2(-92, -307)
 scale = Vector2(0.689453, 0.752604)
 texture = ExtResource("8_j3sk6")
 
-[node name="Tree3" type="Sprite2D" parent="Level"]
-z_index = 3
+[node name="TreeForeground2" type="Sprite2D" parent="Environment/Decorations"]
+z_index = 5
 position = Vector2(570, -145)
 scale = Vector2(0.693148, 0.60584)
 texture = ExtResource("7_wjun0")
 
-[node name="Characters" type="Node" parent="."]
+[node name="GameEntities" type="Node2D" parent="."]
 
-[node name="Monster" parent="Characters" instance=ExtResource("5_wjun0")]
-position = Vector2(301, 69)
-
-[node name="Player" parent="Characters" instance=ExtResource("4_e2fbs")]
+[node name="Player" parent="GameEntities" instance=ExtResource("4_e2fbs")]
 position = Vector2(-327, 116)
 
-[node name="Systems" type="Node" parent="."]
+[node name="Enemies" type="Node2D" parent="GameEntities"]
 
-[node name="EnemyManager" type="Node2D" parent="Systems"]
+[node name="Monster" parent="GameEntities/Enemies" instance=ExtResource("5_wjun0")]
+position = Vector2(301, 69)
+
+[node name="UserInterface" type="CanvasLayer" parent="."]
+follow_viewport_enabled = true
+
+[node name="HUD" type="Control" parent="UserInterface"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LifeBarUI" parent="UserInterface/HUD" instance=ExtResource("7_gfl13")]
+offset_left = -564.0
+offset_top = -316.0
+metadata/_edit_use_anchors_ = true
+
+[node name="Overlays" type="Control" parent="UserInterface"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -573.0
+offset_top = -322.0
+offset_right = -573.0
+offset_bottom = -322.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="GameOverUI" parent="UserInterface/Overlays" instance=ExtResource("8_4xied")]
+visible = false
+layout_mode = 1
+
+[node name="GameSystems" type="Node" parent="."]
+
+[node name="Managers" type="Node" parent="GameSystems"]
+
+[node name="EnemyManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("7_r6l07")
 
-[node name="GameManager" type="Node2D" parent="Systems"]
-script = ExtResource("1_03gy3")
+[node name="ReplaySystem" type="Node" parent="GameSystems"]
 
-[node name="AudioManager" type="AudioStreamPlayer2D" parent="Systems"]
-position = Vector2(4, 0)
+[node name="ReplayRecorder" type="Node" parent="GameSystems/ReplaySystem"]
+script = ExtResource("10_r6l07")
+
+[node name="Audio" type="Node" parent="GameSystems"]
+
+[node name="BackgroundMusic" type="AudioStreamPlayer2D" parent="GameSystems/Audio"]
 stream = ExtResource("9_r6l07")
 volume_db = 6.038
 autoplay = true
-
-[node name="Camera2D" type="Camera2D" parent="Systems"]
-
-[node name="ReplayManager" type="Node" parent="Systems"]
-script = ExtResource("10_r6l07")

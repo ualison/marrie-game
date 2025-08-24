@@ -29,7 +29,7 @@ public partial class EnemyManager : Node
         }
 
         CallDeferred(nameof(DiscoverEnemies));
-        GD.Print("EnemyManager initialized");
+        Log.System("EnemyManager initialized", "EnemyManager");
     }
 
     private void DiscoverEnemies()

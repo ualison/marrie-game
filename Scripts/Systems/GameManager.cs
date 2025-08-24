@@ -1,5 +1,6 @@
 using Godot;
 using System.Linq;
+using MarrieGame.Core.Logging;
 
 /// <summary>
 /// Main game orchestrator following Single Responsibility Principle
@@ -27,13 +28,16 @@ public partial class GameManager : Node
             Instance = this;
             ProcessMode = ProcessModeEnum.Always;
             
+            // Initialize logging system first
+            InitializeLoggingSystem();
+            
             // Initialize all managers in correct order
             InitializeManagers();
             
             // Subscribe to events for coordination
             SubscribeToEvents();
             
-            GD.Print("GameManager: Initialized - Game orchestration active");
+            Log.System("Game orchestration active", "GameManager");
         }
         else
         {
@@ -41,14 +45,33 @@ public partial class GameManager : Node
         }
     }
     
+    private void InitializeLoggingSystem()
+    {
+        // Create and add the logger to the scene tree if it doesn't exist
+        if (MarrieGame.Core.Logging.GameLogger.Instance == null)
+        {
+            var logger = new MarrieGame.Core.Logging.GameLogger();
+            // Use call_deferred to avoid timing issues during scene setup
+            GetTree().Root.CallDeferred("add_child", logger);
+            CallDeferred(nameof(LogSystemInitialized));
+        }
+    }
+    
+    private void LogSystemInitialized()
+    {
+        Log.System("Logging system initialized", "GameManager");
+    }
+    
     private void InitializeManagers()
     {
+        Log.StartTimer("ManagerInitialization");
+        
         // Ensure all managers exist as children
         EnsureManagerExists<PlayerStateManager>();
         EnsureManagerExists<UIManager>();
         EnsureManagerExists<ReplaySystemManager>();
         
-        GD.Print("GameManager: All managers initialized");
+        Log.EndTimer("ManagerInitialization", "All managers initialized");
     }
     
     private void EnsureManagerExists<T>() where T : Node, new()
@@ -57,7 +80,7 @@ public partial class GameManager : Node
         {
             var manager = new T();
             AddChild(manager);
-            GD.Print($"GameManager: Created {typeof(T).Name}");
+            Log.System($"Created {typeof(T).Name}", "GameManager");
         }
     }
     
@@ -66,12 +89,12 @@ public partial class GameManager : Node
         // Listen to key events for game flow coordination
         GameEvents.GameRestart += OnGameRestart;
         
-        GD.Print("GameManager: Event subscriptions active");
+        Log.System("Event subscriptions active", "GameManager");
     }
     
     private void OnPlayerDied(Vector2 deathPosition, int remainingHealth)
     {
-        GD.Print($"GameManager: Coordinating player death response at {deathPosition}");
+        Log.Gameplay($"Coordinating player death response at {deathPosition} (Health: {remainingHealth})", "GameManager");
         
         // Pause the game
         PauseGame();
@@ -82,7 +105,7 @@ public partial class GameManager : Node
     
     private void OnGameRestart()
     {
-        GD.Print("GameManager: Coordinating game restart");
+        Log.Gameplay("Coordinating game restart", "GameManager");
         
         // Reset game state
         IsGameActive = true;
@@ -97,7 +120,7 @@ public partial class GameManager : Node
             EnemyManager.Instance.ResetAllEnemies();
         }
         
-        GD.Print("GameManager: Game restart coordination complete");
+        Log.Gameplay("Game restart coordination complete", "GameManager");
     }
     
     #region Game State Management
@@ -111,7 +134,7 @@ public partial class GameManager : Node
         GetTree().Paused = true;
         
         GameEvents.OnGameStateChanged("Paused");
-        GD.Print("GameManager: Game paused");
+        Log.Gameplay("Game paused", "GameManager");
     }
     
     public void ResumeGame()
@@ -122,18 +145,18 @@ public partial class GameManager : Node
         GetTree().Paused = false;
         
         GameEvents.OnGameStateChanged("Active");
-        GD.Print("GameManager: Game resumed");
+        Log.Gameplay("Game resumed", "GameManager");
     }
     
     public void RestartGame()
     {
-        GD.Print("GameManager: Restart requested");
+        Log.Gameplay("Restart requested", "GameManager");
         GameEvents.OnGameRestart();
     }
     
     public void QuitGame()
     {
-        GD.Print("GameManager: Quit requested");
+        Log.System("Quit requested", "GameManager");
         GetTree().Quit();
     }
     
@@ -165,7 +188,7 @@ public partial class GameManager : Node
             GameEvents.GameRestart -= OnGameRestart;
             
             Instance = null;
-            GD.Print("GameManager: Cleaned up");
+            Log.System("Cleaned up", "GameManager");
         }
     }
 }

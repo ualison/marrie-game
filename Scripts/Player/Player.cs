@@ -36,7 +36,7 @@ public partial class Player : CharacterBody2D, IPausable, IResettable
         AddToGroup("player");
         InitializePhysics();
         InitializeComponents();
-        GD.Print($"Player initialized - Health system: {(_playerLife != null ? "✓" : "✗")}");
+        Log.System($"Player initialized - Health system: {(_playerLife != null ? "✓" : "✗")}", "Player");
     }
 
     private void InitializePhysics()
@@ -357,7 +357,7 @@ private void ProcessDamageFromEnemy(Node2D enemy)
     private void OnPlayerDied()
     {
         // Handle player death - stop movement and apply visual effects
-        GD.Print("Player died!");
+        Log.Gameplay("Player died!", "Player");
         Velocity = Vector2.Zero;
 
         ApplyDeathVisuals();
@@ -393,7 +393,7 @@ private void ProcessDamageFromEnemy(Node2D enemy)
         // Reset sprite direction to initial state
         ResetSpriteDirection();
 
-        GD.Print("Player reset complete with direction reset");
+        Log.Gameplay("Player reset complete with direction reset", "Player");
     }
 
 private void ResetSpriteDirection()
@@ -405,11 +405,11 @@ private void ResetSpriteDirection()
     {
         var scale = _sprite.Scale;
         _sprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
-        GD.Print($"Player sprite direction reset - facing right: {_facingRight}");
+        Log.Debug($"Player sprite direction reset - facing right: {_facingRight}", "Player");
     }
     else
     {
-        GD.Print("Player sprite not found for direction reset");
+        Log.Warning("Player sprite not found for direction reset", "Player");
     }
 }
 
@@ -417,14 +417,14 @@ private void ResetSpriteDirection()
     {
         // Pause player movement for replay mode
         _isPaused = true;
-        GD.Print("Player paused for replay");
+        Log.Replay("Player paused for replay", "Player");
     }
 
     public void ResumePlayer()
     {
         // Resume player movement after replay
         _isPaused = false;
-        GD.Print("Player resumed after replay");
+        Log.Replay("Player resumed after replay", "Player");
     }
 
     public bool IsPaused() => _isPaused; // Check if player is paused

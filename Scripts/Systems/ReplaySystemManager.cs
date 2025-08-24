@@ -149,12 +149,12 @@ public partial class ReplaySystemManager : Node
     
     private void OnPlayerDied(Vector2 deathPosition, int remainingHealth)
     {
-        GD.Print($"ReplaySystemManager: Player died - about to capture frames BEFORE stopping recording");
+        Log.Replay($"Player died - capturing replay data at {deathPosition} (Health: {remainingHealth})", "ReplaySystemManager");
         
         // Ensure we have a valid recorder reference
         if (_replayRecorder == null)
         {
-            GD.Print("ReplaySystemManager: _replayRecorder is null, attempting immediate discovery...");
+            Log.Error("ReplayRecorder is null, attempting immediate discovery", "ReplaySystemManager");
             DiscoverReplayComponents();
         }
         
@@ -162,11 +162,11 @@ public partial class ReplaySystemManager : Node
         if (_replayRecorder != null)
         {
             var stats = _replayRecorder.GetRecordingStats();
-            GD.Print($"ReplaySystemManager: Recording stats before capture - Player: {stats.playerFrames}, Monster: {stats.monsterFrames}");
+            Log.Replay($"Recording stats before capture - Player: {stats.playerFrames}, Monster: {stats.monsterFrames}", "ReplaySystemManager");
         }
         else
         {
-            GD.PrintErr("ReplaySystemManager: Still no ReplayRecorder found - cannot capture frames!");
+            Log.Error("Still no ReplayRecorder found - cannot capture frames!", "ReplaySystemManager");
         }
         
         // IMPORTANT: Store death record BEFORE stopping recording to capture frames

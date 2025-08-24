@@ -44,18 +44,18 @@ public partial class PlayerStateManager : Node
     
     private void TryImmediateInitialization()
     {
-        GD.Print("PlayerStateManager: Attempting immediate initialization");
+        Log.System("Attempting immediate initialization", "PlayerStateManager");
         DiscoverPlayerComponents();
         ConnectPlayerSystems();
         CachePlayerSpawn();
         
         if (_player != null && _playerLife != null)
         {
-            GD.Print("PlayerStateManager: Immediate initialization successful");
+            Log.System("Immediate initialization successful", "PlayerStateManager");
         }
         else
         {
-            GD.Print("PlayerStateManager: Immediate initialization failed, waiting for SceneReady");
+            Log.System("Immediate initialization failed, waiting for SceneReady", "PlayerStateManager");
         }
     }
     
@@ -71,16 +71,16 @@ public partial class PlayerStateManager : Node
         _player = GetTree().GetFirstNodeInGroup("player") as Player;
         _playerLife = _player?.GetLifeSystem();
         
-        GD.Print($"PlayerStateManager: Player found: {_player != null}, Life system: {_playerLife != null}");
+        Log.System($"Player found: {_player != null}, Life system: {_playerLife != null}", "PlayerStateManager");
         
         if (_player != null)
         {
-            GD.Print($"PlayerStateManager: Player node name: {_player.Name}");
+            Log.Debug($"Player node name: {_player.Name}", "PlayerStateManager");
         }
         
         if (_playerLife != null)
         {
-            GD.Print($"PlayerStateManager: PlayerLife node name: {_playerLife.Name}");
+            Log.Debug($"PlayerLife node name: {_playerLife.Name}", "PlayerStateManager");
         }
     }
     
@@ -92,14 +92,14 @@ public partial class PlayerStateManager : Node
             if (_playerLife.IsConnected(PlayerLife.SignalName.PlayerDied, new Callable(this, nameof(OnPlayerHealthDepleted))))
             {
                 _playerLife.PlayerDied -= OnPlayerHealthDepleted;
-                GD.Print("PlayerStateManager: Disconnected existing PlayerDied signal");
+                Log.Debug("Disconnected existing PlayerDied signal", "PlayerStateManager");
             }
             _playerLife.PlayerDied += OnPlayerHealthDepleted;
-            GD.Print("PlayerStateManager: Connected to PlayerLife.PlayerDied signal");
+            Log.System("Connected to PlayerLife.PlayerDied signal", "PlayerStateManager");
         }
         else
         {
-            GD.PrintErr("PlayerStateManager: Cannot connect to PlayerLife - it's null!");
+            Log.Error("Cannot connect to PlayerLife - it's null!", "PlayerStateManager");
         }
     }
     
@@ -108,7 +108,7 @@ public partial class PlayerStateManager : Node
         if (_player != null)
         {
             PlayerSpawnPosition = _player.GlobalPosition;
-            GD.Print($"Cached player spawn position: {PlayerSpawnPosition}");
+            Log.System($"Cached player spawn position: {PlayerSpawnPosition}", "PlayerStateManager");
         }
     }
     
@@ -116,7 +116,7 @@ public partial class PlayerStateManager : Node
     {
         if (IsPlayerDead) return;
         
-        GD.Print($"PlayerStateManager: Player health depleted");
+        Log.Gameplay("Player health depleted", "PlayerStateManager");
         
         Vector2 deathPosition = _player?.GlobalPosition ?? Vector2.Zero;
         HandlePlayerDeath(deathPosition);
@@ -129,16 +129,16 @@ public partial class PlayerStateManager : Node
         // Don't allow death during replay
         if (ReplayRecorder.Instance != null && ReplayRecorder.Instance.IsRecording == false)
         {
-            GD.Print("Ignoring player death during replay");
+            Log.Replay("Ignoring player death during replay", "PlayerStateManager");
             return;
         }
         
-        GD.Print($"PlayerStateManager: Player died at {deathPosition}");
+        Log.Gameplay($"Player died at {deathPosition}", "PlayerStateManager");
         
         IsPlayerDead = true;
         
         // Notify other systems
-        GD.Print("PlayerStateManager: Firing PlayerDied event");
+        Log.System("Firing PlayerDied event", "PlayerStateManager");
         PlayerDied?.Invoke(deathPosition, _playerLife?.CurrentHealth ?? 0);
         GameEvents.OnPlayerDied(deathPosition, _playerLife?.CurrentHealth ?? 0);
     }
@@ -153,14 +153,14 @@ public partial class PlayerStateManager : Node
         
         if (_player != null)
         {
-            GD.Print($"Respawning player from {_player.GlobalPosition} to {PlayerSpawnPosition}");
+            Log.Gameplay($"Respawning player from {_player.GlobalPosition} to {PlayerSpawnPosition}", "PlayerStateManager");
             _player.GlobalPosition = PlayerSpawnPosition;
             _player.Reset();
-            GD.Print($"Player respawned at: {_player.GlobalPosition}");
+            Log.Gameplay($"Player respawned at: {_player.GlobalPosition}", "PlayerStateManager");
         }
         else
         {
-            GD.PrintErr("Cannot respawn - player not found!");
+            Log.Error("Cannot respawn - player not found!", "PlayerStateManager");
         }
         
         IsPlayerDead = false;
