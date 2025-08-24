@@ -30,6 +30,7 @@ public partial class FollowerMonster : CharacterBody2D
     private Timer _stateTimer;
     private AudioStreamPlayer2D _footstepAudio;
     private Node2D _spriteNode;
+    private Tween _currentTween; // Track current fade tween
     #endregion
 
     #region Initialization
@@ -98,7 +99,6 @@ public partial class FollowerMonster : CharacterBody2D
     #endregion
 
     #region Physics
-
     public void DisableForReplay()
     {
         IsDisabledForReplay = true;
@@ -110,7 +110,7 @@ public partial class FollowerMonster : CharacterBody2D
     {
         IsDisabledForReplay = false;
         SetProcessMode(ProcessModeEnum.Always);
-
+        
         // Make monster visible and pause state switching for a moment
         if (_spriteNode != null)
         {
@@ -118,17 +118,17 @@ public partial class FollowerMonster : CharacterBody2D
             _spriteNode.Modulate = Colors.White;
             Show();
         }
-
+        
         // Don't immediately start new behavior - stay visible for a bit
         _stateTimer.Stop();
         _currentState = MonsterState.Following;
         _isVisible = true;
         _isFullyVisible = true;
-
+        
         // Enable collision
         SetCollisionMask(1u);
         SetCollisionLayer(1u);
-
+        
         // Wait a few seconds before resuming normal behavior
         GetTree().CreateTimer(3.0f).Timeout += () =>
         {
@@ -137,13 +137,14 @@ public partial class FollowerMonster : CharacterBody2D
                 StartFollowing(); // Resume normal behavior
             }
         };
-
+        
         GD.Print("FollowerMonster enabled after replay - will resume normal behavior in 3 seconds");
     }
+
     public override void _PhysicsProcess(double delta)
     {
         if (IsDisabledForReplay) return;
-
+        
         if (_player?.GetLifeSystem()?.IsDead != false) return;
 
         if (_currentState == MonsterState.Following)
@@ -203,7 +204,7 @@ public partial class FollowerMonster : CharacterBody2D
     {
         _currentState = MonsterState.InitialWait;
         _isVisible = true;
-        _isFullyVisible = false;
+        _isFullyVisible = true; // Fully visible during initial wait
 
         GlobalPosition = _initialPosition;
         Velocity = Vector2.Zero;
@@ -211,6 +212,7 @@ public partial class FollowerMonster : CharacterBody2D
         if (_spriteNode != null)
         {
             _spriteNode.Visible = true;
+            _spriteNode.Modulate = Colors.White; // Fully opaque during wait
         }
 
         SetCollisionMask(0u);
@@ -221,32 +223,42 @@ public partial class FollowerMonster : CharacterBody2D
         _stateTimer.WaitTime = InitialWaitTime;
         _stateTimer.Start();
 
-        GD.Print($"Monster waiting at scene position {_initialPosition} for {InitialWaitTime} seconds");
+        GD.Print($"Monster waiting at scene position {_initialPosition} for {InitialWaitTime} seconds - fully visible");
     }
 
-    private void StartFollowing()
+   private void StartFollowing()
+{
+    _currentState = MonsterState.Following;
+    _isVisible = true;
+    _isFullyVisible = false;
+
+    PositionBehindPlayerOnGround();
+    SetCollisionMask(1u);
+    SetCollisionLayer(1u);
+    FacePlayer();
+
+    // CRITICAL: Set transparent and wait one frame before fading
+    if (_spriteNode != null)
     {
-        _currentState = MonsterState.Following;
-        _isVisible = true;
-        _isFullyVisible = false;
-
-        // Position on random side and start fade immediately
-        PositionBehindPlayerOnGround();
-
-        // Enable collision immediately to prevent falling through ground
-        SetCollisionMask(1u);
-        SetCollisionLayer(1u);
-
-        FacePlayer();
-        FadeIn();
-        PlayAudio(true);
-
-        float visibleTime = GD.Randf() * (MaxVisibleTime - MinVisibleTime) + MinVisibleTime;
-        _stateTimer.WaitTime = visibleTime;
-        _stateTimer.Start();
-
-        GD.Print("Monster started following behavior");
+        _spriteNode.Visible = true;
+        _spriteNode.Modulate = new Color(1, 1, 1, 0);
     }
+
+    // Wait one frame before starting fade
+    CallDeferred(nameof(DelayedFadeIn));
+
+    PlayAudio(true);
+
+    float visibleTime = GD.Randf() * (MaxVisibleTime - MinVisibleTime) + MinVisibleTime;
+    _stateTimer.WaitTime = visibleTime;
+    _stateTimer.Start();
+}
+
+private void DelayedFadeIn()
+{
+    // This ensures the modulate change takes effect before tween starts
+    FadeIn();
+}
 
     private void StartHiding()
     {
@@ -304,36 +316,26 @@ public partial class FollowerMonster : CharacterBody2D
 
         GD.Print($"Monster positioned on {(_shouldSpawnOnRight ? "right" : "left")} side at distance {safeDistance}");
     }
-
-    private void EnableCollisionAfterDelay()
-    {
-        // Simple 1-second delay before enabling collision
-        GetTree().CreateTimer(1.0f).Timeout += () =>
-        {
-            if (_isFullyVisible && _currentState == MonsterState.Following)
-            {
-                SetCollisionMask(1u);
-                SetCollisionLayer(1u);
-                GD.Print("Monster collision enabled");
-            }
-        };
-    }
     #endregion
 
-    #region Visual and Audio Effects
+    #region Visual and Audio Effects - FIXED FADE METHODS
     private void FadeIn()
     {
         if (_spriteNode == null) return;
 
+        // Kill any existing tween to prevent conflicts
+        _currentTween?.Kill();
+
         _spriteNode.Visible = true;
+        // Ensure sprite starts transparent
         _spriteNode.Modulate = new Color(1, 1, 1, 0);
 
-        var tween = CreateTween();
-        tween.TweenProperty(_spriteNode, "modulate:a", 1.0f, 0.5f);
-        tween.TweenCallback(Callable.From(() =>
+        _currentTween = CreateTween();
+        _currentTween.TweenProperty(_spriteNode, "modulate:a", 1.0f, 0.5f);
+        _currentTween.TweenCallback(Callable.From(() =>
         {
             _isFullyVisible = true;
-            GD.Print("Monster fully visible");
+            GD.Print("Monster fade in complete - fully visible");
         }));
     }
 
@@ -341,17 +343,20 @@ public partial class FollowerMonster : CharacterBody2D
     {
         if (_spriteNode == null) return;
 
+        // Kill any existing tween to prevent conflicts
+        _currentTween?.Kill();
+
         // Disable collision immediately when starting to fade out
         SetCollisionMask(0u);
         SetCollisionLayer(0u);
         _isFullyVisible = false;
 
-        var tween = CreateTween();
-        tween.TweenProperty(_spriteNode, "modulate:a", 0.0f, 0.5f);
-        tween.TweenCallback(Callable.From(() =>
+        _currentTween = CreateTween();
+        _currentTween.TweenProperty(_spriteNode, "modulate:a", 0.0f, 0.5f);
+        _currentTween.TweenCallback(Callable.From(() =>
         {
             _spriteNode.Visible = false;
-            GD.Print("Monster fully hidden - cannot take damage");
+            GD.Print("Monster fade out complete - fully hidden");
         }));
     }
 
@@ -388,8 +393,9 @@ public partial class FollowerMonster : CharacterBody2D
     // Reset monster to initial state for game restart
     public void Reset()
     {
-        // Stop any active timers
+        // Stop any active timers and tweens
         _stateTimer?.Stop();
+        _currentTween?.Kill();
 
         // Reset to initial position and state
         GlobalPosition = _initialPosition;
@@ -398,7 +404,7 @@ public partial class FollowerMonster : CharacterBody2D
         // Reset state variables
         _currentState = MonsterState.InitialWait;
         _isVisible = true;
-        _isFullyVisible = false;
+        _isFullyVisible = true;
 
         // Make visible at initial position
         if (_spriteNode != null)

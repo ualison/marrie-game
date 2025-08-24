@@ -150,13 +150,38 @@ public partial class ReplayRecorder : Node
     #region Frame Creation
     private ReplayFrame CreateFrameForCharacter(Node2D character, float timestamp)
     {
+        bool isVisible = true;
+        float alpha = 1.0f;
+        
+        // Record alpha for FollowerMonster to capture fade transitions
+        if (character is FollowerMonster follower)
+        {
+            isVisible = follower.IsVisible();
+            
+            // Get actual sprite alpha - this captures fade state accurately
+            var spriteNode = follower.GetNodeOrNull<Node2D>("AnimatedSprite2D") 
+                          ?? follower.GetNodeOrNull<Node2D>("MonsterSprite");
+            if (spriteNode != null)
+            {
+                alpha = spriteNode.Modulate.A;
+            }
+        }
+        // For Player, keep simple - no fade effects needed
+        else if (character is Player)
+        {
+            isVisible = true;
+            alpha = 1.0f;
+        }
+        
         return new ReplayFrame
         {
             Timestamp = timestamp,
             Position = character.GlobalPosition,
             Rotation = character.GlobalRotation,
             Animation = ExtractCurrentAnimation(character),
-            SpriteFlip = ExtractSpriteFlip(character)
+            SpriteFlip = ExtractSpriteFlip(character),
+            IsVisible = isVisible,
+            Alpha = alpha
         };
     }
 
@@ -166,33 +191,33 @@ public partial class ReplayRecorder : Node
         return animSprite?.IsPlaying() == true ? animSprite.Animation : "idle";
     }
 
- private bool ExtractSpriteFlip(Node2D character)
-{
-    Node2D sprite = null;
-    
-    // For FollowerMonster, check the _spriteNode which could be AnimatedSprite2D or MonsterSprite
-    if (character is FollowerMonster)
+    private bool ExtractSpriteFlip(Node2D character)
     {
-        sprite = character.GetNodeOrNull<Node2D>("AnimatedSprite2D")
-            ?? character.GetNodeOrNull<Node2D>("MonsterSprite");
-    }
-    // For Monster, check MonsterSprite
-    else if (character is Monster)
-    {
-        sprite = character.GetNodeOrNull<Node2D>("MonsterSprite")
-            ?? character.GetNodeOrNull<Node2D>("Sprite2D");
-    }
-    // For Player, check the usual suspects
-    else
-    {
-        sprite = character.GetNodeOrNull<Node2D>("AnimatedSprite2D")
-            ?? character.GetNodeOrNull<Node2D>("MarrieSprite")
-            ?? character.GetNodeOrNull<Node2D>("Sprite2D");
-    }
+        Node2D sprite = null;
+        
+        // For FollowerMonster, check the _spriteNode which could be AnimatedSprite2D or MonsterSprite
+        if (character is FollowerMonster)
+        {
+            sprite = character.GetNodeOrNull<Node2D>("AnimatedSprite2D")
+                ?? character.GetNodeOrNull<Node2D>("MonsterSprite");
+        }
+        // For Monster, check MonsterSprite
+        else if (character is Monster)
+        {
+            sprite = character.GetNodeOrNull<Node2D>("MonsterSprite")
+                ?? character.GetNodeOrNull<Node2D>("Sprite2D");
+        }
+        // For Player, check the usual suspects
+        else
+        {
+            sprite = character.GetNodeOrNull<Node2D>("AnimatedSprite2D")
+                ?? character.GetNodeOrNull<Node2D>("MarrieSprite")
+                ?? character.GetNodeOrNull<Node2D>("Sprite2D");
+        }
 
-    // Return true if sprite is flipped (negative X scale)
-    return sprite?.Scale.X < 0;
-}
+        // Return true if sprite is flipped (negative X scale)
+        return sprite?.Scale.X < 0;
+    }
     #endregion
 
     #region Cleanup

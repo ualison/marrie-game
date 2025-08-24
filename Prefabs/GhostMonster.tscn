@@ -4,16 +4,16 @@
 [ext_resource type="Texture2D" uid="uid://bj7aeaudq2rbt" path="res://Art/Monsterv3Ghost.png" id="2_efpf5"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
-size = Vector2(293, 354)
+size = Vector2(302, 376)
 
 [node name="GhostMonster" type="CharacterBody2D"]
 script = ExtResource("1_uqgqf")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(-7.5, -31)
+position = Vector2(10, -20)
 shape = SubResource("RectangleShape2D_kyqiw")
 
 [node name="GhostMonsterSprite" type="Sprite2D" parent="."]
-position = Vector2(-5, -6)
-scale = Vector2(0.320313, 0.300781)
+position = Vector2(12.5, 9.00002)
+scale = Vector2(0.31543, 0.317708)
 texture = ExtResource("2_efpf5")

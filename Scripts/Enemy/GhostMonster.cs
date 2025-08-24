@@ -1,12 +1,12 @@
 using Godot;
 using System.Collections.Generic;
 
-// Ghost version of monster that replays recorded movements and interactions
+// Ghost version of monster that replays recorded movements and interactions - Performance Optimized
 public partial class GhostMonster : CharacterBody2D
 {
     #region Constants and Configuration
-    private const float SMOOTH_SPEED = 10.0f;
-    private static readonly Color GHOST_TINT = new(1.0f, 0.5f, 0.5f, 0.7f); // Semi-transparent red
+    private static readonly Color GHOST_TINT = new(1.0f, 0.5f, 0.5f, 0.7f);
+    private const float ALPHA_TOLERANCE = 0.01f; // Avoid unnecessary updates
     #endregion
 
     #region State Variables
@@ -14,7 +14,7 @@ public partial class GhostMonster : CharacterBody2D
     private int _currentFrameIndex;
     private float _replayStartTime;
     private bool _isReplaying;
-    private string _monsterType; // "FollowerMonster" or "Monster"
+    private string _monsterType;
     #endregion
 
     #region Visual Components
@@ -23,9 +23,12 @@ public partial class GhostMonster : CharacterBody2D
     private Node2D _activeSprite;
     #endregion
 
-    #region Movement Smoothing
-    private Vector2 _currentPosition;
-    private Vector2 _targetPosition;
+    #region Performance Cache
+    private bool _hasAnimationFrames = false;
+    private float _lastAlpha = -1f; // Cache to avoid unnecessary updates
+    private bool _lastFlipState = false;
+    private string _lastAnimation = "";
+    private Vector2 _lastPosition = Vector2.Zero;
     #endregion
 
     #region Initialization
@@ -38,29 +41,99 @@ public partial class GhostMonster : CharacterBody2D
     }
     #endregion
 
-    #region Core Update Loop
+    #region Core Update Loop - OPTIMIZED
     public override void _Process(double delta)
     {
         if (!_isReplaying || _replayFrames == null) return;
 
         float elapsedTime = Time.GetTicksMsec() / 1000.0f - _replayStartTime;
-        var targetFrame = FindFrameAtTime(elapsedTime);
+        var targetFrame = FindFrameAtTime(elapsedTime); // Use same method as GhostPlayer
 
         if (targetFrame != null)
         {
-            _targetPosition = targetFrame.Position;
-            ApplyFrameToGhost(targetFrame);
+            GlobalPosition = targetFrame.Position;
+            ApplyFrameToGhostOptimized(targetFrame);
         }
         else if (_currentFrameIndex >= _replayFrames.Count)
         {
             _isReplaying = false;
-            GD.Print($"GhostMonster: Replay completed at frame {_currentFrameIndex}/{_replayFrames.Count}");
-            GD.Print($"Ghost monster sprite visible: {_activeSprite?.Visible}");
+            GD.Print("GhostMonster: Replay completed");
             return;
         }
+    }
+    // Use the same frame finder as GhostPlayer
+    private ReplayFrame FindFrameAtTime(float time)
+    {
+        for (int i = _currentFrameIndex; i < _replayFrames.Count; i++)
+        {
+            if (_replayFrames[i].Timestamp >= time)
+            {
+                _currentFrameIndex = i;
+                return _replayFrames[i];
+            }
+        }
+        return null;
+    }
+    #endregion
 
-        _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * (float)delta);
-        GlobalPosition = _currentPosition;
+    #region Optimized Frame Processing
+    private ReplayFrame FindFrameAtTimeOptimized(float time)
+    {
+        // Optimized: Don't search from beginning every time
+        // Most of the time we just need the next frame
+        if (_currentFrameIndex < _replayFrames.Count && _replayFrames[_currentFrameIndex].Timestamp <= time)
+        {
+            // Fast forward to correct frame
+            while (_currentFrameIndex < _replayFrames.Count - 1 && _replayFrames[_currentFrameIndex + 1].Timestamp <= time)
+            {
+                _currentFrameIndex++;
+            }
+            return _replayFrames[_currentFrameIndex];
+        }
+
+        return _currentFrameIndex < _replayFrames.Count ? _replayFrames[_currentFrameIndex] : null;
+    }
+
+    private void ApplyFrameToGhostOptimized(ReplayFrame frame)
+    {
+        // Only update rotation if it actually changed
+        if (Mathf.Abs(GlobalRotation - frame.Rotation) > 0.01f)
+        {
+            GlobalRotation = frame.Rotation;
+        }
+
+        if (_activeSprite != null)
+        {
+            // Only update alpha if it changed significantly
+            float finalAlpha = frame.Alpha * GHOST_TINT.A;
+            if (Mathf.Abs(_lastAlpha - finalAlpha) > ALPHA_TOLERANCE)
+            {
+                _activeSprite.Visible = frame.Alpha > 0.0f;
+                _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, finalAlpha);
+                _lastAlpha = finalAlpha;
+            }
+
+            // Only update sprite flip if it changed
+            if (_lastFlipState != frame.SpriteFlip)
+            {
+                var currentScale = _activeSprite.Scale;
+                _activeSprite.Scale = new Vector2(
+                    frame.SpriteFlip ? -Mathf.Abs(currentScale.X) : Mathf.Abs(currentScale.X),
+                    currentScale.Y
+                );
+                _lastFlipState = frame.SpriteFlip;
+            }
+        }
+
+        // Only update animation if it changed and we have animation capability
+        if (_hasAnimationFrames && _lastAnimation != frame.Animation)
+        {
+            if (!string.IsNullOrEmpty(frame.Animation))
+            {
+                _animatedSprite?.Play(frame.Animation);
+                _lastAnimation = frame.Animation;
+            }
+        }
     }
     #endregion
 
@@ -79,13 +152,25 @@ public partial class GhostMonster : CharacterBody2D
         _replayStartTime = Time.GetTicksMsec() / 1000.0f;
         _isReplaying = true;
 
-        GlobalPosition = frames[0].Position;
-        _currentPosition = GlobalPosition;
-        _targetPosition = GlobalPosition;
+        // Reset performance cache
+        _lastAlpha = -1f;
+        _lastFlipState = false;
+        _lastAnimation = "";
+        _lastPosition = Vector2.Zero;
 
-        // Start with fade in effect like original monster
-        FadeIn();
-        GD.Print($"GhostMonster: Started replay with {frames.Count} frames ({monsterType})");
+        // Start at first frame position
+        GlobalPosition = frames[0].Position;
+        _lastPosition = GlobalPosition;
+
+        // Show the CharacterBody2D but start sprite hidden
+        Show();
+        if (_activeSprite != null)
+        {
+            _activeSprite.Visible = false;
+            _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, 0);
+        }
+
+        GD.Print($"GhostMonster: Started optimized replay with {frames.Count} frames");
     }
 
     public void StopReplay()
@@ -96,7 +181,6 @@ public partial class GhostMonster : CharacterBody2D
 
     public void FadeOutAndDestroy()
     {
-        // Called by ReplayGem for cleanup with proper timing
         if (_activeSprite == null)
         {
             QueueFree();
@@ -115,55 +199,16 @@ public partial class GhostMonster : CharacterBody2D
     public bool IsReplaying() => _isReplaying;
     #endregion
 
-    #region Frame Processing
-    private ReplayFrame FindFrameAtTime(float time)
-    {
-        for (int i = _currentFrameIndex; i < _replayFrames.Count; i++)
-        {
-            if (_replayFrames[i].Timestamp >= time)
-            {
-                _currentFrameIndex = i;
-                return _replayFrames[i];
-            }
-        }
-        return null;
-    }
-
-    private void ApplyFrameToGhost(ReplayFrame frame)
-    {
-        GlobalRotation = frame.Rotation;
-
-        if (_activeSprite != null)
-        {
-            var currentScale = _activeSprite.Scale;
-            _activeSprite.Scale = new Vector2(
-                frame.SpriteFlip ? -Mathf.Abs(currentScale.X) : Mathf.Abs(currentScale.X),
-                currentScale.Y
-            );
-        }
-
-        if (_animatedSprite != null && !string.IsNullOrEmpty(frame.Animation))
-        {
-            if (_animatedSprite.SpriteFrames?.HasAnimation(frame.Animation) == true)
-            {
-                if (_animatedSprite.Animation != frame.Animation)
-                    _animatedSprite.Play(frame.Animation);
-            }
-        }
-    }
-    #endregion
-
-    #region Visual Setup
+    #region Visual Setup - CACHED
     private void SetupGhostVisuals()
     {
         DiscoverSpriteComponents();
+        CacheAnimationCapability();
         ApplyGhostEffect();
     }
 
-
     private void DiscoverSpriteComponents()
     {
-        // Try animated sprite first
         _animatedSprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
         if (_animatedSprite != null)
         {
@@ -172,9 +217,8 @@ public partial class GhostMonster : CharacterBody2D
             return;
         }
 
-        // Try static sprites - match the names from original monsters
-        _sprite = GetNodeOrNull<Sprite2D>("MonsterSprite")  // This is what FollowerMonster uses
-               ?? GetNodeOrNull<Sprite2D>("GhostMonsterSprite")  // Fallback
+        _sprite = GetNodeOrNull<Sprite2D>("MonsterSprite")
+               ?? GetNodeOrNull<Sprite2D>("GhostMonsterSprite")
                ?? GetNodeOrNull<Sprite2D>("Sprite2D");
 
         if (_sprite != null)
@@ -187,6 +231,12 @@ public partial class GhostMonster : CharacterBody2D
             GD.Print("GhostMonster: No sprite found, creating fallback");
             CreateFallbackVisual();
         }
+    }
+
+    private void CacheAnimationCapability()
+    {
+        // Cache whether we have animation capability to avoid repeated checks
+        _hasAnimationFrames = _animatedSprite != null && _animatedSprite.SpriteFrames != null;
     }
 
     private void ApplyGhostEffect()
@@ -204,7 +254,7 @@ public partial class GhostMonster : CharacterBody2D
 
         var imageTexture = new ImageTexture();
         var image = Image.CreateEmpty(32, 32, false, Image.Format.Rgba8);
-        image.Fill(new Color(1, 0, 0)); // Red for monster
+        image.Fill(new Color(1, 0, 0));
         imageTexture.SetImage(image);
 
         fallbackSprite.Texture = imageTexture;
@@ -216,11 +266,9 @@ public partial class GhostMonster : CharacterBody2D
 
     private void DisableCollisions()
     {
-        // Disable physics collision
         SetCollisionLayerValue(1, false);
         SetCollisionMaskValue(1, false);
 
-        // Disable any damage areas that might exist
         var damageArea = GetNodeOrNull<Area2D>("DamageArea");
         if (damageArea != null)
         {
@@ -228,10 +276,8 @@ public partial class GhostMonster : CharacterBody2D
             damageArea.SetCollisionMaskValue(1, false);
             damageArea.Monitoring = false;
             damageArea.Monitorable = false;
-            GD.Print("Ghost monster damage area disabled");
         }
 
-        // Disable any other Area2D nodes that might cause interactions
         foreach (Node child in GetChildren())
         {
             if (child is Area2D area)
@@ -242,23 +288,6 @@ public partial class GhostMonster : CharacterBody2D
                 area.SetCollisionMaskValue(1, false);
             }
         }
-    }
-
-    private void FadeIn()
-    {
-        if (_activeSprite == null) return;
-
-        // Make sure the ghost monster is shown and visible
-        Show(); // Add this line - ensures the CharacterBody2D itself is visible
-        _activeSprite.Visible = true;
-        _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, 0);
-
-        var tween = CreateTween();
-        tween.TweenProperty(_activeSprite, "modulate:a", GHOST_TINT.A, 0.5f);
-        tween.TweenCallback(Callable.From(() =>
-        {
-            GD.Print($"Ghost monster fully visible at {GlobalPosition}");
-        }));
     }
     #endregion
 }
