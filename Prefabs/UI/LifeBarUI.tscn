@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3 uid="uid://jlrj0meior1r"]
 
-[ext_resource type="Script" uid="uid://c5jh7jww27cv8" path="res://Scripts/Interface/LifeBarUI.cs" id="1_gwh80"]
+[ext_resource type="Script" uid="uid://g3qhhrdutgk5" path="res://Scripts/UI/LifeBarUI.cs" id="1_gwh80"]
 [ext_resource type="Texture2D" uid="uid://c8u1u42hhwaci" path="res://Art/FullHeart.png" id="2_gknlv"]
 [ext_resource type="Texture2D" uid="uid://bw6408wklaekv" path="res://Art/EmptyHeart.png" id="3_mydo5"]
 

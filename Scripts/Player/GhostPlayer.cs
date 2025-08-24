@@ -37,7 +37,7 @@ public partial class GhostPlayer : CharacterBody2D
         DisableCollisions();
         Hide();
 
-        GD.Print($"GhostPlayer ready: {Name}, Parent: {GetParent()?.Name}");
+        Log.Replay($"GhostPlayer ready: {Name}, Parent: {GetParent()?.Name}", "GhostPlayer");
     }
     #endregion
 
@@ -51,11 +51,11 @@ public partial class GhostPlayer : CharacterBody2D
         float elapsedTime = Time.GetTicksMsec() / 1000.0f - _replayStartTime;
         var targetFrame = FindFrameAtTime(elapsedTime);
 
-        if (targetFrame != null)
+        if (targetFrame.HasValue)
         {
             // Update target position and apply frame data
-            _targetPosition = targetFrame.Position;
-            ApplyFrameToGhost(targetFrame);
+            _targetPosition = targetFrame.Value.Position;
+            ApplyFrameToGhost(targetFrame.Value);
         }
         else if (_currentFrameIndex >= _replayFrames.Count)
         {
@@ -76,7 +76,7 @@ public partial class GhostPlayer : CharacterBody2D
         // Validate input data before starting replay
         if (frames == null || frames.Count == 0)
         {
-            GD.Print("GhostPlayer: No frames to replay");
+            Log.Warning("No frames to replay", "GhostPlayer");
             return;
         }
 
@@ -84,7 +84,7 @@ public partial class GhostPlayer : CharacterBody2D
         var filteredFrames = FilterStatinaryFrames(frames);
         if (filteredFrames.Count == 0)
         {
-            GD.Print("GhostPlayer: No movement frames after filtering");
+            Log.Warning("No movement frames after filtering", "GhostPlayer");
             return;
         }
 
@@ -100,7 +100,7 @@ public partial class GhostPlayer : CharacterBody2D
         _targetPosition = GlobalPosition;
 
         Show();
-        GD.Print($"GhostPlayer: Started replay with {filteredFrames.Count} filtered frames (was {frames.Count})");
+        Log.Replay($"Started replay with {filteredFrames.Count} filtered frames (was {frames.Count})", "GhostPlayer");
     }
 
     public void StopReplay()
@@ -108,7 +108,7 @@ public partial class GhostPlayer : CharacterBody2D
         // End replay and hide ghost
         _isReplaying = false;
         Hide();
-        GD.Print("GhostPlayer: Replay stopped");
+        Log.Replay("Replay stopped", "GhostPlayer");
     }
 
     public bool IsReplaying() => _isReplaying; // Check if currently replaying
@@ -139,14 +139,15 @@ public partial class GhostPlayer : CharacterBody2D
             if (distance > MIN_MOVEMENT)
             {
                 // Movement detected - add frame with compressed timestamp
-                var newFrame = new ReplayFrame
-                {
-                    Timestamp = frame.Timestamp - timeCompression,
-                    Position = frame.Position,
-                    Rotation = frame.Rotation,
-                    Animation = frame.Animation,
-                    SpriteFlip = frame.SpriteFlip
-                };
+                var newFrame = new ReplayFrame(
+                    frame.Timestamp - timeCompression,
+                    frame.Position,
+                    frame.Rotation,
+                    frame.Animation,
+                    frame.SpriteFlip,
+                    frame.IsVisible,
+                    frame.Alpha
+                );
                 filtered.Add(newFrame);
                 lastPos = frame.Position;
             }
@@ -160,7 +161,7 @@ public partial class GhostPlayer : CharacterBody2D
         return filtered;
     }
 
-    private ReplayFrame FindFrameAtTime(float time)
+    private ReplayFrame? FindFrameAtTime(float time)
     {
         // Find frame that should be playing at current time
         for (int i = _currentFrameIndex; i < _replayFrames.Count; i++)
@@ -218,7 +219,7 @@ public partial class GhostPlayer : CharacterBody2D
         if (_animatedSprite != null)
         {
             _activeSprite = _animatedSprite;
-            GD.Print($"GhostPlayer: Found AnimatedSprite2D: {_animatedSprite.Name}");
+            Log.Debug($"Found AnimatedSprite2D: {_animatedSprite.Name}", "GhostPlayer");
             return;
         }
 
@@ -230,7 +231,7 @@ public partial class GhostPlayer : CharacterBody2D
         if (_sprite != null)
         {
             _activeSprite = _sprite;
-            GD.Print($"GhostPlayer: Found Sprite2D: {_sprite.Name}");
+            Log.Debug($"Found Sprite2D: {_sprite.Name}", "GhostPlayer");
             return;
         }
 
@@ -241,12 +242,12 @@ public partial class GhostPlayer : CharacterBody2D
         if (_animatedSprite != null)
         {
             _activeSprite = _animatedSprite;
-            GD.Print($"GhostPlayer: Found custom AnimatedSprite2D: {_animatedSprite.Name}");
+            Log.Debug($"Found custom AnimatedSprite2D: {_animatedSprite.Name}", "GhostPlayer");
         }
         else
         {
             // Log error and show available children for debugging
-            GD.PrintErr("GhostPlayer: No sprite component found!");
+            Log.Error("No sprite component found!", "GhostPlayer");
             LogAvailableChildren();
         }
     }
@@ -258,12 +259,12 @@ public partial class GhostPlayer : CharacterBody2D
         {
             _activeSprite.Modulate = GHOST_TINT;
             _activeSprite.Show();
-            GD.Print($"GhostPlayer: Applied ghost effect to '{_activeSprite.Name}'");
+            Log.Debug($"Applied ghost effect to '{_activeSprite.Name}'", "GhostPlayer");
         }
         else
         {
             // Create fallback visual if no sprite found
-            GD.PrintErr("GhostPlayer: No sprite found for ghost effect - creating fallback");
+            Log.Warning("No sprite found for ghost effect - creating fallback", "GhostPlayer");
             CreateFallbackVisual();
         }
     }
@@ -285,7 +286,7 @@ public partial class GhostPlayer : CharacterBody2D
         AddChild(fallbackSprite);
         _activeSprite = fallbackSprite;
 
-        GD.Print("GhostPlayer: Created fallback visual");
+        Log.Debug("Created fallback visual", "GhostPlayer");
     }
 
     private void DisableCollisions()
@@ -300,10 +301,10 @@ public partial class GhostPlayer : CharacterBody2D
     private void LogAvailableChildren()
     {
         // List all children for debugging sprite discovery issues
-        GD.Print("GhostPlayer children:");
+        Log.Debug("GhostPlayer children:", "GhostPlayer");
         foreach (Node child in GetChildren())
         {
-            GD.Print($"  - {child.Name} ({child.GetType().Name})");
+            Log.Debug($"  - {child.Name} ({child.GetType().Name})", "GhostPlayer");
         }
     }
     #endregion

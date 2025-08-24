@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://2ewmtuotju6"
-path="res://.godot/imported/GhostMarrie.png-d780a4239fd53f43632952704a11a9c9.ctex"
+uid="uid://bj7aeaudq2rbt"
+path="res://.godot/imported/Monsterv3Ghost.png-c75ad7f08bbd02dbbee46d2c51518ff3.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Art/GhostMarrie.png"
-dest_files=["res://.godot/imported/GhostMarrie.png-d780a4239fd53f43632952704a11a9c9.ctex"]
+source_file="res://Art/Monsterv3Ghost.png"
+dest_files=["res://.godot/imported/Monsterv3Ghost.png-c75ad7f08bbd02dbbee46d2c51518ff3.ctex"]
 
 [params]
 

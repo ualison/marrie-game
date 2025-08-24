@@ -28,8 +28,8 @@ public partial class LifeBarUI : Control
 
         if (_heartsContainer == null)
         {
-            GD.PrintErr("LifeBarUI: HBoxContainer 'HeartsContainer' not found!");
-            GD.PrintErr("Create an HBoxContainer child named 'HeartsContainer'");
+            Log.Error("HBoxContainer 'HeartsContainer' not found!", "LifeBarUI");
+            Log.Error("Create an HBoxContainer child named 'HeartsContainer'", "LifeBarUI");
         }
     }
 
@@ -41,7 +41,7 @@ public partial class LifeBarUI : Control
         if (_lifeSystem != null)
         {
             ConnectToLifeSystem();
-            GD.Print("LifeBarUI: Connected to PlayerLife!");
+            Log.UI("Connected to PlayerLife!", "LifeBarUI");
         }
         else
         {
@@ -90,8 +90,8 @@ public partial class LifeBarUI : Control
     private void LogLifeSystemError()
     {
         // Log error with helpful debugging information
-        GD.PrintErr("LifeBarUI: PlayerLife not found!");
-        GD.PrintErr("Make sure Player node has the Player.cs script attached!");
+        Log.Error("PlayerLife not found!", "LifeBarUI");
+        Log.Error("Make sure Player node has the Player.cs script attached!", "LifeBarUI");
     }
     #endregion
 

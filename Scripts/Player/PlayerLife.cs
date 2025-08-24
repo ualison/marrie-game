@@ -1,7 +1,8 @@
 using Godot;
+using MarrieGame.Core.Interfaces;
 
 // Player health management with invulnerability periods and event notifications
-public partial class PlayerLife : Node
+public partial class PlayerLife : Node, IHealthSystem
 {
     #region Signals
     [Signal] public delegate void LifeChangedEventHandler(int currentLife, int maxLife);
@@ -17,6 +18,10 @@ public partial class PlayerLife : Node
     public int CurrentLife { get; private set; }
     public bool IsInvulnerable { get; private set; }
     public bool IsDead => CurrentLife <= 0;
+    
+    // IHealthSystem implementation
+    public int CurrentHealth => CurrentLife;
+    public int MaxHealth => MaxLife;
     #endregion
 
     #region Components
@@ -111,6 +116,9 @@ public partial class PlayerLife : Node
     {
         // Notify subscribers of health changes
         EmitSignal(SignalName.LifeChanged, CurrentLife, MaxLife);
+        
+        // Also notify through simple event bus
+        GameEvents.OnPlayerHealthChanged(CurrentLife, MaxLife);
     }
     #endregion
 }

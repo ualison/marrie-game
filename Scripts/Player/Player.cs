@@ -1,11 +1,13 @@
 using Godot;
+using MarrieGame.Core.Interfaces;
 
 // Main character controller handling movement, damage, and visual feedback
-public partial class Player : CharacterBody2D
+public partial class Player : CharacterBody2D, IPausable, IResettable
 {
     #region Exported Properties
     [Export] public float Speed = 120.0f;
     [Export] public float JumpHeight = 100.0f;
+    [Export] public bool StartFacingRight = true; // Configurable initial direction
     #endregion
 
     #region Movement State
@@ -34,7 +36,7 @@ public partial class Player : CharacterBody2D
         AddToGroup("player");
         InitializePhysics();
         InitializeComponents();
-        GD.Print($"Player initialized - Health system: {(_playerLife != null ? "✓" : "✗")}");
+        Log.System($"Player initialized - Health system: {(_playerLife != null ? "✓" : "✗")}", "Player");
     }
 
     private void InitializePhysics()
@@ -223,14 +225,48 @@ public partial class Player : CharacterBody2D
 
     private void SetupHurtBox()
     {
-        // Connect hurt box signals for damage detection
         _hurtBox = GetNodeOrNull<Area2D>("HurtBox");
         if (_hurtBox != null)
         {
-            _hurtBox.BodyEntered += OnHurtBoxBodyEntered;
-            _hurtBox.AreaEntered += OnHurtBoxAreaEntered;
+            // Remove the old enter-based detection:
+            // _hurtBox.BodyEntered += OnHurtBoxBodyEntered;
+            // _hurtBox.AreaEntered += OnHurtBoxAreaEntered;
+
+            // Use continuous overlap detection instead
+            var timer = new Timer { WaitTime = 0.1f, Autostart = true };
+            timer.Timeout += CheckForEnemyOverlap;
+            AddChild(timer);
         }
     }
+
+// Add this new method to Player.cs:
+private void CheckForEnemyOverlap()
+{
+    if (_hurtBox == null || _playerLife?.IsDead == true) return;
+    
+    var overlappingBodies = _hurtBox.GetOverlappingBodies();
+    var overlappingAreas = _hurtBox.GetOverlappingAreas();
+    
+    // Check overlapping bodies
+    foreach (Node2D body in overlappingBodies)
+    {
+        if (body.IsInGroup("enemies"))
+        {
+            ProcessDamageFromEnemy(body);
+            return; // Only process one enemy per check
+        }
+    }
+    
+    // Check overlapping areas
+    foreach (Area2D area in overlappingAreas)
+    {
+        if (area.IsInGroup("enemies"))
+        {
+            ProcessDamageFromEnemy(area);
+            return;
+        }
+    }
+}
 
     private void SetupVisualTimer()
     {
@@ -242,23 +278,24 @@ public partial class Player : CharacterBody2D
     #endregion
 
     #region Visual Effects
-    private void StartBlinkEffect()
-    {
-        // Create blinking effect during invulnerability
-        if (_sprite == null) return;
+private void StartBlinkEffect()
+{
+    if (_sprite == null) return;
 
-        _isBlinking = true;
-        _blinkTween?.Kill();
+    _isBlinking = true;
+    _blinkTween?.Kill();
 
-        _blinkTween = CreateTween();
-        _blinkTween.SetLoops();
-        _blinkTween.TweenProperty(_sprite, "modulate:a", 0.3f, 0.15f);
-        _blinkTween.TweenProperty(_sprite, "modulate:a", 1.0f, 0.15f);
+    // Softer red color instead of pure red
+    var lightRed = new Color(1.0f, 0.6f, 0.6f, 1.0f);
 
-        _visualTimer.WaitTime = 2.0f;
-        _visualTimer.Start();
-    }
+    _blinkTween = CreateTween();
+    _blinkTween.SetLoops();
+    _blinkTween.TweenProperty(_sprite, "modulate", lightRed, 0.15f);
+    _blinkTween.TweenProperty(_sprite, "modulate", Colors.White, 0.15f);
 
+    _visualTimer.WaitTime = 2.0f;
+    _visualTimer.Start();
+}
     private void StopVisualEffects()
     {
         // Stop all visual effects and restore normal appearance
@@ -280,26 +317,33 @@ public partial class Player : CharacterBody2D
     private void OnHurtBoxBodyEntered(Node2D body)
     {
         // Handle collision with enemy bodies
-        if (body.IsInGroup("enemy"))
+        if (body.IsInGroup("enemies"))
             ProcessDamageFromEnemy(body);
     }
 
     private void OnHurtBoxAreaEntered(Area2D area)
     {
         // Handle collision with enemy areas
-        if (area.IsInGroup("enemy"))
+        if (area.IsInGroup("enemies"))
             ProcessDamageFromEnemy(area);
     }
 
-    private void ProcessDamageFromEnemy(Node2D enemy)
+    
+
+private void ProcessDamageFromEnemy(Node2D enemy)
+{
+    if (enemy is Monster monster && monster.EnableFollowerBehavior && !monster.CanTakeDamage())
+        return;
+
+    if (TakeDamage(1))
     {
-        // Apply damage and knockback if successful
-        if (TakeDamage(1))
-        {
-            ApplyKnockback(enemy);
-            GD.Print($"Player took damage! Health: {_playerLife.CurrentLife}");
-        }
+        ApplyKnockback(enemy);
+        
+        // Make monster flash purple
+        if (enemy.HasMethod("PlayDamageEffect"))
+            enemy.Call("PlayDamageEffect");
     }
+}
 
     private void ApplyKnockback(Node2D source)
     {
@@ -313,11 +357,13 @@ public partial class Player : CharacterBody2D
     private void OnPlayerDied()
     {
         // Handle player death - stop movement and apply visual effects
-        GD.Print("Player died!");
+        Log.Gameplay("Player died!", "Player");
         Velocity = Vector2.Zero;
 
         ApplyDeathVisuals();
-        GameManager.Instance?.PlayerDied(GlobalPosition);
+        
+        // Notify death through event system instead of direct GameManager call
+        GameEvents.OnPlayerDied(GlobalPosition, _playerLife?.CurrentHealth ?? 0);
     }
 
     private void ApplyDeathVisuals()
@@ -343,22 +389,49 @@ public partial class Player : CharacterBody2D
         Velocity = Vector2.Zero;
         StopVisualEffects();
         RestoreNormalAppearance();
+
+        // Reset sprite direction to initial state
+        ResetSpriteDirection();
+
+        Log.Gameplay("Player reset complete with direction reset", "Player");
     }
+
+private void ResetSpriteDirection()
+{
+    // Reset player to initial facing direction
+    _facingRight = StartFacingRight;
+    
+    if (_sprite != null)
+    {
+        var scale = _sprite.Scale;
+        _sprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
+        Log.Debug($"Player sprite direction reset - facing right: {_facingRight}", "Player");
+    }
+    else
+    {
+        Log.Warning("Player sprite not found for direction reset", "Player");
+    }
+}
 
     public void PausePlayer()
     {
         // Pause player movement for replay mode
         _isPaused = true;
-        GD.Print("Player paused for replay");
+        Log.Replay("Player paused for replay", "Player");
     }
 
     public void ResumePlayer()
     {
         // Resume player movement after replay
         _isPaused = false;
-        GD.Print("Player resumed after replay");
+        Log.Replay("Player resumed after replay", "Player");
     }
 
     public bool IsPaused() => _isPaused; // Check if player is paused
+    
+    // IPausable interface implementation  
+    bool IPausable.IsPaused => _isPaused;
+    public void Pause() => PausePlayer();
+    public void Resume() => ResumePlayer();
     #endregion
 }

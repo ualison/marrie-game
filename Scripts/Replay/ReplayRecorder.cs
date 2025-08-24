@@ -1,270 +1,257 @@
 using Godot;
 using System.Collections.Generic;
+using System.Linq;
 
-// Movement recording system for ghost replay functionality with pause/resume support
+/// <summary>
+/// Performance-optimized replay recording system with efficient character tracking and data extraction
+/// </summary>
 public partial class ReplayRecorder : Node
 {
     #region Singleton
     public static ReplayRecorder Instance { get; private set; }
     #endregion
 
-    #region Configuration
+    #region Exported Configuration
     [Export] public float RecordInterval { get; set; } = 0.1f;
-    private const float MIN_MOVEMENT_THRESHOLD = 0.1f; // Minimum distance to consider movement
+    [Export] public string PlayerGroupName { get; set; } = "player";
+    [Export] public string EnemyGroupName { get; set; } = "enemies";
+    [Export] public bool EnableOptimizations { get; set; } = true;
     #endregion
 
-    #region State Management
+    #region Properties
     public bool IsRecording { get; private set; }
-    private bool _isPausedForReplay = false;
-    private float _pauseStartTime;
+    public bool IsPausedForReplay => _isPausedForReplay;
+    public bool HasRecordedData => _playerFrames.Count > 0 || _monsterFrames.Count > 0;
+    #endregion
+
+    #region Private State
+    private bool _isPausedForReplay;
     private float _recordTimer;
-    private float _startTime;
-    #endregion
+    private float _elapsedRecordingTime;
 
-    #region Movement Tracking
-    private Vector2 _lastPlayerPosition = Vector2.Zero;
-    private bool _playerWasMoving = true;
-    #endregion
-
-    #region Frame Storage
     private readonly List<ReplayFrame> _playerFrames = new();
     private readonly List<ReplayFrame> _monsterFrames = new();
-    #endregion
 
-    #region Character References
+    // Cached references for performance
     private Player _player;
     private Monster _monster;
+
+    // Performance optimization tracking
+    private Vector2 _lastPlayerPosition;
+    private bool _playerWasMoving = true;
+    private int _frameSkipCounter = 0;
+    private const float MIN_MOVEMENT_THRESHOLD = 0.5f;
+    
+    // Discovery retry system
+    private SceneTreeTimer _discoveryTimer;
     #endregion
 
-    #region Initialization
+    #region Godot Lifecycle
     public override void _Ready()
     {
-        // Setup singleton pattern with persistence
-        if (Instance == null)
-        {
-            Instance = this;
-            ProcessMode = ProcessModeEnum.Always;
-            CallDeferred(nameof(InitializeRecording));
-        }
-        else if (Instance != this)
-        {
-            // Remove duplicate instances
-            QueueFree();
-            return;
-        }
-        else
-        {
-            // Reinitialize existing instance
-            CallDeferred(nameof(InitializeRecording));
-        }
+        Instance = this;
+        ProcessMode = ProcessModeEnum.Always;
+        
+        // Add to group for discovery
+        AddToGroup("replay_recorder");
+        
+        // Use CallDeferred for proper initialization order
+        CallDeferred(MethodName.InitializeRecording);
     }
 
-    public void InitializeRecording()
-    {
-        // Ensure tree is available before initializing
-        if (GetTree() == null)
-        {
-            CallDeferred(nameof(InitializeRecording));
-            return;
-        }
-
-        DiscoverCharacters();
-
-        // Start recording if player is available
-        if (_player != null)
-        {
-            StartRecording();
-        }
-    }
-
-    private void DiscoverCharacters()
-    {
-        // Find player and monster characters in the scene
-        _player = GetTree().GetFirstNodeInGroup("player") as Player;
-        _monster = GetTree().GetFirstNodeInGroup("monsters") as Monster;
-
-        GD.Print($"ReplayRecorder discovered - Player: {_player != null}, Monster: {_monster != null}");
-    }
-    #endregion
-
-    #region Core Recording Loop
     public override void _Process(double delta)
     {
-        // Skip processing if not recording
-        if (!IsRecording) return;
+        if (!IsRecording || _isPausedForReplay) 
+            return;
 
-        // Check if player is actually moving to avoid recording static frames
-        bool playerIsMoving = CheckPlayerMovement();
+        var deltaFloat = (float)delta;
+        _recordTimer += deltaFloat;
+        _elapsedRecordingTime += deltaFloat;
 
-        // Don't record if paused for replay or player is stationary
-        if (_isPausedForReplay || !playerIsMoving) return;
-
-        _recordTimer += (float)delta;
-
-        // Record frame at specified intervals
         if (_recordTimer >= RecordInterval)
         {
-            CaptureCurrentFrame();
+            if (ShouldCaptureFrame())
+            {
+                CaptureCurrentFrame();
+            }
             _recordTimer = 0.0f;
         }
     }
 
-    private bool CheckPlayerMovement()
+    public override void _ExitTree()
     {
-        // Determine if player has moved since last check
-        if (_player == null) return false;
-
-        Vector2 currentPosition = _player.GlobalPosition;
-        bool isMoving = currentPosition.DistanceTo(_lastPlayerPosition) > MIN_MOVEMENT_THRESHOLD;
-
-        if (isMoving)
+        if (Instance == this)
         {
-            // Player is moving - update last position
-            _lastPlayerPosition = currentPosition;
-            _playerWasMoving = true;
+            Instance = null;
         }
-        else if (_playerWasMoving)
-        {
-            // Player just stopped - record one final frame
-            _playerWasMoving = false;
-            return true;
-        }
-
-        return isMoving;
+        
+        // Clear cache on exit
+        CharacterDataExtractor.ClearCache();
     }
+    #endregion
 
-    private void CaptureCurrentFrame()
+    #region Initialization
+    public void InitializeRecording()
     {
-        // Use total elapsed time since recording started for consistent timeline
-        float currentTime = Time.GetTicksMsec() / 1000.0f - _startTime;
+        DiscoverCharacters();
 
-        // Record player state if available
         if (_player != null)
         {
-            var frame = CreateFrameForCharacter(_player, currentTime);
-            _playerFrames.Add(frame);
-
-            // Debug: Print every 10th frame to check for gaps
-            if (_playerFrames.Count % 10 == 0)
-            {
-                GD.Print($"Frame {_playerFrames.Count}: Time={currentTime:F2}s, Pos={frame.Position}");
-            }
+            StartRecording();
         }
-
-        // Record monster state if available
-        if (_monster != null)
+        else
         {
-            _monsterFrames.Add(CreateFrameForCharacter(_monster, currentTime));
+            // Retry character discovery
+            ScheduleDiscoveryRetry();
         }
+    }
+
+    private void ScheduleDiscoveryRetry()
+    {
+        // SceneTreeTimer doesn't have Kill method, just create new one
+        _discoveryTimer = GetTree().CreateTimer(0.1f);
+        _discoveryTimer.Timeout += InitializeRecording;
+    }
+
+    private void DiscoverCharacters()
+    {
+        // Use more specific discovery with null-conditional operators
+        _player = GetTree().GetFirstNodeInGroup(PlayerGroupName) as Player;
+        
+        // Find Monster with follower behavior enabled
+        var enemies = GetTree().GetNodesInGroup(EnemyGroupName);
+        _monster = enemies.OfType<Monster>().FirstOrDefault(m => m.EnableFollowerBehavior) ?? 
+                   enemies.OfType<Monster>().FirstOrDefault();
+
+        Log.Replay($"ReplayRecorder discovered - Player: {_player != null}, " +
+                 $"Monster: {_monster != null}, FollowerBehavior: {_monster?.EnableFollowerBehavior}", "ReplayRecorder");
     }
     #endregion
 
     #region Recording Control
-    private void StartRecording()
+    public void StartRecording()
     {
-        // Clear previous data and start fresh recording session
         ClearRecording();
-
         IsRecording = true;
         _recordTimer = 0f;
-        _startTime = Time.GetTicksMsec() / 1000.0f;
-
-        // Initialize movement tracking
+        _elapsedRecordingTime = 0f;
+        
+        // Initialize movement tracking for optimizations
         if (_player != null)
         {
             _lastPlayerPosition = _player.GlobalPosition;
             _playerWasMoving = true;
         }
-
-        GD.Print("ReplayRecorder: Started new recording session");
+        
+        Log.Replay($"Started recording - Player: {_player != null}, IsRecording: {IsRecording}, IsPausedForReplay: {_isPausedForReplay}", "ReplayRecorder");
     }
 
     public void StopRecording()
     {
-        // End recording and log final frame count
         IsRecording = false;
-        GD.Print($"Recording stopped. Player: {_playerFrames.Count}, Monster: {_monsterFrames.Count} frames");
+        Log.Replay($"Recording stopped. Player: {_playerFrames.Count}, Monster: {_monsterFrames.Count} frames", "ReplayRecorder");
     }
 
     public void ClearRecording()
     {
-        // Clear all recorded data for new session
         _playerFrames.Clear();
         _monsterFrames.Clear();
         _recordTimer = 0f;
-        GD.Print("Recording data cleared - ready for new session");
+        _elapsedRecordingTime = 0f;
+        _frameSkipCounter = 0;
+        CharacterDataExtractor.ClearCache();
     }
 
     public void PauseRecording()
     {
-        // Pause recording for replay mode
         _isPausedForReplay = true;
-        _pauseStartTime = Time.GetTicksMsec() / 1000.0f;
-        GD.Print("Recording paused for replay");
+        Log.Replay("Recording paused for replay", "ReplayRecorder");
     }
 
     public void ResumeRecording()
     {
-        // Resume recording and adjust timeline to maintain continuity
-        if (_isPausedForReplay)
-        {
-            // Calculate pause duration and adjust start time
-            float pauseDuration = (Time.GetTicksMsec() / 1000.0f) - _pauseStartTime;
-            _startTime += pauseDuration; // Shift start time to maintain timeline continuity
+        _isPausedForReplay = false;
+        Log.Replay($"Recording resumed - IsRecording: {IsRecording}, IsPausedForReplay: {_isPausedForReplay}", "ReplayRecorder");
+    }
+    #endregion
 
-            _isPausedForReplay = false;
-            GD.Print($"Recording resumed after {pauseDuration:F2}s pause");
+    #region Frame Capture with Optimizations
+    private bool ShouldCaptureFrame()
+    {
+        if (!EnableOptimizations) return true;
+
+        // Check if player moved significantly
+        if (_player != null)
+        {
+            var currentPos = _player.GlobalPosition;
+            var distance = currentPos.DistanceTo(_lastPlayerPosition);
+            
+            if (distance < MIN_MOVEMENT_THRESHOLD)
+            {
+                // Skip frames when not moving, but capture every 10th frame for safety
+                _frameSkipCounter++;
+                if (_frameSkipCounter < 10)
+                {
+                    return false;
+                }
+                _frameSkipCounter = 0;
+            }
+            else
+            {
+                _lastPlayerPosition = currentPos;
+                _frameSkipCounter = 0;
+            }
+        }
+
+        return true;
+    }
+
+    private void CaptureCurrentFrame()
+    {
+        var currentTime = _elapsedRecordingTime;
+
+        // Record player state using optimized extractor
+        if (_player != null)
+        {
+            var frame = CharacterDataExtractor.ExtractFrame(_player, currentTime);
+            _playerFrames.Add(frame);
+        }
+
+        // Record monster state
+        if (_monster != null)
+        {
+            var frame = CharacterDataExtractor.ExtractFrame(_monster, currentTime);
+            _monsterFrames.Add(frame);
         }
     }
     #endregion
 
     #region Data Access
-    public List<ReplayFrame> GetPlayerFrames() => new(_playerFrames); // Return copy of player frames
-    public List<ReplayFrame> GetMonsterFrames() => new(_monsterFrames); // Return copy of monster frames
-    public bool HasRecordedData() => _playerFrames.Count > 0 || _monsterFrames.Count > 0; // Check if data exists
-    #endregion
+    /// <summary>
+    /// Returns a copy of recorded player frames
+    /// </summary>
+    public List<ReplayFrame> GetPlayerFrames() => new(_playerFrames);
 
-    #region Frame Creation
-    private ReplayFrame CreateFrameForCharacter(Node2D character, float timestamp)
+    /// <summary>
+    /// Returns a copy of recorded monster frames  
+    /// </summary>
+    public List<ReplayFrame> GetMonsterFrames() => new(_monsterFrames);
+
+    /// <summary>
+    /// Forces character rediscovery (useful after scene changes)
+    /// </summary>
+    public void RefreshCharacterReferences()
     {
-        // Create replay frame from character's current state
-        return new ReplayFrame
-        {
-            Timestamp = timestamp,
-            Position = character.GlobalPosition,
-            Rotation = character.GlobalRotation,
-            Animation = ExtractCurrentAnimation(character),
-            SpriteFlip = ExtractSpriteFlip(character)
-        };
+        DiscoverCharacters();
+        CharacterDataExtractor.ClearCache();
     }
 
-    private string ExtractCurrentAnimation(Node2D character)
+    /// <summary>
+    /// Gets recording statistics for debugging
+    /// </summary>
+    public (int playerFrames, int monsterFrames, float recordingTime, int cacheSize) GetRecordingStats()
     {
-        // Get current animation from AnimatedSprite2D if available
-        var animSprite = character.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
-        return animSprite?.IsPlaying() == true ? animSprite.Animation : "idle";
-    }
-
-    private bool ExtractSpriteFlip(Node2D character)
-    {
-        // Check sprite flip state from any sprite component
-        var sprite = character.GetNodeOrNull<Node2D>("AnimatedSprite2D")
-            ?? character.GetNodeOrNull<Node2D>("Sprite2D")
-            ?? character.GetNodeOrNull<Node2D>("MarrieSprite")
-            ?? character.GetNodeOrNull<Node2D>("MonsterSprite");
-
-        return sprite?.Scale.X < 0;
-    }
-    #endregion
-
-    #region Cleanup
-    public override void _ExitTree()
-    {
-        // Clear singleton reference when exiting
-        if (Instance == this)
-        {
-            Instance = null;
-        }
+        return (_playerFrames.Count, _monsterFrames.Count, _elapsedRecordingTime, CharacterDataExtractor.GetCacheSize());
     }
     #endregion
 }
