@@ -24,6 +24,8 @@ public partial class Apple : Node2D
     private Area2D _detectionArea;
     private Sprite2D _appleSprite;
     private Label _promptLabel;
+    private RigidBody2D _rigidBody;
+    private Area2D _rockDetectionArea;
     #endregion
 
     #region State
@@ -32,6 +34,7 @@ public partial class Apple : Node2D
     private Timer _transitionTimer;
     private Tween _fadeTween;
     private Vector2 _originalScale; // Store original scale for transitions
+    private bool _isFalling = false; // Track if apple is falling
     #endregion
 
     #region Apple State Enum
@@ -48,6 +51,7 @@ public partial class Apple : Node2D
     public override void _Ready()
     {
         InitializeComponents();
+        SetupRigidBody();
         ConnectSignals();
         SetupPromptLabel();
         SetupTransitionTimer();
@@ -60,8 +64,16 @@ public partial class Apple : Node2D
     private void InitializeComponents()
     {
         _detectionArea = GetNode<Area2D>("DetectionArea");
-        _appleSprite = GetNode<Sprite2D>("AppleSprite");
-        _promptLabel = GetNode<Label>("PromptLabel");
+        _rigidBody = GetNode<RigidBody2D>("RigidBody2D");
+        _appleSprite = GetNode<Sprite2D>("RigidBody2D/AppleSprite");
+        _promptLabel = GetNode<Label>("RigidBody2D/PromptLabel");
+        _rockDetectionArea = GetNode<Area2D>("RigidBody2D/RockDetectionArea");
+    }
+
+    private void SetupRigidBody()
+    {
+        // Connect rock hit detection - the Area2D is already set up in the scene
+        _rockDetectionArea.BodyEntered += OnRockHit;
     }
 
     private void ConnectSignals()
@@ -302,6 +314,47 @@ public partial class Apple : Node2D
         }
     }
 
+    private void OnRockHit(Node2D body)
+    {
+        // Check if it's a rock hitting the apple
+        if (body.Name.ToString().Contains("Rock") || body.IsInGroup("rocks"))
+        {
+            Log.System($"Rock hit apple in {_currentState} state", "Apple");
+            
+            // Only make apple fall if it's in Gray state
+            if (_currentState == AppleState.Gray && !_isFalling)
+            {
+                MakeAppleFall();
+            }
+        }
+    }
+
+    private void MakeAppleFall()
+    {
+        if (_isFalling) return;
+        
+        _isFalling = true;
+        
+        // Unfreeze the rigidbody and enable gravity to make it fall
+        _rigidBody.Freeze = false; // Unfreeze to allow physics
+        _rigidBody.GravityScale = 1.0f; // Enable gravity
+        
+        // Stop the color transition timer since apple is now falling
+        if (_transitionTimer != null)
+        {
+            _transitionTimer.Stop();
+        }
+        
+        Log.System("Apple is now falling due to rock hit", "Apple");
+        
+        // Add some impulse for more dramatic effect
+        Vector2 randomImpulse = new Vector2(
+            (float)GD.RandRange(-50, 50), 
+            (float)GD.RandRange(-20, 0)
+        );
+        _rigidBody.ApplyImpulse(randomImpulse);
+    }
+
     private void UpdatePromptDisplay()
     {
         if (!_playerNearby)
@@ -355,5 +408,9 @@ public partial class Apple : Node2D
     public bool IsInLifePhase() => _currentState == AppleState.Red || _currentState == AppleState.Neutral;
     
     public bool IsInManaPhase() => _currentState == AppleState.Purple || _currentState == AppleState.Gray;
+    
+    public bool CanFallFromRockHit() => _currentState == AppleState.Gray && !_isFalling;
+    
+    public bool IsFalling() => _isFalling;
     #endregion
 }

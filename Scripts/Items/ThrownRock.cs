@@ -12,6 +12,7 @@ public partial class ThrownRock : Node2D
 
     #region Components
     private Sprite2D _sprite;
+    private Area2D _collisionArea; // For collision detection with other objects
     #endregion
 
     #region Trajectory State
@@ -25,6 +26,7 @@ public partial class ThrownRock : Node2D
     public override void _Ready()
     {
         SetupSprite();
+        SetupCollisionArea();
         LoadRockTexture();
         Log.System("ThrownRock ready", "ThrownRock");
     }
@@ -34,6 +36,28 @@ public partial class ThrownRock : Node2D
         _sprite = new Sprite2D();
         _sprite.Scale = new Vector2(0.05f, 0.05f); // Small scale for thrown rock
         AddChild(_sprite);
+    }
+
+    private void SetupCollisionArea()
+    {
+        // Create Area2D for collision detection with other objects (like apples)
+        _collisionArea = new Area2D();
+        var collisionShape = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 10.0f; // Small collision radius for the rock
+        collisionShape.Shape = shape;
+        
+        // Set collision layers - rock should be on layer 8 to be detected by apples
+        _collisionArea.CollisionLayer = 8; // Rock collision layer (matches Apple's RockDetectionArea mask)
+        _collisionArea.CollisionMask = 0;  // Don't need to detect other objects
+        
+        AddChild(_collisionArea);
+        _collisionArea.AddChild(collisionShape);
+        
+        // Add to rocks group for easy identification
+        AddToGroup("rocks");
+        
+        Log.System("ThrownRock collision area set up on layer 8", "ThrownRock");
     }
 
     private void LoadRockTexture()

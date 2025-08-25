@@ -272,21 +272,29 @@ public partial class RockThrower : Node2D
 
     private void CreateRockProjectile()
     {
-        // Create a thrown rock that follows the trajectory
-        var thrownRock = new ThrownRock();
-        thrownRock.TravelSpeed = RockVelocity; // Set the rock movement speed
-        GetTree().CurrentScene.AddChild(thrownRock);
+        // Load and instantiate rock from scene file
+        var rockScene = GD.Load<PackedScene>("res://Prefabs/Rock.tscn");
+        var rock = rockScene.Instantiate() as Rock;
+        
+        if (rock == null)
+        {
+            Log.Warning("Failed to instantiate rock from scene", "RockThrower");
+            return;
+        }
+        
+        rock.TravelSpeed = RockVelocity; // Set the rock movement speed
+        GetTree().CurrentScene.AddChild(rock);
         
         // Use the stored global trajectory points
         if (_currentGlobalTrajectory != null && _currentGlobalTrajectory.Length > 0)
         {
-            thrownRock.SetTrajectory(_currentGlobalTrajectory);
+            rock.SetTrajectory(_currentGlobalTrajectory);
             Log.System($"Rock projectile created with {_currentGlobalTrajectory.Length} trajectory points and velocity {RockVelocity}", "RockThrower");
         }
         else
         {
             Log.Warning("No trajectory data available for rock projectile", "RockThrower");
-            thrownRock.QueueFree();
+            rock.QueueFree();
         }
     }
 
