@@ -18,6 +18,7 @@ public partial class RockThrower : Node2D
     [Export] public float LineOpacity { get; set; } = 0.8f; // Line opacity (0.0 = transparent, 1.0 = opaque)
     [Export] public uint CollisionMask { get; set; } = 1; // Which collision layers to check against
     [Export] public bool ExtendToGround { get; set; } = true; // Whether to extend trajectory to ground if no obstacles hit
+    [Export] public float RockVelocity { get; set; } = 300.0f; // Speed at which the rock moves along its trajectory
     #endregion
 
     #region State
@@ -273,13 +274,14 @@ public partial class RockThrower : Node2D
     {
         // Create a thrown rock that follows the trajectory
         var thrownRock = new ThrownRock();
+        thrownRock.TravelSpeed = RockVelocity; // Set the rock movement speed
         GetTree().CurrentScene.AddChild(thrownRock);
         
         // Use the stored global trajectory points
         if (_currentGlobalTrajectory != null && _currentGlobalTrajectory.Length > 0)
         {
             thrownRock.SetTrajectory(_currentGlobalTrajectory);
-            Log.System($"Rock projectile created with {_currentGlobalTrajectory.Length} trajectory points", "RockThrower");
+            Log.System($"Rock projectile created with {_currentGlobalTrajectory.Length} trajectory points and velocity {RockVelocity}", "RockThrower");
         }
         else
         {
