@@ -12,6 +12,7 @@ public partial class PlayerMana : Node, IManaSystem
 
     #region Exported Properties
     [Export] public int MaxMana { get; set; } = 5;
+    [Export] public int StartingMana { get; set; } = 5; // Starting mana amount (full purple hearts at beginning)
     [Export] public float ManaRegenRate { get; set; } = 1.0f; // Mana per second
     [Export] public float ManaRegenDelay { get; set; } = 2.0f; // Delay after mana use before regen starts
     [Export] public bool AutoRegenerate { get; set; } = true;
@@ -36,8 +37,8 @@ public partial class PlayerMana : Node, IManaSystem
     #region Initialization
     public override void _Ready()
     {
-        // Initialize mana to maximum and setup systems
-        CurrentMana = MaxMana;
+        // Initialize mana to starting amount and setup systems
+        CurrentMana = Mathf.Clamp(StartingMana, 0, MaxMana);
         SetupRegenTimers();
         NotifyManaChanged();
     }
@@ -104,8 +105,8 @@ public partial class PlayerMana : Node, IManaSystem
 
     public void Reset()
     {
-        // Reset to full mana for game restart
-        CurrentMana = MaxMana;
+        // Reset to starting mana amount for game restart
+        CurrentMana = Mathf.Clamp(StartingMana, 0, MaxMana);
         StopRegeneration();
         NotifyManaChanged();
     }

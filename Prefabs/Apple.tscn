@@ -1,0 +1,31 @@
+[gd_scene load_steps=5 format=3 uid="uid://dx0uy3xgtdtry"]
+
+[ext_resource type="Texture2D" uid="uid://drdwnrxrmpqqt" path="res://Art/AppleLife.png" id="1_redapple"]
+[ext_resource type="Texture2D" uid="uid://bwwymn4vuk225" path="res://Art/AppleMana.png" id="2_purpleapple"]
+[ext_resource type="Script" uid="uid://c8mt75j5vt54r" path="res://Scripts/Items/Apple.cs" id="3_applescript"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_apple"]
+radius = 21.3776
+
+[node name="Apple" type="Node2D"]
+script = ExtResource("3_applescript")
+RedAppleTexture = ExtResource("1_redapple")
+PurpleAppleTexture = ExtResource("2_purpleapple")
+
+[node name="AppleSprite" type="Sprite2D" parent="."]
+scale = Vector2(0.0441406, 0.0436523)
+texture = ExtResource("1_redapple")
+
+[node name="PromptLabel" type="Label" parent="."]
+offset_left = -19.0
+offset_top = -42.0
+offset_right = 20.0
+offset_bottom = -28.0
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 10
+text = "Press E"
+
+[node name="DetectionArea" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DetectionArea"]
+shape = SubResource("CircleShape2D_apple")
