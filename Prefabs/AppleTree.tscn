@@ -18,7 +18,7 @@ position = Vector2(105, 149)
 scale = Vector2(0.84082, 0.840495)
 
 [node name="ApplePostion7" type="Node2D" parent="."]
-position = Vector2(-119, 93.9997)
+position = Vector2(-128, 117)
 scale = Vector2(0.84082, 0.840495)
 
 [node name="ApplePostion6" type="Node2D" parent="."]
@@ -38,9 +38,9 @@ position = Vector2(243, 163)
 scale = Vector2(0.84082, 0.840495)
 
 [node name="ApplePostion8" type="Node2D" parent="."]
-position = Vector2(-131, 179)
+position = Vector2(-126, 197)
 scale = Vector2(0.84082, 0.840495)
 
 [node name="ApplePostion5" type="Node2D" parent="."]
-position = Vector2(-73, 245)
+position = Vector2(-80, 262)
 scale = Vector2(0.84082, 0.840495)

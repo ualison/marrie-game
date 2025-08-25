@@ -1,9 +1,10 @@
-[gd_scene load_steps=7 format=3 uid="uid://ckwbdf3jm340m"]
+[gd_scene load_steps=8 format=3 uid="uid://ckwbdf3jm340m"]
 
 [ext_resource type="Texture2D" uid="uid://dubgbfarwhdd5" path="res://Art/MarrieV3.png" id="2_b43ah"]
 [ext_resource type="Script" uid="uid://dtbbh4gt6l7cr" path="res://Scripts/Player/Player.cs" id="2_kyqiw"]
 [ext_resource type="Script" uid="uid://bfetyy0iofqcj" path="res://Scripts/Player/PlayerLife.cs" id="3_gntrk"]
 [ext_resource type="Script" uid="uid://gp6wfjapkopj" path="res://Scripts/Player/PlayerMana.cs" id="4_mana"]
+[ext_resource type="Script" path="res://Scripts/Systems/Inventory.cs" id="5_inventory"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_gntrk"]
 size = Vector2(133, 271)
@@ -42,3 +43,7 @@ MaxLife = 2
 script = ExtResource("4_mana")
 MaxMana = 4
 StartingMana = 0
+
+[node name="Inventory" type="Node" parent="CharacterBody2D"]
+script = ExtResource("5_inventory")
+MaxRocks = 5
