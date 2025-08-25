@@ -11,9 +11,9 @@ public partial class RockThrower : Node2D
     [Export] public PackedScene RockProjectileScene { get; set; }
     [Export] public float MaxThrowDistance { get; set; } = 500.0f;
     [Export] public float MinThrowDistance { get; set; } = 100.0f;
-    [Export] public float TrajectoryHeight { get; set; } = 300.0f;
+    [Export] public float TrajectoryHeight { get; set; } = 50.0f;
     [Export] public int TrajectoryPoints { get; set; } = 30;
-    [Export] public Color TrajectoryColor { get; set; } = Colors.Red;
+    [Export] public Color TrajectoryColor { get; set; } = Colors.Purple;
     [Export] public float TrajectoryWidth { get; set; } = 5.0f;
     [Export] public float LineOpacity { get; set; } = 0.8f; // Line opacity (0.0 = transparent, 1.0 = opaque)
     [Export] public uint CollisionMask { get; set; } = 1; // Which collision layers to check against
@@ -125,7 +125,6 @@ public partial class RockThrower : Node2D
         _currentMousePosition = screenPosition;
         
         _trajectoryLine.Show();
-        Log.UI("Started drawing rock trajectory", "RockThrower");
     }
 
     private void UpdateTrajectory()
@@ -168,60 +167,47 @@ public partial class RockThrower : Node2D
         return Mathf.Lerp(MinThrowDistance, MaxThrowDistance, normalizedDistance);
     }
 
-    private Vector2[] GenerateTrajectoryPoints(Vector2 start, Vector2 direction, float distance)
+   private Vector2[] GenerateTrajectoryPoints(Vector2 start, Vector2 direction, float distance)
+{
+    var points = new List<Vector2>();
+
+    // Normalize direction and set initial speed
+    Vector2 dir = direction.Normalized();
+    float speed = distance * 2.0f; // scale throw strength (tweak as needed)
+
+    // Split speed into components
+    Vector2 velocity = dir * speed;
+
+    // Arc height influence (adds upward boost)
+    velocity.Y -= TrajectoryHeight;
+
+    // Physics simulation step
+    float timeStep = 0.05f; // smaller = smoother curve
+    int maxSteps = 200;
+
+    Vector2 currentPos = start;
+
+    for (int i = 0; i < maxSteps; i++)
     {
-        var points = new List<Vector2>();
-        Vector2 endPoint = start + direction * distance;
-        bool hitObstacle = false;
-        
-        // Calculate the highest point between start and end for arch reference
-        float minY = Mathf.Min(start.Y, endPoint.Y);
-        
-        for (int i = 0; i < TrajectoryPoints; i++)
-        {
-            float t = (float)i / (TrajectoryPoints - 1);
-            
-            // Linear interpolation for horizontal movement
-            Vector2 linearPoint = start.Lerp(endPoint, t);
-            
-            // Parabolic arc for vertical movement (creates upward arch)
-            // Using sine function for smoother arch that peaks at the middle
-            // In Godot: Y=0 is top, positive Y goes down, so we subtract height to go up
-            float archHeight = TrajectoryHeight * Mathf.Sin(t * Mathf.Pi);
-            
-            // Apply the arch height relative to the highest point (lowest Y value)
-            Vector2 currentPoint = new Vector2(linearPoint.X, linearPoint.Y - archHeight);
-            
-            // Check for collision at this point
-            if (CheckCollisionAtPoint(currentPoint))
-            {
-                // Stop the trajectory here - collision detected
-                hitObstacle = true;
-                break;
-            }
-            
-            points.Add(currentPoint);
-        }
-        
-        // If no obstacle was hit, extend trajectory until it hits the ground
-        if (!hitObstacle && points.Count > 0 && ExtendToGround)
-        {
-            Vector2 lastPoint = points[points.Count - 1];
-            Vector2 finalGroundPoint = FindGroundCollision(lastPoint, direction);
-            if (finalGroundPoint != lastPoint)
-            {
-                points.Add(finalGroundPoint);
-            }
-        }
-        
-        // Ensure we have at least the starting point
-        if (points.Count == 0)
-        {
-            points.Add(start);
-        }
-        
-        return points.ToArray();
+        // Save point
+        points.Add(currentPos);
+
+        // Advance physics
+        currentPos += velocity * timeStep;
+        velocity.Y += 9.8f * 30f * timeStep; // gravity factor (tweak)
+
+        // Collision check
+        if (CheckCollisionAtPoint(currentPos))
+            break;
     }
+
+    // Fallback if no points
+    if (points.Count == 0)
+        points.Add(start);
+
+    return points.ToArray();
+}
+
 
     private Vector2 FindGroundCollision(Vector2 startPoint, Vector2 direction)
     {
@@ -316,7 +302,6 @@ public partial class RockThrower : Node2D
         _trajectoryLine.Hide();
         _trajectoryLine.ClearPoints();
         _currentGlobalTrajectory = null; // Clear stored trajectory
-        Log.UI("Rock trajectory cancelled", "RockThrower");
     }
     #endregion
 
