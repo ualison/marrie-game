@@ -8,7 +8,7 @@ public partial class GhostPlayer : CharacterBody2D
     private const float RECORD_INTERVAL = 0.1f; // Match ReplayRecorder interval
     private const float MIN_MOVEMENT = 0.5f; // Minimum distance to filter stationary frames
     private const float SMOOTH_SPEED = 10.0f; // Position interpolation speed
-    private static readonly Color GHOST_TINT = new(0.5f, 0.5f, 1.0f, 0.7f); // Semi-transparent blue
+    private static readonly Color GHOST_TINT = new(0.6f, 0.3f, 0.9f, 0.7f); // Purple gem-like color
     #endregion
 
     #region State Variables

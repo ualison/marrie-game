@@ -5,7 +5,7 @@ using System.Collections.Generic;
 public partial class GhostMonster : CharacterBody2D
 {
     #region Constants and Configuration
-    private static readonly Color GHOST_TINT = new(1.0f, 0.5f, 0.5f, 0.7f);
+    private static readonly Color GHOST_TINT = new(0.6f, 0.3f, 0.9f, 0.7f); // Purple gem-like color
     private const float ALPHA_TOLERANCE = 0.01f; // Avoid unnecessary updates
     private const float SMOOTH_SPEED = 10.0f; // Position interpolation speed for smooth movement
     #endregion

@@ -1,13 +1,11 @@
-[gd_scene load_steps=15 format=3 uid="uid://54o6xy0qaoae"]
+[gd_scene load_steps=13 format=3 uid="uid://54o6xy0qaoae"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
-[ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="6_apple"]
 [ext_resource type="PackedScene" uid="uid://jlrj0meior1r" path="res://Prefabs/UI/LifeHearts.tscn" id="7_gfl13"]
-[ext_resource type="Texture2D" uid="uid://dl1p663jvus6i" path="res://Art/Tree1.png" id="7_wjun0"]
+[ext_resource type="PackedScene" uid="uid://dbt3v1ee4f7fr" path="res://Prefabs/AppleTree.tscn" id="8_2e0hl"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
-[ext_resource type="Texture2D" uid="uid://c3wsakw3ln5j3" path="res://Art/Tree2.png" id="8_j3sk6"]
 [ext_resource type="PackedScene" uid="uid://bcy7l2h8xj4wd" path="res://Prefabs/UI/ManaBar.tscn" id="8_manabar"]
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
@@ -85,37 +83,15 @@ texture = ExtResource("2_8u8ny")
 z_index = -5
 position = Vector2(6, 294)
 
+[node name="AppleTree1" parent="Environment" instance=ExtResource("8_2e0hl")]
+position = Vector2(83, -367)
+
 [node name="Decorations" type="Node2D" parent="Environment"]
-
-[node name="TreeForeground" type="Sprite2D" parent="Environment/Decorations"]
-z_index = 5
-position = Vector2(-583, -172)
-scale = Vector2(0.669922, 0.649089)
-texture = ExtResource("7_wjun0")
-
-[node name="TreeBackground" type="Sprite2D" parent="Environment/Decorations"]
-z_index = -3
-position = Vector2(-92, -307)
-scale = Vector2(0.689453, 0.752604)
-texture = ExtResource("8_j3sk6")
-
-[node name="TreeForeground2" type="Sprite2D" parent="Environment/Decorations"]
-z_index = 5
-position = Vector2(570, -145)
-scale = Vector2(0.693148, 0.60584)
-texture = ExtResource("7_wjun0")
 
 [node name="GameEntities" type="Node2D" parent="."]
 
 [node name="Player" parent="GameEntities" instance=ExtResource("4_e2fbs")]
 position = Vector2(-327, 116)
-
-[node name="Items" type="Node2D" parent="GameEntities"]
-
-[node name="Apple" parent="GameEntities/Items" instance=ExtResource("6_apple")]
-position = Vector2(19, -55)
-TransitionTime = 2.0
-NeutralPhaseTime = 3.0
 
 [node name="GameSystems" type="Node" parent="."]
 
