@@ -34,6 +34,7 @@ public partial class Monster : CharacterBody2D
     #region Components
     private Player _player;
     private MonsterLife _monsterLife;
+    private MonsterLifeBar _monsterLifeBar;
     private Timer _stateTimer;
     private AudioStreamPlayer2D _footstepAudio;
     private Sprite2D _sprite;
@@ -65,6 +66,7 @@ public partial class Monster : CharacterBody2D
     {
         FindSprite();
         FindMonsterLife();
+        FindMonsterLifeBar();
         SetupDamageArea();
     }
 
@@ -73,6 +75,7 @@ public partial class Monster : CharacterBody2D
         SetupTimer();
         FindSprite();
         FindMonsterLife();
+        FindMonsterLifeBar();
         SetupAudio();
         SetupDamageArea();
         CallDeferred(nameof(FindPlayerAndStart));
@@ -118,6 +121,21 @@ public partial class Monster : CharacterBody2D
         else
         {
             Log.Debug("Monster: MonsterLife component found and connected", "Monster");
+        }
+    }
+
+    private void FindMonsterLifeBar()
+    {
+        // Find MonsterLifeBar component
+        _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>("MonsterLifeBar");
+        
+        if (_monsterLifeBar == null)
+        {
+            Log.Warning("Monster: No MonsterLifeBar component found!", "Monster");
+        }
+        else
+        {
+            Log.Debug("Monster: MonsterLifeBar component found and connected", "Monster");
         }
     }
 
@@ -181,12 +199,22 @@ public partial class Monster : CharacterBody2D
         if (ShowForTesting)
         {
             Show();
+            // Show MonsterLifeBar for testing
+            if (_monsterLifeBar != null)
+            {
+                _monsterLifeBar.Show();
+            }
             #if DEBUG
             Log.Debug("Monster: Ready for contact damage", "Monster");
             #endif
         }
         else
         {
+            // Hide MonsterLifeBar when monster is hidden
+            if (_monsterLifeBar != null)
+            {
+                _monsterLifeBar.Hide();
+            }
         }
     }
     #endregion
@@ -308,6 +336,12 @@ public partial class Monster : CharacterBody2D
         {
             _spriteNode.Visible = true;
             _spriteNode.Modulate = Colors.White;
+        }
+
+        // Show MonsterLifeBar during initial wait
+        if (_monsterLifeBar != null)
+        {
+            _monsterLifeBar.Show();
         }
 
         SetCollisionMask(0u);
@@ -446,6 +480,12 @@ public partial class Monster : CharacterBody2D
         _spriteNode.Visible = true;
         _spriteNode.Modulate = new Color(1, 1, 1, 0);
 
+        // Show MonsterLifeBar when fading in
+        if (_monsterLifeBar != null)
+        {
+            _monsterLifeBar.Show();
+        }
+
         _currentTween = CreateTween();
         _currentTween.TweenProperty(_spriteNode, "modulate:a", 1.0f, 0.5f);
         _currentTween.TweenCallback(Callable.From(() =>
@@ -464,6 +504,12 @@ public partial class Monster : CharacterBody2D
         SetCollisionMask(0u);
         SetCollisionLayer(0u);
         _isFullyVisible = false;
+
+        // Hide MonsterLifeBar when fading out
+        if (_monsterLifeBar != null)
+        {
+            _monsterLifeBar.Hide();
+        }
 
         _currentTween = CreateTween();
         _currentTween.TweenProperty(_spriteNode, "modulate:a", 0.0f, 0.5f);
@@ -552,6 +598,12 @@ public partial class Monster : CharacterBody2D
         {
             _spriteNode.Visible = true;
             _spriteNode.Modulate = Colors.White;
+        }
+
+        // Show MonsterLifeBar when resetting
+        if (_monsterLifeBar != null)
+        {
+            _monsterLifeBar.Show();
         }
 
         SetCollisionMask(0u);
