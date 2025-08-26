@@ -6,7 +6,7 @@ public partial class Monster : CharacterBody2D
 {
     #region Exported Properties
     [Export] public int DamageAmount { get; set; } = 1;
-    [Export] public bool ShowForTesting { get; set; } = true;
+    [Export] public bool InitiallyVisible { get; set; } = true;
     // Note: Reality is now managed globally by RealityManager, not per-monster
     
     // Follower behavior properties
@@ -24,11 +24,11 @@ public partial class Monster : CharacterBody2D
     public bool IsDisabledForReplay { get; private set; } = false;
     #endregion
 
-    #region Follower State (only used when EnableFollowerBehavior = true)
-    private MonsterState _currentState = MonsterState.Hidden;
+    #region Monster State (used by both simple and follower monsters)
+    private MonsterState _currentState = MonsterState.Visible;
     private bool _isTransitioning = false; // Track if currently fading in/out
-    private bool _isVisible = false;
-    private bool _isFullyVisible = false;
+    private bool _isVisible = true;  // Initialize consistently with _currentState
+    private bool _isFullyVisible = true;  // Initialize consistently with _currentState
     private bool _shouldSpawnOnRight = false;
     private float _gravity;
     private Vector2 _initialPosition;
@@ -203,10 +203,14 @@ public partial class Monster : CharacterBody2D
             return;
         }
         
-        if (ShowForTesting)
+        // Initialize simple monsters to use state system consistently
+        if (InitiallyVisible)
         {
+            _currentState = MonsterState.Visible;
+            _isVisible = true;
+            _isFullyVisible = true;
             Show();
-            // Show MonsterLifeBar for testing
+            // Show MonsterLifeBar when visible
             if (_monsterLifeBar != null)
             {
                 _monsterLifeBar.Show();
@@ -217,6 +221,10 @@ public partial class Monster : CharacterBody2D
         }
         else
         {
+            _currentState = MonsterState.Hidden;
+            _isVisible = false;
+            _isFullyVisible = false;
+            Hide();
             // Hide MonsterLifeBar when monster is hidden
             if (_monsterLifeBar != null)
             {
@@ -671,18 +679,55 @@ public partial class Monster : CharacterBody2D
     #endregion
 
     #region Public API
-    public new bool IsVisible() => EnableFollowerBehavior ? _isVisible : Visible;
-    public bool IsFullyVisible() => EnableFollowerBehavior ? _isFullyVisible : true;
+    public new bool IsVisible() => _isVisible;
+    public bool IsFullyVisible() => _isFullyVisible;
     public MonsterState GetState() => _currentState;
-    public void ForceHide() { if (EnableFollowerBehavior) { _stateTimer.Stop(); StartHiddenBehavior(); } }
-    public void ForceShow() { if (EnableFollowerBehavior) { _stateTimer.Stop(); StartVisibleBehavior(); } }
+    public void ForceHide() 
+    { 
+        if (EnableFollowerBehavior) 
+        { 
+            _stateTimer.Stop(); 
+            StartHiddenBehavior(); 
+        }
+        else
+        {
+            // For simple monsters, directly set to hidden state
+            _currentState = MonsterState.Hidden;
+            _isVisible = false;
+            _isFullyVisible = false;
+            Hide();
+            if (_monsterLifeBar != null)
+            {
+                _monsterLifeBar.Hide();
+            }
+        }
+    }
+    
+    public void ForceShow() 
+    { 
+        if (EnableFollowerBehavior) 
+        { 
+            _stateTimer.Stop(); 
+            StartVisibleBehavior(); 
+        }
+        else
+        {
+            // For simple monsters, directly set to visible state
+            _currentState = MonsterState.Visible;
+            _isVisible = true;
+            _isFullyVisible = true;
+            Show();
+            if (_monsterLifeBar != null)
+            {
+                _monsterLifeBar.Show();
+            }
+        }
+    }
 
     public bool CanTakeDamage() 
     {
-        // Simplified: can take damage only when visible and not transitioning
-        bool result = EnableFollowerBehavior ? (_currentState == MonsterState.Visible && !_isTransitioning) : true;
-        // Remove frequent debug logging that can cause performance issues
-        // Log.Debug($"CanTakeDamage - EnableFollowerBehavior: {EnableFollowerBehavior}, CurrentState: {_currentState}, IsTransitioning: {_isTransitioning}, Result: {result}", "Monster");
+        // Use state-based logic consistently for both follower and simple monsters
+        bool result = _currentState == MonsterState.Visible && !_isTransitioning;
         return result;
     }
 
