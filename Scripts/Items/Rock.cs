@@ -127,35 +127,38 @@ public partial class Rock : Node2D
         AddToGroup("rocks");
         
         EnableInputProcessing();
+        
+        Log.System($"Rock setup in thrown mode - CollisionArea: {_collisionArea != null}", "Rock");
     }
 
     private void SetupCollisionArea()
     {
-        // Use existing collision area from scene if available, otherwise create one
+        // Use existing collision area from scene if available
         if (_collisionArea == null)
         {
-            // Create Area2D for collision detection with other objects (like apples)
-            _collisionArea = new Area2D();
-            var collisionShape = new CollisionShape2D();
-            var shape = new CircleShape2D();
-            shape.Radius = 10.0f; // Small collision radius for the thrown rock
-            collisionShape.Shape = shape;
-            
-            // Set collision layers - rock should be on layer 8 to be detected by apples
-            _collisionArea.CollisionLayer = 8; // Rock collision layer (matches Apple's RockDetectionArea mask)
-            _collisionArea.CollisionMask = 0;  // Don't need to detect other objects
-            
-            AddChild(_collisionArea);
-            _collisionArea.AddChild(collisionShape);
-        }
-        else
-        {
-            // Collision area exists in scene, just ensure proper layer setup
-            _collisionArea.CollisionLayer = 8;
-            _collisionArea.CollisionMask = 0;
+            // This shouldn't happen since we're using the scene file now
+            Log.Warning("ThrownCollisionArea not found in scene", "Rock");
+            return;
         }
         
-        Log.System("Rock collision area set up on layer 8", "Rock");
+        // Ensure proper layer setup for thrown rocks
+        _collisionArea.CollisionLayer = 8;  // Rock is on layer 8
+        _collisionArea.CollisionMask = 4;   // Rock detects apples on layer 4
+        
+        // Connect to area entered signal so rock disappears when hitting apple
+        _collisionArea.AreaEntered += OnRockHitArea;
+        
+        Log.System($"Rock collision area set up - Layer: {_collisionArea.CollisionLayer}, Mask: {_collisionArea.CollisionMask}, AreaEntered signal connected", "Rock");
+    }
+
+    private void OnRockHitArea(Area2D area)
+    {
+        // Rock hit something with an Area2D (like an apple)
+        Log.System($"Rock's area hit another area: {area.Name} on layer {area.CollisionLayer}, mask {area.CollisionMask}", "Rock");
+        
+        // Stop movement and disappear
+        _isMoving = false;
+        CreateImpactEffect();
     }
 
     private void ConnectSignals()
@@ -284,7 +287,7 @@ public partial class Rock : Node2D
         _isMoving = false;
         GlobalPosition = hitPosition;
         
-        Log.System("Rock hit something during flight", "Rock");
+        Log.System("Rock hit ground during flight", "Rock");
         
         // Create impact effect and remove rock
         CreateImpactEffect();
@@ -292,18 +295,16 @@ public partial class Rock : Node2D
 
     private bool CheckCollisionAtPosition(Vector2 worldPoint)
     {
-        // Use PhysicsServer2D to check for collisions at this point
+        // Use PhysicsServer2D to check only for ground collisions
         var spaceState = GetWorld2D().DirectSpaceState;
         
-        // Create a small collision query at this point
+        // Check for ground/static objects (layer 1) - let Area2D handle apple collisions
         var query = new PhysicsPointQueryParameters2D();
         query.Position = worldPoint;
-        query.CollisionMask = 1; // Check collision layer 1 (typically ground/static objects)
-        query.Exclude = new Godot.Collections.Array<Rid>(); // Don't exclude anything
+        query.CollisionMask = 1; // Check only for ground
+        query.Exclude = new Godot.Collections.Array<Rid>();
         
-        // Perform the collision check
         var result = spaceState.IntersectPoint(query);
-        
         return result.Count > 0;
     }
 
@@ -391,11 +392,8 @@ public partial class Rock : Node2D
             _rockSprite.Scale = new Vector2(0.05f, 0.05f);
         }
         
-        // Setup thrown mode if not already done
-        if (_collisionArea == null)
-        {
-            SetupThrownMode();
-        }
+        // Always setup collision area for thrown mode
+        SetupCollisionArea();
         
         // Start at the first point
         GlobalPosition = _trajectoryPoints[0];

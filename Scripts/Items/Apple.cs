@@ -73,7 +73,7 @@ public partial class Apple : Node2D
     private void SetupRigidBody()
     {
         // Connect rock hit detection - the Area2D is already set up in the scene
-        _rockDetectionArea.BodyEntered += OnRockHit;
+        _rockDetectionArea.AreaEntered += OnProjectileImpact;
     }
 
     private void ConnectSignals()
@@ -314,27 +314,40 @@ public partial class Apple : Node2D
         }
     }
 
-    private void OnRockHit(Node2D body)
+    private void OnProjectileImpact(Area2D area)
     {
-        // Check if it's a rock hitting the apple
-        if (body.Name.ToString().Contains("Rock") || body.IsInGroup("rocks"))
+        // Generic projectile impact detection - any Area2D on layer 8 is considered a projectile
+        if (area.CollisionLayer == 8)
         {
-            Log.System($"Rock hit apple in {_currentState} state", "Apple");
+            Log.System($"Projectile impact on apple in {_currentState} state", "Apple");
             
-            // Only make apple fall if it's in Gray state
-            if (_currentState == AppleState.Gray && !_isFalling)
+            // Apple should fall when hit in Neutral state (gray color)
+            if (_currentState == AppleState.Neutral && !_isFalling)
             {
+                Log.System("Apple is in Neutral state (gray) - triggering fall", "Apple");
                 MakeAppleFall();
+            }
+            else
+            {
+                Log.System($"Apple not falling - state: {_currentState}, falling: {_isFalling}", "Apple");
             }
         }
     }
 
-    private void MakeAppleFall()
+    public void MakeAppleFall()
     {
         if (_isFalling) return;
         
         _isFalling = true;
         
+        // Use call_deferred to change physics properties safely during collision detection
+        CallDeferred(nameof(DeferredMakeAppleFall));
+        
+        Log.System("Apple fall initiated (deferred)", "Apple");
+    }
+    
+    private void DeferredMakeAppleFall()
+    {
         // Unfreeze the rigidbody and enable gravity to make it fall
         _rigidBody.Freeze = false; // Unfreeze to allow physics
         _rigidBody.GravityScale = 1.0f; // Enable gravity
@@ -345,7 +358,7 @@ public partial class Apple : Node2D
             _transitionTimer.Stop();
         }
         
-        Log.System("Apple is now falling due to rock hit", "Apple");
+        Log.System("Apple is now falling due to projectile hit", "Apple");
         
         // Add some impulse for more dramatic effect
         Vector2 randomImpulse = new Vector2(
