@@ -1,10 +1,9 @@
-[gd_scene load_steps=19 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=18 format=3 uid="uid://bnv528gs1hngu"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
 [ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_wjun0"]
-[ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="6_apple"]
 [ext_resource type="PackedScene" uid="uid://jlrj0meior1r" path="res://Prefabs/UI/LifeHearts.tscn" id="7_gfl13"]
 [ext_resource type="Script" uid="uid://bmh2wdvmm4i7l" path="res://Scripts/Systems/EnemyManager.cs" id="7_r6l07"]
 [ext_resource type="Texture2D" uid="uid://dl1p663jvus6i" path="res://Art/Tree1.png" id="7_wjun0"]
@@ -113,11 +112,6 @@ texture = ExtResource("7_wjun0")
 
 [node name="Player" parent="GameEntities" instance=ExtResource("4_e2fbs")]
 position = Vector2(-327, 116)
-
-[node name="Items" type="Node2D" parent="GameEntities"]
-
-[node name="Apple" parent="GameEntities/Items" instance=ExtResource("6_apple")]
-position = Vector2(-133, 240)
 
 [node name="Enemies" type="Node2D" parent="GameEntities"]
 
