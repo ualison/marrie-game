@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=19 format=3 uid="uid://bnv528gs1hngu"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
@@ -9,7 +9,7 @@
 [ext_resource type="Texture2D" uid="uid://dl1p663jvus6i" path="res://Art/Tree1.png" id="7_wjun0"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
 [ext_resource type="Texture2D" uid="uid://c3wsakw3ln5j3" path="res://Art/Tree2.png" id="8_j3sk6"]
-[ext_resource type="PackedScene" uid="uid://bcy7l2h8xj4wd" path="res://Prefabs/UI/ManaBar.tscn" id="8_manabar"]
+[ext_resource type="PackedScene" uid="uid://bcy7l2h8xj4wd" path="res://Prefabs/UI/ManaHeats.tscn" id="8_manabar"]
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
 [ext_resource type="Script" uid="uid://bb2ife872jlja" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
@@ -17,10 +17,43 @@
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
 [ext_resource type="Script" uid="uid://cf5q88b7yl5la" path="res://Scripts/Systems/ReplaySystemManager.cs" id="14_r6l07"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
+[ext_resource type="PackedScene" uid="uid://bjv4m5whn2djf" path="res://Prefabs/UI/Message.tscn" id="18_tnm7e"]
 
 [node name="ForestScene" type="Node2D"]
 
 [node name="Camera" type="Camera2D" parent="."]
+
+[node name="Environment" type="Node2D" parent="."]
+
+[node name="Background" type="Sprite2D" parent="Environment"]
+z_index = -10
+position = Vector2(-1, -5)
+scale = Vector2(0.800781, 0.688233)
+texture = ExtResource("2_8u8ny")
+
+[node name="Ground" parent="Environment" instance=ExtResource("3_r6l07")]
+z_index = -5
+position = Vector2(6, 294)
+
+[node name="Decorations" type="Node2D" parent="Environment"]
+
+[node name="TreeForeground" type="Sprite2D" parent="Environment/Decorations"]
+z_index = 5
+position = Vector2(-583, -172)
+scale = Vector2(0.669922, 0.649089)
+texture = ExtResource("7_wjun0")
+
+[node name="TreeBackground" type="Sprite2D" parent="Environment/Decorations"]
+z_index = -3
+position = Vector2(-92, -307)
+scale = Vector2(0.689453, 0.752604)
+texture = ExtResource("8_j3sk6")
+
+[node name="TreeForeground2" type="Sprite2D" parent="Environment/Decorations"]
+z_index = 5
+position = Vector2(570, -145)
+scale = Vector2(0.693148, 0.60584)
+texture = ExtResource("7_wjun0")
 
 [node name="UserInterface" type="CanvasLayer" parent="."]
 follow_viewport_enabled = true
@@ -72,41 +105,16 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="GameOverUI" parent="UserInterface/Overlays" instance=ExtResource("8_4xied")]
+[node name="GameOver" parent="UserInterface/Overlays" instance=ExtResource("8_4xied")]
 visible = false
 layout_mode = 1
 
-[node name="Environment" type="Node2D" parent="."]
-
-[node name="Background" type="Sprite2D" parent="Environment"]
-z_index = -10
-position = Vector2(-1, -5)
-scale = Vector2(0.800781, 0.688233)
-texture = ExtResource("2_8u8ny")
-
-[node name="Ground" parent="Environment" instance=ExtResource("3_r6l07")]
-z_index = -5
-position = Vector2(6, 294)
-
-[node name="Decorations" type="Node2D" parent="Environment"]
-
-[node name="TreeForeground" type="Sprite2D" parent="Environment/Decorations"]
-z_index = 5
-position = Vector2(-583, -172)
-scale = Vector2(0.669922, 0.649089)
-texture = ExtResource("7_wjun0")
-
-[node name="TreeBackground" type="Sprite2D" parent="Environment/Decorations"]
-z_index = -3
-position = Vector2(-92, -307)
-scale = Vector2(0.689453, 0.752604)
-texture = ExtResource("8_j3sk6")
-
-[node name="TreeForeground2" type="Sprite2D" parent="Environment/Decorations"]
-z_index = 5
-position = Vector2(570, -145)
-scale = Vector2(0.693148, 0.60584)
-texture = ExtResource("7_wjun0")
+[node name="Message" parent="UserInterface/Overlays" instance=ExtResource("18_tnm7e")]
+visible = false
+offset_left = 378.0
+offset_top = 532.0
+offset_right = 778.0
+offset_bottom = 632.0
 
 [node name="GameEntities" type="Node2D" parent="."]
 
@@ -116,7 +124,7 @@ position = Vector2(-327, 116)
 [node name="Enemies" type="Node2D" parent="GameEntities"]
 
 [node name="Monster" parent="GameEntities/Enemies" instance=ExtResource("5_wjun0")]
-position = Vector2(301, 69)
+position = Vector2(286, 68)
 
 [node name="GameSystems" type="Node" parent="."]
 

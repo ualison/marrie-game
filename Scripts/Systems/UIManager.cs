@@ -13,6 +13,7 @@ public partial class UIManager : Node
     private GameOver _gameOverUI;
     private LifeBar _lifeBarUI;
     private ManaBar _manaBarUI;
+    private GameMessage _gameMessageUI;
     #endregion
     
     public override void _Ready()
@@ -77,8 +78,9 @@ public partial class UIManager : Node
         _gameOverUI = GetTree().GetFirstNodeInGroup("game_over_ui") as GameOver;
         _lifeBarUI = GetTree().GetFirstNodeInGroup("life_bar_ui") as LifeBar;
         _manaBarUI = GetTree().GetFirstNodeInGroup("mana_bar_ui") as ManaBar;
+        _gameMessageUI = GetTree().GetFirstNodeInGroup("game_message_ui") as GameMessage;
         
-        Log.System($"GameOverUI found: {_gameOverUI != null}, LifeBarUI found: {_lifeBarUI != null}, ManaBarUI found: {_manaBarUI != null}", "UIManager");
+        Log.System($"GameOverUI found: {_gameOverUI != null}, LifeBarUI found: {_lifeBarUI != null}, ManaBarUI found: {_manaBarUI != null}, GameMessageUI found: {_gameMessageUI != null}", "UIManager");
         
         // Debug: List all nodes in the game_over_ui group
         var gameOverNodes = GetTree().GetNodesInGroup("game_over_ui");
@@ -171,8 +173,17 @@ public partial class UIManager : Node
             }
         }
         
+        if (_gameMessageUI == null)
+        {
+            _gameMessageUI = FindNodeByType<GameMessage>(GetTree().CurrentScene);
+            if (_gameMessageUI != null)
+            {
+                Log.System($"Found GameMessageUI by recursive search: {_gameMessageUI.Name}", "UIManager");
+            }
+        }
+        
         // Final status
-        Log.System($"Final result - GameOverUI: {_gameOverUI?.Name ?? "null"}, LifeBarUI: {_lifeBarUI?.Name ?? "null"}, ManaBarUI: {_manaBarUI?.Name ?? "null"}", "UIManager");
+        Log.System($"Final result - GameOverUI: {_gameOverUI?.Name ?? "null"}, LifeBarUI: {_lifeBarUI?.Name ?? "null"}, ManaBarUI: {_manaBarUI?.Name ?? "null"}, GameMessageUI: {_gameMessageUI?.Name ?? "null"}", "UIManager");
     }
     
     private T FindNodeByType<T>(Node startNode) where T : class
@@ -265,6 +276,46 @@ public partial class UIManager : Node
     public GameOver GetGameOverUI() => _gameOverUI;
     public LifeBar GetLifeBarUI() => _lifeBarUI;
     public ManaBar GetManaBarUI() => _manaBarUI;
+    public GameMessage GetGameMessageUI() => _gameMessageUI;
+    
+    #region Public Message API
+    /// <summary>
+    /// Show a gameplay message to the player
+    /// </summary>
+    /// <param name="message">The message to display</param>
+    public static void ShowGameplayMessage(string message)
+    {
+        if (Instance?._gameMessageUI != null)
+        {
+            Instance._gameMessageUI.ShowMessage(message);
+            Log.UI($"Showing gameplay message: {message}", "UIManager");
+        }
+        else
+        {
+            Log.Warning($"Cannot show message '{message}' - GameMessageUI not found", "UIManager");
+        }
+    }
+    
+    /// <summary>
+    /// Hide the current gameplay message if one is showing
+    /// </summary>
+    public static void HideGameplayMessage()
+    {
+        if (Instance?._gameMessageUI != null)
+        {
+            Instance._gameMessageUI.HideMessage();
+        }
+    }
+    
+    /// <summary>
+    /// Check if a gameplay message is currently being displayed
+    /// </summary>
+    /// <returns>True if a message is showing</returns>
+    public static bool IsShowingGameplayMessage()
+    {
+        return Instance?._gameMessageUI?.IsShowingMessage() ?? false;
+    }
+    #endregion
     
     public override void _ExitTree()
     {

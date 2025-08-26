@@ -7,11 +7,18 @@ public partial class ReplayGem : Node2D
     private Area2D _detectionArea;
     private Sprite2D _gemSprite;
     private Label _promptLabel;
+    private Tween _floatingTween;
+    #endregion
+
+    #region Export Variables
+    [Export] public float FloatingDistance { get; set; } = 8.0f; // How far up and down to float
+    [Export] public float FloatingDuration { get; set; } = 2.0f; // How long one cycle takes
     #endregion
 
     #region State
     private bool _playerNearby = false;
     private bool _canInteract = false; // Prevent immediate auto-triggering
+    private Vector2 _originalGemPosition;
     #endregion
 
     #region Initialization
@@ -39,6 +46,13 @@ public partial class ReplayGem : Node2D
         _detectionArea = GetNode<Area2D>("DetectionArea");
         _gemSprite = GetNode<Sprite2D>("GemSprite");
         _promptLabel = GetNode<Label>("PromptLabel");
+        
+        // Store original gem position for floating animation
+        _originalGemPosition = _gemSprite.Position;
+        
+        // Create tween for floating animation
+        _floatingTween = CreateTween();
+        _floatingTween.SetLoops(); // Loop infinitely
     }
 
     private void ConnectSignals()
@@ -86,11 +100,38 @@ public partial class ReplayGem : Node2D
     {
         Log.Replay("=== ReplayGem HandleReplayActivation called ===", "ReplayGem");
         
+        // Check if player has enough mana (requires 1 mana)
+        var playerMana = GetPlayerManaSystem();
+        if (playerMana == null)
+        {
+            Log.Warning("PlayerMana system not found", "ReplayGem");
+            return;
+        }
+
+        if (!playerMana.HasEnoughMana(1))
+        {
+            // Show "Not enough mana" message
+            ShowInsufficientManaMessage();
+            Log.Replay("Replay activation failed: Insufficient mana", "ReplayGem");
+            return;
+        }
+
+        // Consume 1 mana for replay
+        if (!playerMana.UseMana(1))
+        {
+            Log.Warning("Failed to consume mana for replay", "ReplayGem");
+            return;
+        }
+
+        Log.Replay("Consumed 1 mana for replay activation", "ReplayGem");
+        
         // Get death record and start replay through orchestrator
         var deathRecord = GetDeathRecord();
         if (deathRecord == null) 
         {
             Log.Warning("No death record available for replay", "ReplayGem");
+            // Refund mana if replay fails
+            playerMana.RestoreMana(1);
             return;
         }
 
@@ -108,6 +149,8 @@ public partial class ReplayGem : Node2D
         else
         {
             Log.Error("ReplayOrchestrator.Instance is null", "ReplayGem");
+            // Refund mana if replay fails
+            playerMana.RestoreMana(1);
         }
     }
 
@@ -124,6 +167,9 @@ public partial class ReplayGem : Node2D
 
     private void HideGemDuringReplay()
     {
+        // Stop floating animation during replay
+        StopFloatingAnimation();
+        
         if (_promptLabel != null)
         {
             _promptLabel.Hide();
@@ -142,6 +188,7 @@ public partial class ReplayGem : Node2D
         if (_gemSprite != null)
         {
             _gemSprite.Show();
+            StartFloatingAnimation();
         }
 
         if (_promptLabel != null)
@@ -157,6 +204,9 @@ public partial class ReplayGem : Node2D
     {
         // Hide gem completely and cleanup
         _detectionArea.SetDeferred("monitoring", false);
+        
+        // Stop floating animation
+        StopFloatingAnimation();
 
         if (_promptLabel != null)
         {
@@ -202,6 +252,65 @@ public partial class ReplayGem : Node2D
     }
     #endregion
 
+    #region Mana System Integration
+    private PlayerMana GetPlayerManaSystem()
+    {
+        // Try multiple strategies to find PlayerMana system
+        var player = GetTree().GetFirstNodeInGroup("player") as Player;
+        if (player != null)
+        {
+            var playerMana = player.GetNodeOrNull<PlayerMana>("PlayerMana");
+            if (playerMana != null) return playerMana;
+        }
+
+        // Fallback: search by group
+        return GetTree().GetFirstNodeInGroup("mana_system") as PlayerMana;
+    }
+
+    private void ShowInsufficientManaMessage()
+    {
+        // Use UIManager to show the message
+        UIManager.ShowGameplayMessage("Not enough mana!");
+    }
+    #endregion
+
+    #region Floating Animation
+    private void StartFloatingAnimation()
+    {
+        if (_floatingTween == null || _gemSprite == null) return;
+        
+        // Stop any existing animation
+        _floatingTween.Kill();
+        _floatingTween = CreateTween();
+        _floatingTween.SetLoops(); // Loop infinitely
+        
+        // Reset to original position
+        _gemSprite.Position = _originalGemPosition;
+        
+        // Create floating motion: up -> down -> up (continuous)
+        var upPosition = new Vector2(_originalGemPosition.X, _originalGemPosition.Y - FloatingDistance);
+        var downPosition = new Vector2(_originalGemPosition.X, _originalGemPosition.Y + FloatingDistance);
+        
+        _floatingTween.TweenProperty(_gemSprite, "position", upPosition, FloatingDuration / 2.0f);
+        _floatingTween.TweenProperty(_gemSprite, "position", downPosition, FloatingDuration);
+        _floatingTween.TweenProperty(_gemSprite, "position", _originalGemPosition, FloatingDuration / 2.0f);
+    }
+    
+    private void StopFloatingAnimation()
+    {
+        if (_floatingTween != null)
+        {
+            _floatingTween.Kill();
+        }
+        
+        // Reset gem to original position
+        if (_gemSprite != null)
+        {
+            _gemSprite.Position = _originalGemPosition;
+        }
+    }
+    #endregion
+
     #region Public API (for restoring gem after replay)
     public void ShowGemAfterReplay()
     {
@@ -209,6 +318,7 @@ public partial class ReplayGem : Node2D
         if (_gemSprite != null && IsInstanceValid(this))
         {
             _gemSprite.Show();
+            StartFloatingAnimation();
         }
     }
     #endregion

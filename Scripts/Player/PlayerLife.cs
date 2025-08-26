@@ -11,6 +11,7 @@ public partial class PlayerLife : Node, IHealthSystem
 
     #region Exported Properties
     [Export] public int MaxLife { get; set; } = 3;
+    [Export] public int StartingLife { get; set; } = 3; // Starting life amount (full red hearts at beginning)
     [Export] public float InvulnerabilityTime { get; set; } = 2.0f;
     #endregion
 
@@ -31,8 +32,8 @@ public partial class PlayerLife : Node, IHealthSystem
     #region Initialization
     public override void _Ready()
     {
-        // Initialize health to maximum and setup systems
-        CurrentLife = MaxLife;
+        // Initialize health to starting amount and setup systems
+        CurrentLife = Mathf.Clamp(StartingLife, 0, MaxLife);
         SetupInvulnerabilityTimer();
         NotifyLifeChanged();
     }
@@ -80,8 +81,8 @@ public partial class PlayerLife : Node, IHealthSystem
 
     public void Reset()
     {
-        // Reset to full health for game restart
-        CurrentLife = MaxLife;
+        // Reset to starting life amount for game restart
+        CurrentLife = Mathf.Clamp(StartingLife, 0, MaxLife);
         IsInvulnerable = false;
         _invulnerabilityTimer.Stop();
         NotifyLifeChanged();

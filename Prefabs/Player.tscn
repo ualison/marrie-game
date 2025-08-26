@@ -40,12 +40,13 @@ texture = ExtResource("2_b43ah")
 [node name="PlayerLife" type="Node2D" parent="CharacterBody2D"]
 position = Vector2(0, -4)
 script = ExtResource("3_gntrk")
-MaxLife = 2
+MaxLife = 4
+StartingLife = 1
 
 [node name="PlayerMana" type="Node" parent="CharacterBody2D"]
 script = ExtResource("4_mana")
 MaxMana = 4
-StartingMana = 0
+StartingMana = 1
 
 [node name="Inventory" type="Node" parent="CharacterBody2D"]
 script = ExtResource("5_inventory")

@@ -1,0 +1,43 @@
+[gd_scene load_steps=3 format=3 uid="uid://bjv4m5whn2djf"]
+
+[ext_resource type="Script" uid="uid://b31msy55cstja" path="res://Scripts/UI/GameMessage.cs" id="1_gamemessage"]
+[ext_resource type="Texture2D" uid="uid://dgt1qlw7a46lr" path="res://Art/TextBoxMessage.png" id="2_textboxbg"]
+
+[node name="GameMessage" type="Control" groups=["game_message_ui"]]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 400.0
+offset_bottom = 100.0
+script = ExtResource("1_gamemessage")
+
+[node name="MessageBackground" type="NinePatchRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_textboxbg")
+patch_margin_left = 32
+patch_margin_top = 32
+patch_margin_right = 32
+patch_margin_bottom = 32
+
+[node name="MessageLabel" type="Label" parent="MessageBackground"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 18
+text = "Message Text"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3

@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://jlrj0meior1r" path="res://Prefabs/UI/LifeHearts.tscn" id="7_gfl13"]
 [ext_resource type="PackedScene" uid="uid://dbt3v1ee4f7fr" path="res://Prefabs/AppleTree.tscn" id="8_2e0hl"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
-[ext_resource type="PackedScene" uid="uid://bcy7l2h8xj4wd" path="res://Prefabs/UI/ManaBar.tscn" id="8_manabar"]
+[ext_resource type="PackedScene" uid="uid://bcy7l2h8xj4wd" path="res://Prefabs/UI/ManaHeats.tscn" id="8_manabar"]
 [ext_resource type="AudioStream" uid="uid://c5xm6p8ayswcj" path="res://Sounds/Background3.wav" id="11_1pt5x"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
 [ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="12_r6l07"]
@@ -45,7 +45,7 @@ offset_left = -564.0
 offset_top = -316.0
 metadata/_edit_use_anchors_ = true
 
-[node name="ManaBar" parent="UserInterface/HUD" instance=ExtResource("8_manabar")]
+[node name="ManaHearts" parent="UserInterface/HUD" instance=ExtResource("8_manabar")]
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.511285

@@ -1,0 +1,17 @@
+[gd_scene load_steps=3 format=3 uid="uid://844rfld3y4ee"]
+
+[ext_resource type="Script" path="res://Scripts/UI/RockCountUI.cs" id="1_vnikc"]
+[ext_resource type="Texture2D" uid="uid://8tum5coe2u2v" path="res://Art/Rock.png" id="2_t5ape"]
+
+[node name="RockCountUI" type="Label"]
+offset_left = 51.0
+offset_top = 607.0
+offset_right = 94.0
+offset_bottom = 633.0
+text = " 0"
+script = ExtResource("1_vnikc")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(-24, 11)
+scale = Vector2(0.0537109, 0.0527344)
+texture = ExtResource("2_t5ape")
