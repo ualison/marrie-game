@@ -151,7 +151,7 @@ public partial class LifeBar : Control
             Texture = index < currentLife ? FullHeartTexture : EmptyHeartTexture,
             ExpandMode = TextureRect.ExpandModeEnum.FitWidthProportional,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            CustomMinimumSize = new Vector2(32, 32)
+            CustomMinimumSize = new Vector2(40, 40)
         };
 
         return heart;

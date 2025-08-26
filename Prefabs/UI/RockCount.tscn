@@ -3,15 +3,18 @@
 [ext_resource type="Script" path="res://Scripts/UI/RockCountUI.cs" id="1_vnikc"]
 [ext_resource type="Texture2D" uid="uid://8tum5coe2u2v" path="res://Art/Rock.png" id="2_t5ape"]
 
-[node name="RockCountUI" type="Label"]
-offset_left = 51.0
-offset_top = 607.0
-offset_right = 94.0
-offset_bottom = 633.0
-text = " 0"
-script = ExtResource("1_vnikc")
+[node name="RockCountUI" type="HBoxContainer"]
+custom_minimum_size = Vector2(0, 45)
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
-position = Vector2(-24, 11)
-scale = Vector2(0.0537109, 0.0527344)
+[node name="RockIcon" type="TextureRect" parent="."]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
 texture = ExtResource("2_t5ape")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RockLabel" type="Label" parent="."]
+layout_mode = 2
+text = "0"
+vertical_alignment = 1
+script = ExtResource("1_vnikc")

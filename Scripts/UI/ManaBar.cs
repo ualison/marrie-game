@@ -151,7 +151,7 @@ public partial class ManaBar : Control
             Texture = index < currentMana ? FullManaTexture : EmptyManaTexture,
             ExpandMode = TextureRect.ExpandModeEnum.FitWidthProportional,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            CustomMinimumSize = new Vector2(32, 32)
+            CustomMinimumSize = new Vector2(40, 40)
         };
 
         return mana;
