@@ -1,12 +1,18 @@
 using Godot;
 
 /// <summary>
-/// Apple item that cycles through four states: Red → Neutral → Purple → Gray → Red
-/// - Red: Life phase (collectible, restores life)
-/// - Neutral: Gray transition phase (not collectible, no prompt)
-/// - Purple: Mana phase (collectible, restores mana)  
-/// - Gray: Dark gray phase (not collectible, no prompt)
-/// Only Red and Purple phases are collectible
+/// Apple item with different state cycles for tree vs fallen apples:
+/// 
+/// Tree Cycle: RedLife → GrayKnockable → PurpleMana → RedLife (repeats)
+/// Fallen Cycle: RedLife → GrayNotCollectible → PurpleMana → RedLife (repeats)
+/// 
+/// States:
+/// - RedLife: Red color, Life phase (collectible when fallen, restores health)
+/// - GrayKnockable: Gray color, Knockable phase (tree only, can be hit by rocks to fall)
+/// - PurpleMana: Purple color, Mana phase (collectible when fallen, restores mana)
+/// - GrayNotCollectible: Dark gray color, Non-collectible phase (fallen only, not collectible)
+/// 
+/// Only RedLife and PurpleMana phases are collectible, and only when apple is on the ground
 /// </summary>
 public partial class Apple : Node2D
 {
@@ -26,24 +32,26 @@ public partial class Apple : Node2D
     private Label _promptLabel;
     private RigidBody2D _rigidBody;
     private Area2D _rockDetectionArea;
+    private Area2D _groundDetectionArea;
     #endregion
 
     #region State
     private bool _playerNearby = false;
-    private AppleState _currentState = AppleState.Red; // Current apple state
+    private AppleState _currentState = AppleState.RedLife; // Current apple state
     private Timer _transitionTimer;
     private Tween _fadeTween;
     private Vector2 _originalScale; // Store original scale for transitions
     private bool _isFalling = false; // Track if apple is falling
+    private bool _hasLanded = false; // Track if apple has landed on ground
     #endregion
 
     #region Apple State Enum
     public enum AppleState
     {
-        Red,        // Life phase (collectible)
-        Neutral,    // Gray transition phase (not collectible)
-        Purple,     // Mana phase (collectible)
-        Gray        // Gray phase (not collectible)
+        RedLife,           // Red color - Life phase (collectible, restores health)
+        GrayKnockable,     // Gray color - Knockable phase (can be hit by rocks to fall)
+        PurpleMana,        // Purple color - Mana phase (collectible, restores mana)
+        GrayNotCollectible // Gray color - Fallen apple phase (not collectible after being knocked down)
     }
     #endregion
 
@@ -63,17 +71,21 @@ public partial class Apple : Node2D
 
     private void InitializeComponents()
     {
-        _detectionArea = GetNode<Area2D>("DetectionArea");
+        _detectionArea = GetNode<Area2D>("RigidBody2D/DetectionArea");
         _rigidBody = GetNode<RigidBody2D>("RigidBody2D");
         _appleSprite = GetNode<Sprite2D>("RigidBody2D/AppleSprite");
         _promptLabel = GetNode<Label>("RigidBody2D/PromptLabel");
         _rockDetectionArea = GetNode<Area2D>("RigidBody2D/RockDetectionArea");
+        _groundDetectionArea = GetNode<Area2D>("RigidBody2D/GroundDetectionArea");
     }
 
     private void SetupRigidBody()
     {
         // Connect rock hit detection - the Area2D is already set up in the scene
         _rockDetectionArea.AreaEntered += OnProjectileImpact;
+        
+        // Connect to ground collision detection via dedicated ground detection area
+        _groundDetectionArea.BodyEntered += OnGroundCollision;
     }
 
     private void ConnectSignals()
@@ -101,15 +113,15 @@ public partial class Apple : Node2D
 
     private float GetCurrentPhaseTime()
     {
-        // Neutral and Gray phases last longer (transition phases)
-        return (_currentState == AppleState.Neutral || _currentState == AppleState.Gray) 
+        // GrayKnockable phase lasts longer (transition phase)
+        return (_currentState == AppleState.GrayKnockable) 
             ? NeutralPhaseTime 
             : TransitionTime;
     }
 
     private void SetInitialState()
     {
-        _currentState = AppleState.Red;
+        _currentState = AppleState.RedLife;
         if (RedAppleTexture != null)
         {
             _appleSprite.Texture = RedAppleTexture;
@@ -138,18 +150,27 @@ public partial class Apple : Node2D
 
     private void HandleAppleConsumption()
     {
-        // Only allow consumption during Red and Purple phases
-        if (_currentState != AppleState.Red && _currentState != AppleState.Purple)
+        Log.System($"HandleAppleConsumption called - state: {_currentState}, hasLanded: {_hasLanded}", "Apple");
+        
+        // Only allow consumption during RedLife and PurpleMana phases
+        if (_currentState != AppleState.RedLife && _currentState != AppleState.PurpleMana)
         {
             Log.UI("Apple is not collectible in current state", "Apple");
             return;
         }
+        
+        // Only allow pickup if apple has fallen and landed (prevent tree cheating)
+        if (!_hasLanded)
+        {
+            Log.UI("Cannot pickup apple from tree - must be knocked down first", "Apple");
+            return;
+        }
 
-        if (_currentState == AppleState.Red)
+        if (_currentState == AppleState.RedLife)
         {
             ConsumeRedApple(); // Red phase gives life
         }
-        else if (_currentState == AppleState.Purple)
+        else if (_currentState == AppleState.PurpleMana)
         {
             ConsumePurpleApple(); // Purple phase gives mana
         }
@@ -204,6 +225,7 @@ public partial class Apple : Node2D
     #region Color Transition
     private void OnTransitionTimeout()
     {
+        Log.System($"Apple transitioning from {_currentState} state", "Apple");
         TransitionColor();
     }
 
@@ -234,23 +256,38 @@ public partial class Apple : Node2D
 
     private void SwitchTexture()
     {
-        // Cycle through states: Red → Neutral → Purple → Gray → Red
-        _currentState = _currentState switch
+        // Different cycles based on whether apple has fallen or not
+        if (_isFalling || !_rigidBody.Freeze)
         {
-            AppleState.Red => AppleState.Neutral,
-            AppleState.Neutral => AppleState.Purple,
-            AppleState.Purple => AppleState.Gray,
-            AppleState.Gray => AppleState.Red,
-            _ => AppleState.Red
-        };
+            // Fallen apple cycle: RedLife → GrayNotCollectible → PurpleMana → RedLife
+            _currentState = _currentState switch
+            {
+                AppleState.RedLife => AppleState.GrayNotCollectible,
+                AppleState.GrayNotCollectible => AppleState.PurpleMana,
+                AppleState.PurpleMana => AppleState.RedLife,
+                AppleState.GrayKnockable => AppleState.GrayNotCollectible, // Transition from tree to fallen
+                _ => AppleState.RedLife
+            };
+        }
+        else
+        {
+            // Tree apple cycle: RedLife → GrayKnockable → PurpleMana → RedLife
+            _currentState = _currentState switch
+            {
+                AppleState.RedLife => AppleState.GrayKnockable,
+                AppleState.GrayKnockable => AppleState.PurpleMana,
+                AppleState.PurpleMana => AppleState.RedLife,
+                _ => AppleState.RedLife
+            };
+        }
         
         // Update texture based on current state
         Texture2D newTexture = _currentState switch
         {
-            AppleState.Red => RedAppleTexture,
-            AppleState.Neutral => NeutralAppleTexture,
-            AppleState.Purple => PurpleAppleTexture,
-            AppleState.Gray => NeutralAppleTexture, // Use neutral texture for gray phase
+            AppleState.RedLife => RedAppleTexture,
+            AppleState.GrayKnockable => NeutralAppleTexture,
+            AppleState.PurpleMana => PurpleAppleTexture,
+            AppleState.GrayNotCollectible => NeutralAppleTexture,
             _ => RedAppleTexture
         };
 
@@ -275,19 +312,19 @@ public partial class Apple : Node2D
         
         switch (_currentState)
         {
-            case AppleState.Red:
+            case AppleState.RedLife:
                 // Normal red apple appearance
                 break;
-            case AppleState.Neutral:
-                // Gray/neutral appearance - slightly desaturated
-                _appleSprite.Modulate = new Color(0.8f, 0.8f, 0.8f, 1.0f);
+            case AppleState.GrayKnockable:
+                // Gray appearance - slightly desaturated and knockable by rocks
+                _appleSprite.Modulate = new Color(0.7f, 0.7f, 0.7f, 1.0f);
                 break;
-            case AppleState.Purple:
+            case AppleState.PurpleMana:
                 // Normal purple apple appearance
                 break;
-            case AppleState.Gray:
-                // Darker gray appearance to distinguish from neutral
-                _appleSprite.Modulate = new Color(0.6f, 0.6f, 0.6f, 1.0f);
+            case AppleState.GrayNotCollectible:
+                // Darker gray appearance for fallen apples (not collectible)
+                _appleSprite.Modulate = new Color(0.5f, 0.5f, 0.5f, 1.0f);
                 break;
         }
     }
@@ -296,6 +333,8 @@ public partial class Apple : Node2D
     #region Player Detection
     private void OnPlayerEntered(Node2D body)
     {
+        Log.System($"OnPlayerEntered called - body: {body.Name}, is player group: {body.IsInGroup("player")}", "Apple");
+        
         if (body.IsInGroup("player"))
         {
             _playerNearby = true;
@@ -306,6 +345,8 @@ public partial class Apple : Node2D
 
     private void OnPlayerExited(Node2D body)
     {
+        Log.System($"OnPlayerExited called - body: {body.Name}, is player group: {body.IsInGroup("player")}", "Apple");
+        
         if (body.IsInGroup("player"))
         {
             _playerNearby = false;
@@ -317,14 +358,16 @@ public partial class Apple : Node2D
     private void OnProjectileImpact(Area2D area)
     {
         // Generic projectile impact detection - any Area2D on layer 8 is considered a projectile
+        Log.System($"OnProjectileImpact called - area: {area.Name}, layer: {area.CollisionLayer}, apple state: {_currentState}, falling: {_isFalling}", "Apple");
+        
         if (area.CollisionLayer == 8)
         {
             Log.System($"Projectile impact on apple in {_currentState} state", "Apple");
             
-            // Apple should fall when hit in Neutral state (gray color)
-            if (_currentState == AppleState.Neutral && !_isFalling)
+            // Apple should fall ONLY when hit in GrayKnockable state
+            if (_currentState == AppleState.GrayKnockable && !_isFalling)
             {
-                Log.System("Apple is in Neutral state (gray) - triggering fall", "Apple");
+                Log.System("Apple is in GrayKnockable state - triggering fall", "Apple");
                 MakeAppleFall();
             }
             else
@@ -332,12 +375,32 @@ public partial class Apple : Node2D
                 Log.System($"Apple not falling - state: {_currentState}, falling: {_isFalling}", "Apple");
             }
         }
+        else
+        {
+            Log.System($"Area layer {area.CollisionLayer} is not a projectile (expected layer 8)", "Apple");
+        }
+    }
+
+    private void OnGroundCollision(Node2D body)
+    {
+        // Check if apple hit the ground (StaticBody2D)
+        if (body is StaticBody2D && _isFalling && !_hasLanded)
+        {
+            Log.System("Apple hit ground - landing detected (deferred)", "Apple");
+            // Use CallDeferred to avoid physics state change during collision detection
+            CallDeferred(nameof(OnGroundLanding));
+        }
     }
 
     public void MakeAppleFall()
     {
-        if (_isFalling) return;
+        if (_isFalling) 
+        {
+            Log.System("MakeAppleFall called but apple is already falling", "Apple");
+            return;
+        }
         
+        Log.System("MakeAppleFall called - apple will fall", "Apple");
         _isFalling = true;
         
         // Use call_deferred to change physics properties safely during collision detection
@@ -348,17 +411,19 @@ public partial class Apple : Node2D
     
     private void DeferredMakeAppleFall()
     {
-        // Unfreeze the rigidbody and enable gravity to make it fall
+        Log.System($"DeferredMakeAppleFall called - Before: Freeze={_rigidBody.Freeze}, GravityScale={_rigidBody.GravityScale}", "Apple");
+        
+        // Ensure the RigidBody2D can move and respond to physics
         _rigidBody.Freeze = false; // Unfreeze to allow physics
         _rigidBody.GravityScale = 1.0f; // Enable gravity
         
-        // Stop the color transition timer since apple is now falling
-        if (_transitionTimer != null)
-        {
-            _transitionTimer.Stop();
-        }
+        Log.System($"DeferredMakeAppleFall - After: Freeze={_rigidBody.Freeze}, GravityScale={_rigidBody.GravityScale}", "Apple");
         
-        Log.System("Apple is now falling due to projectile hit", "Apple");
+        // Change state to GrayNotCollectible when apple falls
+        _currentState = AppleState.GrayNotCollectible;
+        ApplyStateVisualEffects();
+        
+        Log.System("Apple is now falling with physics enabled - will disable when hitting ground", "Apple");
         
         // Add some impulse for more dramatic effect
         Vector2 randomImpulse = new Vector2(
@@ -366,31 +431,61 @@ public partial class Apple : Node2D
             (float)GD.RandRange(-20, 0)
         );
         _rigidBody.ApplyImpulse(randomImpulse);
+        
+        Log.System($"Applied impulse: {randomImpulse}", "Apple");
+    }
+
+    public void OnGroundLanding()
+    {
+        Log.System("Apple has landed on ground - disabling physics and collisions", "Apple");
+        
+        _hasLanded = true;
+        
+        // Disable RigidBody2D physics
+        _rigidBody.GravityScale = 0.0f;
+        _rigidBody.LinearVelocity = Vector2.Zero;
+        _rigidBody.AngularVelocity = 0.0f;
+        _rigidBody.Freeze = true;
+        
+        // Disable physical collision with player (keep only detection area)
+        var physicsCollision = _rigidBody.GetNodeOrNull<CollisionShape2D>("PhysicsCollision");
+        if (physicsCollision != null)
+        {
+            physicsCollision.Disabled = true;
+        }
+        
+        Log.System("Apple is now settled on ground - physics disabled, detection area active", "Apple");
     }
 
     private void UpdatePromptDisplay()
     {
+        Log.System($"UpdatePromptDisplay called - playerNearby: {_playerNearby}, state: {_currentState}, hasLanded: {_hasLanded}", "Apple");
+        
         if (!_playerNearby)
         {
             _promptLabel.Hide();
             return;
         }
 
-        // Show prompts for red and purple states (collectible phases)
-        if (_currentState == AppleState.Red || _currentState == AppleState.Purple)
+        // Only show prompts for red and purple states
+        bool isCollectibleState = (_currentState == AppleState.RedLife || _currentState == AppleState.PurpleMana);
+        
+        if (isCollectibleState)
         {
             string promptText = _currentState switch
             {
-                AppleState.Red => "Press E (Life)",
-                AppleState.Purple => "Press E (Mana)",
+                AppleState.RedLife => "Press E (Life)",
+                AppleState.PurpleMana => "Press E (Mana)",
                 _ => "Press E"
             };
             _promptLabel.Text = promptText;
             _promptLabel.Show();
+            Log.System($"Showing prompt: {promptText}", "Apple");
         }
         else
         {
             _promptLabel.Hide();
+            Log.System($"Hiding prompt - not collectible state: {_currentState}", "Apple");
         }
     }
     #endregion
@@ -399,7 +494,7 @@ public partial class Apple : Node2D
     public void SetTransitionTime(float time)
     {
         TransitionTime = time;
-        if (_transitionTimer != null && (_currentState == AppleState.Red || _currentState == AppleState.Purple))
+        if (_transitionTimer != null && (_currentState == AppleState.RedLife || _currentState == AppleState.PurpleMana))
         {
             _transitionTimer.WaitTime = time;
         }
@@ -408,21 +503,21 @@ public partial class Apple : Node2D
     public void SetNeutralPhaseTime(float time)
     {
         NeutralPhaseTime = time;
-        if (_transitionTimer != null && (_currentState == AppleState.Neutral || _currentState == AppleState.Gray))
+        if (_transitionTimer != null && (_currentState == AppleState.GrayKnockable))
         {
             _transitionTimer.WaitTime = time;
         }
     }
 
-    public bool IsCollectible() => _currentState == AppleState.Red || _currentState == AppleState.Purple;
+    public bool IsCollectible() => _currentState == AppleState.RedLife || _currentState == AppleState.PurpleMana;
     
     public AppleState GetCurrentState() => _currentState;
     
-    public bool IsInLifePhase() => _currentState == AppleState.Red || _currentState == AppleState.Neutral;
+    public bool IsInLifePhase() => _currentState == AppleState.RedLife;
     
-    public bool IsInManaPhase() => _currentState == AppleState.Purple || _currentState == AppleState.Gray;
+    public bool IsInManaPhase() => _currentState == AppleState.PurpleMana;
     
-    public bool CanFallFromRockHit() => _currentState == AppleState.Gray && !_isFalling;
+    public bool CanFallFromRockHit() => _currentState == AppleState.GrayKnockable && !_isFalling;
     
     public bool IsFalling() => _isFalling;
     #endregion

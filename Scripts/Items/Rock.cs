@@ -156,6 +156,12 @@ public partial class Rock : Node2D
         // Rock hit something with an Area2D (like an apple)
         Log.System($"Rock's area hit another area: {area.Name} on layer {area.CollisionLayer}, mask {area.CollisionMask}", "Rock");
         
+        // Check if this is an apple's rock detection area
+        if (area.CollisionLayer == 4)
+        {
+            Log.System("Rock confirmed hit apple detection area", "Rock");
+        }
+        
         // Stop movement and disappear
         _isMoving = false;
         CreateImpactEffect();
