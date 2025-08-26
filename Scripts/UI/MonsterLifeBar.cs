@@ -133,21 +133,8 @@ public partial class MonsterLifeBar : Control
         {
             UpdatePosition();
             
-            // Only sync visibility if the monster is explicitly hidden (not just in certain states)
-            if (_monster.Visible && !Visible)
-            {
-                #if DEBUG
-                Log.Debug($"MonsterLifeBar showing - Monster is visible", "MonsterLifeBarUI");
-                #endif
-                Visible = true;
-            }
-            else if (!_monster.Visible && Visible)
-            {
-                #if DEBUG
-                Log.Debug($"MonsterLifeBar hiding - Monster is hidden", "MonsterLifeBarUI");
-                #endif
-                Visible = false;
-            }
+            // Don't automatically control visibility - let the Monster class handle it
+            // The Monster class calls Show() and Hide() explicitly based on its state
         }
     }
 

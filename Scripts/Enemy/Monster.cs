@@ -13,6 +13,7 @@ public partial class Monster : CharacterBody2D
     [Export] public bool EnableFollowerBehavior { get; set; } = false;
     [Export] public float FollowDistance { get; set; } = 150.0f;
     [Export] public float MinSpawnDistance { get; set; } = 200.0f;
+    [Export] public float MinimumFollowDistance { get; set; } = 80.0f;
     [Export] public float WalkSpeed { get; set; } = 40.0f;
     [Export] public float InitialWaitTime { get; set; } = 7.0f;
     [Export] public float MinVisibleTime { get; set; } = 30.0f;
@@ -374,10 +375,19 @@ public partial class Monster : CharacterBody2D
         _isVisible = true;
         _isFullyVisible = false;
 
+        // Hide life bar before repositioning to prevent showing at old position
+        if (_monsterLifeBar != null)
+        {
+            _monsterLifeBar.Hide();
+        }
+
         PositionBehindPlayerOnGround();
         SetCollisionMask(1u);
         SetCollisionLayer(1u);
         FacePlayer();
+
+        // Ensure life bar position is updated after repositioning
+        UpdateLifeBarPosition();
 
         if (_spriteNode != null)
         {
@@ -418,7 +428,23 @@ public partial class Monster : CharacterBody2D
         if (_currentState == MonsterState.InitialWait)
             StartFirstTransition();
         else if (_currentState == MonsterState.Following)
+        {
+            // Check if monster is close enough to player to avoid hiding
+            if (_player != null)
+            {
+                float distanceToPlayer = GlobalPosition.DistanceTo(_player.GlobalPosition);
+                if (distanceToPlayer <= MinimumFollowDistance)
+                {
+                    // Monster is too close to player, continue following instead of hiding
+                    float extendedVisibleTime = GD.Randf() * (MaxVisibleTime - MinVisibleTime) + MinVisibleTime;
+                    _stateTimer.WaitTime = extendedVisibleTime;
+                    _stateTimer.Start();
+                    Log.Debug($"Monster too close to player ({distanceToPlayer:F1} <= {MinimumFollowDistance}), extending follow time", "Monster");
+                    return;
+                }
+            }
             StartHiding();
+        }
         else
             StartFollowing();
     }
@@ -434,10 +460,19 @@ public partial class Monster : CharacterBody2D
 
         GetTree().CreateTimer(0.5f).Timeout += () =>
         {
+            // Hide life bar before repositioning
+            if (_monsterLifeBar != null)
+            {
+                _monsterLifeBar.Hide();
+            }
+
             PositionBehindPlayerOnGround();
             SetCollisionMask(1u);
             SetCollisionLayer(1u);
             FacePlayer();
+
+            // Ensure life bar position is updated after repositioning
+            UpdateLifeBarPosition();
 
             if (_spriteNode != null)
             {
@@ -492,18 +527,38 @@ public partial class Monster : CharacterBody2D
     {
         if (_monsterLifeBar != null && _monsterLifeBar.FollowMonster)
         {
-            // Force the life bar to update its position to match the monster's new position
-            var camera = GetViewport().GetCamera2D();
-            if (camera != null)
-            {
-                Vector2 screenPos = camera.GetScreenCenterPosition() + (GlobalPosition - camera.GlobalPosition) * camera.Zoom;
-                _monsterLifeBar.GlobalPosition = screenPos + _monsterLifeBar.OffsetFromMonster;
-            }
-            else
-            {
-                _monsterLifeBar.GlobalPosition = GlobalPosition + _monsterLifeBar.OffsetFromMonster;
-            }
+            // Wait one frame to ensure monster position is fully updated
+            CallDeferred(nameof(DoUpdateLifeBarPosition));
         }
+    }
+
+    private void DoUpdateLifeBarPosition()
+    {
+        if (_monsterLifeBar == null || !_monsterLifeBar.FollowMonster) return;
+
+        // Skip position updates when life bar is hidden to avoid unnecessary calculations
+        if (!_monsterLifeBar.Visible) return;
+
+        DoUpdateLifeBarPositionForced();
+    }
+
+    private void DoUpdateLifeBarPositionForced()
+    {
+        if (_monsterLifeBar == null || !_monsterLifeBar.FollowMonster) return;
+
+        // Direct position calculation 
+        var camera = GetViewport().GetCamera2D();
+        if (camera != null)
+        {
+            Vector2 screenPos = camera.GetScreenCenterPosition() + (GlobalPosition - camera.GlobalPosition) * camera.Zoom;
+            _monsterLifeBar.GlobalPosition = screenPos + _monsterLifeBar.OffsetFromMonster;
+        }
+        else
+        {
+            _monsterLifeBar.GlobalPosition = GlobalPosition + _monsterLifeBar.OffsetFromMonster;
+        }
+        
+        Log.Debug($"Life bar position updated to: {_monsterLifeBar.GlobalPosition} (Monster at: {GlobalPosition})", "Monster");
     }
     #endregion
 
@@ -517,17 +572,23 @@ public partial class Monster : CharacterBody2D
         _spriteNode.Visible = true;
         _spriteNode.Modulate = new Color(1, 1, 1, 0);
 
-        // Show MonsterLifeBar when fading in
-        if (_monsterLifeBar != null)
-        {
-            _monsterLifeBar.Show();
-        }
-
         _currentTween = CreateTween();
         _currentTween.TweenProperty(_spriteNode, "modulate:a", 1.0f, 0.5f);
         _currentTween.TweenCallback(Callable.From(() =>
         {
             _isFullyVisible = true;
+            
+            // Delay showing life bar slightly to ensure position is correct
+            GetTree().CreateTimer(0.1f).Timeout += () =>
+            {
+                if (_monsterLifeBar != null)
+                {
+                    // Update position right before showing the life bar
+                    DoUpdateLifeBarPositionForced(); // Force position update even when hidden
+                    _monsterLifeBar.Show();
+                }
+            };
+            
             Log.Debug("Monster fade in complete - fully visible", "Monster");
         }));
     }
@@ -553,6 +614,7 @@ public partial class Monster : CharacterBody2D
         _currentTween.TweenCallback(Callable.From(() =>
         {
             _spriteNode.Visible = false;
+            // Life bar is already hidden, no need to update position when not visible
             Log.Debug("Monster fade out complete - fully hidden", "Monster");
         }));
     }
