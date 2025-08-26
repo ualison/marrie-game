@@ -290,6 +290,7 @@ public partial class RockThrower : Node2D
         {
             rock.SetTrajectory(_currentGlobalTrajectory);
             Log.System($"Rock projectile created with {_currentGlobalTrajectory.Length} trajectory points and velocity {RockVelocity}", "RockThrower");
+            _currentGlobalTrajectory = null; // Clear trajectory after successful use
         }
         else
         {
@@ -303,7 +304,7 @@ public partial class RockThrower : Node2D
         _isDrawingTrajectory = false;
         _trajectoryLine.Hide();
         _trajectoryLine.ClearPoints();
-        _currentGlobalTrajectory = null; // Clear stored trajectory
+        // Don't clear trajectory here - let CreateRockProjectile clear it after use
     }
 
     private void CancelTrajectory()

@@ -315,7 +315,23 @@ public partial class GhostPlayer : CharacterBody2D
         }
         else
         {
-            Log.Warning("Cannot apply flip - _activeSprite is null", "GhostPlayer");
+            // Try to rediscover sprites if they're null - this might happen during initialization
+            DiscoverSpriteComponents();
+            if (_activeSprite == null)
+            {
+                Log.Warning("Cannot apply flip - _activeSprite is null even after rediscovery", "GhostPlayer");
+                return; // Skip this frame if sprite is still not available
+            }
+            
+            // Retry the flip operation now that we have a sprite
+            var currentScale = _activeSprite.Scale;
+            var newScaleX = frame.SpriteFlip ? -Mathf.Abs(currentScale.X) : Mathf.Abs(currentScale.X);
+            _activeSprite.Scale = new Vector2(newScaleX, currentScale.Y);
+            
+            if (_animatedSprite != null)
+            {
+                _animatedSprite.FlipH = frame.SpriteFlip;
+            }
         }
 
         // Apply visibility state

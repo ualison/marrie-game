@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=19 format=3 uid="uid://bnv528gs1hngu"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
@@ -15,6 +15,7 @@
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
 [ext_resource type="Script" uid="uid://cf5q88b7yl5la" path="res://Scripts/Systems/ReplaySystemManager.cs" id="14_r6l07"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
+[ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="18_j8t0e"]
 [ext_resource type="PackedScene" uid="uid://bjv4m5whn2djf" path="res://Prefabs/UI/Message.tscn" id="18_tnm7e"]
 [ext_resource type="PackedScene" uid="uid://dxvamghbt08mr" path="res://Prefabs/UI/ScreenElements.tscn" id="19_screen"]
 
@@ -53,6 +54,14 @@ z_index = 5
 position = Vector2(570, -145)
 scale = Vector2(0.693148, 0.60584)
 texture = ExtResource("7_wjun0")
+
+[node name="Items" type="Node2D" parent="Environment"]
+
+[node name="Rock" parent="Environment/Items" instance=ExtResource("18_j8t0e")]
+position = Vector2(-190, 235)
+
+[node name="Rock2" parent="Environment/Items" instance=ExtResource("18_j8t0e")]
+position = Vector2(464, 227)
 
 [node name="UserInterface" type="CanvasLayer" parent="."]
 follow_viewport_enabled = true
