@@ -1,9 +1,9 @@
 namespace MarrieGame.Core.Enums
 {
     /// <summary>
-    /// Defines the reality state of monsters, affecting which type of damage they take from rocks
+    /// Defines the reality state, affecting which type of damage entities take from rocks
     /// </summary>
-    public enum MonsterReality
+    public enum Reality
     {
         /// <summary>
         /// Current reality - rock damage affects red hearts only
@@ -11,9 +11,9 @@ namespace MarrieGame.Core.Enums
         CurrentReality,
         
         /// <summary>
-        /// Purple gem reality - rock damage affects purple hearts only
+        /// Past reality - rock damage affects purple hearts only
         /// Monster dies when all purple hearts are lost
         /// </summary>
-        PurpleGemReality
+        PastReality
     }
 }

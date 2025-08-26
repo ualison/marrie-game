@@ -125,6 +125,17 @@ public partial class ReplayGem : Node2D
 
         Log.Replay("Consumed 1 mana for replay activation", "ReplayGem");
         
+        // Change reality to PastReality when starting replay
+        if (RealityManager.Instance != null)
+        {
+            RealityManager.Instance.StartReplay();
+            Log.Replay("Reality changed to PastReality for replay", "ReplayGem");
+        }
+        else
+        {
+            Log.Warning("RealityManager.Instance is null - cannot change reality", "ReplayGem");
+        }
+        
         // Get death record and start replay through orchestrator
         var deathRecord = GetDeathRecord();
         if (deathRecord == null) 
@@ -319,6 +330,17 @@ public partial class ReplayGem : Node2D
         {
             _gemSprite.Show();
             StartFloatingAnimation();
+        }
+        
+        // End replay in RealityManager to return to CurrentReality
+        if (RealityManager.Instance != null)
+        {
+            RealityManager.Instance.EndReplay();
+            Log.Replay("Reality changed back to CurrentReality after replay", "ReplayGem");
+        }
+        else
+        {
+            Log.Warning("RealityManager.Instance is null - cannot reset reality after replay", "ReplayGem");
         }
     }
     #endregion

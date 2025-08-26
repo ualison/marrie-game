@@ -7,13 +7,13 @@ public partial class Monster : CharacterBody2D
     #region Exported Properties
     [Export] public int DamageAmount { get; set; } = 1;
     [Export] public bool ShowForTesting { get; set; } = true;
-    [Export] public MonsterReality CurrentReality { get; set; } = MonsterReality.CurrentReality;
+    // Note: Reality is now managed globally by RealityManager, not per-monster
     
     // Follower behavior properties
     [Export] public bool EnableFollowerBehavior { get; set; } = false;
-    [Export] public float FollowDistance { get; set; } = 150.0f;
-    [Export] public float MinSpawnDistance { get; set; } = 200.0f;
-    [Export] public float MinimumFollowDistance { get; set; } = 80.0f;
+    [Export] public float FollowDistance { get; set; } = 150.0f; // Target distance to maintain behind player
+    [Export] public float MinSpawnDistance { get; set; } = 200.0f; // Initial spawn distance from player
+    [Export] public float MinimumFollowDistance { get; set; } = 80.0f; // Don't move if closer than this to player
     [Export] public float WalkSpeed { get; set; } = 40.0f;
     [Export] public float InitialWaitTime { get; set; } = 7.0f;
     [Export] public float MinVisibleTime { get; set; } = 30.0f;
@@ -25,8 +25,8 @@ public partial class Monster : CharacterBody2D
     #endregion
 
     #region Follower State (only used when EnableFollowerBehavior = true)
-    public enum MonsterState { Following, Hidden, InitialWait }
-    private MonsterState _currentState = MonsterState.InitialWait;
+    private MonsterState _currentState = MonsterState.Hidden;
+    private bool _isTransitioning = false; // Track if currently fading in/out
     private bool _isVisible = false;
     private bool _isFullyVisible = false;
     private bool _shouldSpawnOnRight = false;
@@ -171,6 +171,10 @@ public partial class Monster : CharacterBody2D
         _damageArea = new Area2D { Name = "DamageArea" };
         AddChild(_damageArea);
 
+        // Set collision layers/masks to only detect players (layer 1)
+        _damageArea.CollisionLayer = 0; // Don't collide with anything as a layer
+        _damageArea.CollisionMask = 1; // Only detect objects on layer 1 (players)
+
         var shape = new CollisionShape2D();
         shape.Shape = new CircleShape2D { Radius = 25.0f };
         _damageArea.AddChild(shape);
@@ -260,7 +264,7 @@ public partial class Monster : CharacterBody2D
         }
         
         _stateTimer.Stop();
-        _currentState = MonsterState.Following;
+        _currentState = MonsterState.Visible;
         _isVisible = true;
         _isFullyVisible = true;
         
@@ -274,7 +278,8 @@ public partial class Monster : CharacterBody2D
         {
             if (!IsDisabledForReplay)
             {
-                StartFollowing();
+                _currentState = MonsterState.Visible;
+                StartVisibleBehavior();
             }
         };
         
@@ -288,10 +293,11 @@ public partial class Monster : CharacterBody2D
         
         if (_player?.GetLifeSystem()?.IsDead != false) return;
 
-        if (_currentState == MonsterState.Following)
-        {
-            ApplyGravity(delta);
+        // Always apply gravity and physics when monster exists
+        ApplyGravity(delta);
 
+        if (_currentState == MonsterState.Visible)
+        {
             if (_isFullyVisible)
             {
                 UpdateMovement();
@@ -300,9 +306,14 @@ public partial class Monster : CharacterBody2D
             {
                 Velocity = new Vector2(0, Velocity.Y);
             }
-
-            MoveAndSlide();
         }
+        else // MonsterState.Hidden
+        {
+            // Don't move horizontally when hidden, but still fall with gravity
+            Velocity = new Vector2(0, Velocity.Y);
+        }
+
+        MoveAndSlide();
     }
 
     private void ApplyGravity(double delta)
@@ -313,10 +324,22 @@ public partial class Monster : CharacterBody2D
 
     private void UpdateMovement()
     {
+        if (_player == null) return;
+        
+        float distanceToPlayer = GlobalPosition.DistanceTo(_player.GlobalPosition);
+        
+        // If too close to player, don't move toward them
+        if (distanceToPlayer <= MinimumFollowDistance)
+        {
+            Velocity = new Vector2(0, Velocity.Y);
+            return;
+        }
+        
+        // Normal following behavior - maintain FollowDistance behind player
         Vector2 targetPos = _player.GlobalPosition - new Vector2(FollowDistance, 0);
-        float distance = GlobalPosition.DistanceTo(targetPos);
+        float distanceToTarget = GlobalPosition.DistanceTo(targetPos);
 
-        if (distance > 10.0f)
+        if (distanceToTarget > 10.0f)
         {
             Vector2 direction = (targetPos - GlobalPosition).Normalized();
             Velocity = new Vector2(direction.X * WalkSpeed, Velocity.Y);
@@ -324,6 +347,7 @@ public partial class Monster : CharacterBody2D
         }
         else
         {
+            // Stop moving horizontally but keep current velocity for smoother stopping
             Velocity = new Vector2(0, Velocity.Y);
         }
     }
@@ -334,16 +358,24 @@ public partial class Monster : CharacterBody2D
 
         bool shouldFaceLeft = _player.GlobalPosition.X > GlobalPosition.X;
         var scale = _spriteNode.Scale;
-        _spriteNode.Scale = new Vector2(shouldFaceLeft ? -Mathf.Abs(scale.X) : Mathf.Abs(scale.X), scale.Y);
+        
+        // Only update scale if direction actually changed to avoid unnecessary updates
+        bool currentlyFacingLeft = scale.X < 0;
+        if (currentlyFacingLeft != shouldFaceLeft)
+        {
+            _spriteNode.Scale = new Vector2(shouldFaceLeft ? -Mathf.Abs(scale.X) : Mathf.Abs(scale.X), scale.Y);
+        }
     }
     #endregion
 
     #region State Management
     private void StartInitialWait()
     {
-        _currentState = MonsterState.InitialWait;
+        // Initial wait is now just a visible state with no movement
+        _currentState = MonsterState.Visible;
         _isVisible = true;
         _isFullyVisible = true;
+        _isTransitioning = false;
 
         GlobalPosition = _initialPosition;
         Velocity = Vector2.Zero;
@@ -354,14 +386,15 @@ public partial class Monster : CharacterBody2D
             _spriteNode.Modulate = Colors.White;
         }
 
-        // Show MonsterLifeBar during initial wait
+        // Show MonsterLifeBar when visible
         if (_monsterLifeBar != null)
         {
             _monsterLifeBar.Show();
         }
 
-        SetCollisionMask(0u);
-        SetCollisionLayer(0u);
+        // Always keep ground collision enabled (layer 0), disable player collision during initial wait
+        SetCollisionMask(1u); // Bit 0 = ground collision
+        SetCollisionLayer(2u); // Put monster on layer 2 to avoid player collision during wait
 
         FacePlayer();
 
@@ -369,11 +402,12 @@ public partial class Monster : CharacterBody2D
         _stateTimer.Start();
     }
 
-    private void StartFollowing()
+    private void StartVisibleBehavior()
     {
-        _currentState = MonsterState.Following;
+        _currentState = MonsterState.Visible;
         _isVisible = true;
         _isFullyVisible = false;
+        _isTransitioning = true;
 
         // Hide life bar before repositioning to prevent showing at old position
         if (_monsterLifeBar != null)
@@ -409,11 +443,12 @@ public partial class Monster : CharacterBody2D
         FadeIn();
     }
 
-    private void StartHiding()
+    private void StartHiddenBehavior()
     {
         _currentState = MonsterState.Hidden;
         _isVisible = false;
         _isFullyVisible = false;
+        _isTransitioning = true;
 
         FadeOut();
         PlayAudio(false);
@@ -425,67 +460,49 @@ public partial class Monster : CharacterBody2D
 
     private void SwitchState()
     {
-        if (_currentState == MonsterState.InitialWait)
-            StartFirstTransition();
-        else if (_currentState == MonsterState.Following)
+        // Check if this is the first state switch from initial visible state
+        if (_stateTimer.WaitTime == InitialWaitTime && _currentState == MonsterState.Visible)
         {
-            // Check if monster is close enough to player to avoid hiding
+            StartFirstTransition();
+            return;
+        }
+        
+        if (_currentState == MonsterState.Visible)
+        {
+            // Don't hide if monster is too close to player - extend visible time instead
             if (_player != null)
             {
                 float distanceToPlayer = GlobalPosition.DistanceTo(_player.GlobalPosition);
                 if (distanceToPlayer <= MinimumFollowDistance)
                 {
-                    // Monster is too close to player, continue following instead of hiding
+                    // Monster is too close to player, extend visible time instead of hiding
                     float extendedVisibleTime = GD.Randf() * (MaxVisibleTime - MinVisibleTime) + MinVisibleTime;
                     _stateTimer.WaitTime = extendedVisibleTime;
                     _stateTimer.Start();
-                    Log.Debug($"Monster too close to player ({distanceToPlayer:F1} <= {MinimumFollowDistance}), extending follow time", "Monster");
+                    Log.Debug($"Monster too close to player ({distanceToPlayer:F1} <= {MinimumFollowDistance}), extending visible time", "Monster");
                     return;
                 }
             }
-            StartHiding();
+            StartHiddenBehavior();
         }
-        else
-            StartFollowing();
+        else // MonsterState.Hidden
+        {
+            StartVisibleBehavior();
+        }
     }
 
     private void StartFirstTransition()
     {
-        _currentState = MonsterState.Following;
-        _isVisible = false;
-        _isFullyVisible = false;
-
-        FadeOut();
-        PlayAudio(false);
-
+        // First transition: go from initial visible state to hidden, then visible again
+        StartHiddenBehavior();
+        
+        // After a short delay, reposition and become visible
         GetTree().CreateTimer(0.5f).Timeout += () =>
         {
-            // Hide life bar before repositioning
-            if (_monsterLifeBar != null)
+            if (_currentState == MonsterState.Hidden)
             {
-                _monsterLifeBar.Hide();
+                StartVisibleBehavior();
             }
-
-            PositionBehindPlayerOnGround();
-            SetCollisionMask(1u);
-            SetCollisionLayer(1u);
-            FacePlayer();
-
-            // Ensure life bar position is updated after repositioning
-            UpdateLifeBarPosition();
-
-            if (_spriteNode != null)
-            {
-                _spriteNode.Visible = true;
-                _spriteNode.Modulate = new Color(1, 1, 1, 0);
-            }
-
-            CallDeferred(nameof(DelayedFadeIn));
-            PlayAudio(true);
-
-            float visibleTime = GD.Randf() * (MaxVisibleTime - MinVisibleTime) + MinVisibleTime;
-            _stateTimer.WaitTime = visibleTime;
-            _stateTimer.Start();
         };
     }
 
@@ -503,7 +520,8 @@ public partial class Monster : CharacterBody2D
         if (_player == null) return;
 
         Vector2 currentPlayerPos = _player.GlobalPosition;
-        float spawnDistance = _currentState == MonsterState.InitialWait ? MinSpawnDistance : FollowDistance;
+        // Use MinSpawnDistance for initial positioning, FollowDistance for regular following
+        float spawnDistance = (_stateTimer.WaitTime == InitialWaitTime) ? MinSpawnDistance : FollowDistance;
         float safeDistance = Mathf.Max(spawnDistance, 80.0f);
 
         _shouldSpawnOnRight = GD.Randf() > 0.5f;
@@ -558,7 +576,8 @@ public partial class Monster : CharacterBody2D
             _monsterLifeBar.GlobalPosition = GlobalPosition + _monsterLifeBar.OffsetFromMonster;
         }
         
-        Log.Debug($"Life bar position updated to: {_monsterLifeBar.GlobalPosition} (Monster at: {GlobalPosition})", "Monster");
+        // Remove frequent debug logging that can cause performance issues
+        // Log.Debug($"Life bar position updated to: {_monsterLifeBar.GlobalPosition} (Monster at: {GlobalPosition})", "Monster");
     }
     #endregion
 
@@ -577,6 +596,7 @@ public partial class Monster : CharacterBody2D
         _currentTween.TweenCallback(Callable.From(() =>
         {
             _isFullyVisible = true;
+            _isTransitioning = false; // No longer transitioning
             
             // Delay showing life bar slightly to ensure position is correct
             GetTree().CreateTimer(0.1f).Timeout += () =>
@@ -599,8 +619,9 @@ public partial class Monster : CharacterBody2D
 
         _currentTween?.Kill();
 
-        SetCollisionMask(0u);
-        SetCollisionLayer(0u);
+        // Keep ground collision but disable player interactions when hidden
+        SetCollisionMask(1u); // Keep ground collision (bit 0)
+        SetCollisionLayer(2u); // Move to layer 2 to avoid player interactions
         _isFullyVisible = false;
 
         // Hide MonsterLifeBar when fading out
@@ -614,6 +635,7 @@ public partial class Monster : CharacterBody2D
         _currentTween.TweenCallback(Callable.From(() =>
         {
             _spriteNode.Visible = false;
+            _isTransitioning = false; // No longer transitioning
             // Life bar is already hidden, no need to update position when not visible
             Log.Debug("Monster fade out complete - fully hidden", "Monster");
         }));
@@ -622,7 +644,8 @@ public partial class Monster : CharacterBody2D
     public void PlayDamageEffect()
     {
         // Default damage effect - determine color based on current reality
-        Color effectColor = CurrentReality == MonsterReality.CurrentReality ? Colors.Red : Colors.Purple;
+        Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        Color effectColor = currentReality == Reality.CurrentReality ? Colors.Red : Colors.Purple;
         PlayDamageEffect(effectColor);
     }
 
@@ -651,19 +674,21 @@ public partial class Monster : CharacterBody2D
     public new bool IsVisible() => EnableFollowerBehavior ? _isVisible : Visible;
     public bool IsFullyVisible() => EnableFollowerBehavior ? _isFullyVisible : true;
     public MonsterState GetState() => _currentState;
-    public void ForceHide() { if (EnableFollowerBehavior) { _stateTimer.Stop(); StartHiding(); } }
-    public void ForceShow() { if (EnableFollowerBehavior) { _stateTimer.Stop(); StartFollowing(); } }
+    public void ForceHide() { if (EnableFollowerBehavior) { _stateTimer.Stop(); StartHiddenBehavior(); } }
+    public void ForceShow() { if (EnableFollowerBehavior) { _stateTimer.Stop(); StartVisibleBehavior(); } }
 
     public bool CanTakeDamage() 
     {
-        bool result = EnableFollowerBehavior ? (_isFullyVisible && (_currentState == MonsterState.Following || _currentState == MonsterState.InitialWait)) : true;
-        Log.Debug($"CanTakeDamage - EnableFollowerBehavior: {EnableFollowerBehavior}, IsFullyVisible: {_isFullyVisible}, CurrentState: {_currentState}, Result: {result}", "Monster");
+        // Simplified: can take damage only when visible and not transitioning
+        bool result = EnableFollowerBehavior ? (_currentState == MonsterState.Visible && !_isTransitioning) : true;
+        // Remove frequent debug logging that can cause performance issues
+        // Log.Debug($"CanTakeDamage - EnableFollowerBehavior: {EnableFollowerBehavior}, CurrentState: {_currentState}, IsTransitioning: {_isTransitioning}, Result: {result}", "Monster");
         return result;
     }
 
     public MonsterLife GetLifeSystem() => _monsterLife;
 
-    public MonsterReality GetCurrentReality() => CurrentReality;
+    public Reality GetCurrentReality() => RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
 
     public bool TakePhysicalDamage(int damage = 1)
     {
@@ -696,7 +721,8 @@ public partial class Monster : CharacterBody2D
     public bool TakeRockDamage(int damage = 1)
     {
         // Rock damage based on current reality
-        Log.Debug($"TakeRockDamage called - CanTakeDamage: {CanTakeDamage()}, MonsterLife: {_monsterLife != null}, CurrentReality: {CurrentReality}", "Monster");
+        Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        Log.Debug($"TakeRockDamage called - CanTakeDamage: {CanTakeDamage()}, MonsterLife: {_monsterLife != null}, CurrentReality: {currentReality}", "Monster");
         
         if (!CanTakeDamage() || _monsterLife == null) 
         {
@@ -706,9 +732,9 @@ public partial class Monster : CharacterBody2D
         
         bool damaged = false;
         
-        switch (CurrentReality)
+        switch (currentReality)
         {
-            case MonsterReality.CurrentReality:
+            case Reality.CurrentReality:
                 // In current reality, rocks damage red hearts only
                 Log.Debug($"Attempting physical damage - CurrentRedHearts: {_monsterLife.CurrentRedHearts}", "Monster");
                 damaged = _monsterLife.TakePhysicalDamage(damage);
@@ -722,8 +748,8 @@ public partial class Monster : CharacterBody2D
                 }
                 break;
                 
-            case MonsterReality.PurpleGemReality:
-                // In purple gem reality, rocks damage purple hearts only
+            case Reality.PastReality:
+                // In past reality, rocks damage purple hearts only
                 damaged = _monsterLife.TakePurpleHeartDamage(damage);
                 if (damaged)
                 {
@@ -746,18 +772,18 @@ public partial class Monster : CharacterBody2D
         if (damaged)
         {
             // Use appropriate color based on which reality and what type of damage was dealt
-            Color damageColor = CurrentReality == MonsterReality.CurrentReality ? Colors.Red : Colors.Purple;
+            Color damageColor = currentReality == Reality.CurrentReality ? Colors.Red : Colors.Purple;
             PlayDamageEffect(damageColor);
-            Log.Debug($"Monster took {damage} rock damage in {CurrentReality} reality", "Monster");
+            Log.Debug($"Monster took {damage} rock damage in {currentReality} reality", "Monster");
         }
         
         return damaged;
     }
 
-    public void SetReality(MonsterReality reality)
+    public void SetReality(Reality reality)
     {
-        CurrentReality = reality;
-        Log.Debug($"Monster reality changed to {reality}", "Monster");
+        // Reality is now managed globally - this method is deprecated
+        Log.Warning($"SetReality called on monster - reality should be managed globally by RealityManager", "Monster");
     }
 
     public void Reset()
@@ -770,9 +796,10 @@ public partial class Monster : CharacterBody2D
         GlobalPosition = _initialPosition;
         Velocity = Vector2.Zero;
 
-        _currentState = MonsterState.InitialWait;
+        _currentState = MonsterState.Visible;
         _isVisible = true;
         _isFullyVisible = true;
+        _isTransitioning = false;
 
         if (_spriteNode != null)
         {
@@ -786,8 +813,9 @@ public partial class Monster : CharacterBody2D
             _monsterLifeBar.Show();
         }
 
-        SetCollisionMask(0u);
-        SetCollisionLayer(0u);
+        // Keep ground collision during reset
+        SetCollisionMask(1u); // Ground collision
+        SetCollisionLayer(2u); // Layer 2 during reset
 
         // Reset MonsterLife
         _monsterLife?.Reset();
@@ -803,9 +831,15 @@ public partial class Monster : CharacterBody2D
 
     private void OnPlayerEntered(Node2D body)
     {
-        Log.Debug($"Monster {Name} collision with {body.Name} - IsGhost: {body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster")}", "Monster");
+        // Only process player collisions - ignore ground and other objects
+        if (body is not Player player)
+        {
+            return; // Don't log non-player collisions to reduce spam
+        }
 
-        if (body is Player player && !player.GetLifeSystem()?.IsDead == true)
+        Log.Debug($"Monster {Name} collision with Player {body.Name} - IsGhost: {body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster")}", "Monster");
+
+        if (!player.GetLifeSystem()?.IsDead == true)
         {
             // Check if we can damage based on behavior mode
             if (EnableFollowerBehavior && !CanTakeDamage()) return;
