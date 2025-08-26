@@ -1,0 +1,42 @@
+[gd_scene load_steps=5 format=3 uid="uid://b3k2m7n8x5qxa"]
+
+[ext_resource type="Texture2D" uid="uid://8tum5coe2u2v" path="res://Art/Rock.png" id="1_rock"]
+[ext_resource type="Script" path="res://Scripts/Items/Rock.cs" id="2_rockscript"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_t25bi"]
+size = Vector2(30, 22)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_collision"]
+radius = 15.0
+
+[node name="Rock" type="Node2D"]
+script = ExtResource("2_rockscript")
+RockTexture = ExtResource("1_rock")
+
+[node name="RockSprite" type="Sprite2D" parent="."]
+scale = Vector2(0.0376953, 0.037207)
+texture = ExtResource("1_rock")
+
+[node name="PromptLabel" type="Label" parent="."]
+offset_left = -18.0
+offset_top = -31.0
+offset_right = 21.0
+offset_bottom = -17.0
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 10
+text = "Press E"
+
+[node name="DetectionArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DetectionArea"]
+position = Vector2(0, -2)
+shape = SubResource("RectangleShape2D_t25bi")
+
+[node name="ThrownCollisionArea" type="Area2D" parent="."]
+collision_layer = 8
+collision_mask = 4
+
+[node name="ThrownCollisionShape" type="CollisionShape2D" parent="ThrownCollisionArea"]
+shape = SubResource("CircleShape2D_collision")

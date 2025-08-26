@@ -1,0 +1,119 @@
+[gd_scene load_steps=14 format=3 uid="uid://54o6xy0qaoae"]
+
+[ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
+[ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
+[ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
+[ext_resource type="PackedScene" uid="uid://jlrj0meior1r" path="res://Prefabs/UI/LifeHearts.tscn" id="7_gfl13"]
+[ext_resource type="PackedScene" uid="uid://dbt3v1ee4f7fr" path="res://Prefabs/AppleTree.tscn" id="8_2e0hl"]
+[ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
+[ext_resource type="PackedScene" uid="uid://bcy7l2h8xj4wd" path="res://Prefabs/UI/ManaBar.tscn" id="8_manabar"]
+[ext_resource type="AudioStream" uid="uid://c5xm6p8ayswcj" path="res://Sounds/Background3.wav" id="11_1pt5x"]
+[ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
+[ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="12_r6l07"]
+[ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="13_bcr4f"]
+[ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
+[ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
+
+[node name="TreeAppleTestScene" type="Node2D"]
+
+[node name="Camera" type="Camera2D" parent="."]
+
+[node name="UserInterface" type="CanvasLayer" parent="."]
+follow_viewport_enabled = true
+
+[node name="HUD" type="Control" parent="UserInterface"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -576.0
+offset_top = -324.0
+offset_right = -576.0
+offset_bottom = -324.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="LifeHearts" parent="UserInterface/HUD" instance=ExtResource("7_gfl13")]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.511285
+anchor_top = 0.487654
+anchor_right = 0.511285
+anchor_bottom = 0.487654
+offset_left = -564.0
+offset_top = -316.0
+metadata/_edit_use_anchors_ = true
+
+[node name="ManaBar" parent="UserInterface/HUD" instance=ExtResource("8_manabar")]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.511285
+anchor_top = 0.37963
+anchor_right = 0.511285
+anchor_bottom = 0.37963
+offset_left = -564.0
+metadata/_edit_use_anchors_ = true
+
+[node name="Overlays" type="Control" parent="UserInterface"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -568.0
+offset_top = -329.0
+offset_right = -568.0
+offset_bottom = -329.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="GameOverUI" parent="UserInterface/Overlays" instance=ExtResource("8_4xied")]
+visible = false
+layout_mode = 1
+
+[node name="Environment" type="Node2D" parent="."]
+
+[node name="Background" type="Sprite2D" parent="Environment"]
+z_index = -10
+position = Vector2(-1, -5)
+scale = Vector2(0.800781, 0.688233)
+texture = ExtResource("2_8u8ny")
+
+[node name="Ground" parent="Environment" instance=ExtResource("3_r6l07")]
+z_index = -5
+position = Vector2(6, 294)
+
+[node name="AppleTree1" parent="Environment" instance=ExtResource("8_2e0hl")]
+position = Vector2(83, -367)
+
+[node name="Decorations" type="Node2D" parent="Environment"]
+
+[node name="GameEntities" type="Node2D" parent="."]
+
+[node name="Player" parent="GameEntities" instance=ExtResource("4_e2fbs")]
+position = Vector2(-327, 116)
+
+[node name="GameSystems" type="Node" parent="."]
+
+[node name="Managers" type="Node" parent="GameSystems"]
+
+[node name="SceneLifecycleManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("11_r6l07")
+
+[node name="PlayerStateManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("12_r6l07")
+
+[node name="UIManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("13_r6l07")
+
+[node name="AudioSystem" type="Node" parent="GameSystems"]
+
+[node name="AudioManager" type="AudioStreamPlayer2D" parent="GameSystems/AudioSystem"]
+stream = ExtResource("11_1pt5x")
+volume_db = 6.038
+autoplay = true
+script = ExtResource("15_r6l07")
+
+[node name="Rock" parent="GameSystems/AudioSystem" instance=ExtResource("13_bcr4f")]
+position = Vector2(-156, 246)

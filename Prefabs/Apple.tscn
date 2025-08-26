@@ -1,0 +1,67 @@
+[gd_scene load_steps=9 format=3 uid="uid://dx0uy3xgtdtry"]
+
+[ext_resource type="Texture2D" uid="uid://drdwnrxrmpqqt" path="res://Art/AppleLife.png" id="1_redapple"]
+[ext_resource type="Texture2D" uid="uid://bwwymn4vuk225" path="res://Art/AppleMana.png" id="2_purpleapple"]
+[ext_resource type="Texture2D" uid="uid://ds0lsvvxhe7l8" path="res://Art/AppleNeutral.png" id="3_neutralapple"]
+[ext_resource type="Script" uid="uid://c8mt75j5vt54r" path="res://Scripts/Items/Apple.cs" id="4_applescript"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_658v3"]
+size = Vector2(34, 32)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_rock_detection"]
+radius = 25.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_apple"]
+radius = 21.3776
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ground_detection"]
+radius = 18.0
+
+[node name="Apple" type="Node2D"]
+script = ExtResource("4_applescript")
+RedAppleTexture = ExtResource("1_redapple")
+PurpleAppleTexture = ExtResource("2_purpleapple")
+NeutralAppleTexture = ExtResource("3_neutralapple")
+
+[node name="RigidBody2D" type="RigidBody2D" parent="."]
+collision_layer = 4
+gravity_scale = 0.0
+freeze = true
+
+[node name="PhysicsCollision" type="CollisionShape2D" parent="RigidBody2D"]
+position = Vector2(0, 4)
+shape = SubResource("RectangleShape2D_658v3")
+
+[node name="AppleSprite" type="Sprite2D" parent="RigidBody2D"]
+scale = Vector2(0.0441406, 0.0436523)
+texture = ExtResource("1_redapple")
+
+[node name="PromptLabel" type="Label" parent="RigidBody2D"]
+offset_left = -19.0
+offset_top = -42.0
+offset_right = 20.0
+offset_bottom = -28.0
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 10
+text = "Press E"
+
+[node name="RockDetectionArea" type="Area2D" parent="RigidBody2D"]
+collision_layer = 4
+collision_mask = 8
+
+[node name="RockDetectionCollision" type="CollisionShape2D" parent="RigidBody2D/RockDetectionArea"]
+shape = SubResource("CircleShape2D_rock_detection")
+
+[node name="DetectionArea" type="Area2D" parent="RigidBody2D"]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RigidBody2D/DetectionArea"]
+shape = SubResource("CircleShape2D_apple")
+
+[node name="GroundDetectionArea" type="Area2D" parent="RigidBody2D"]
+collision_layer = 0
+
+[node name="GroundDetectionShape" type="CollisionShape2D" parent="RigidBody2D/GroundDetectionArea"]
+position = Vector2(0, 16)
+shape = SubResource("CircleShape2D_ground_detection")

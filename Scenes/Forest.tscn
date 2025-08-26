@@ -1,24 +1,80 @@
-[gd_scene load_steps=16 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=18 format=3 uid="uid://bnv528gs1hngu"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
 [ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_wjun0"]
-[ext_resource type="PackedScene" uid="uid://jlrj0meior1r" path="res://Prefabs/UI/LifeBarUI.tscn" id="7_gfl13"]
+[ext_resource type="PackedScene" uid="uid://jlrj0meior1r" path="res://Prefabs/UI/LifeHearts.tscn" id="7_gfl13"]
 [ext_resource type="Script" uid="uid://bmh2wdvmm4i7l" path="res://Scripts/Systems/EnemyManager.cs" id="7_r6l07"]
 [ext_resource type="Texture2D" uid="uid://dl1p663jvus6i" path="res://Art/Tree1.png" id="7_wjun0"]
-[ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOverUI.tscn" id="8_4xied"]
+[ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
 [ext_resource type="Texture2D" uid="uid://c3wsakw3ln5j3" path="res://Art/Tree2.png" id="8_j3sk6"]
+[ext_resource type="PackedScene" uid="uid://bcy7l2h8xj4wd" path="res://Prefabs/UI/ManaBar.tscn" id="8_manabar"]
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
-[ext_resource type="Script" uid="uid://ce4epv6lyxy1x" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
+[ext_resource type="Script" uid="uid://bb2ife872jlja" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
 [ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="12_r6l07"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
-[ext_resource type="Script" uid="uid://c1di2ygv6aj3b" path="res://Scripts/Systems/ReplaySystemManager.cs" id="14_r6l07"]
+[ext_resource type="Script" uid="uid://cf5q88b7yl5la" path="res://Scripts/Systems/ReplaySystemManager.cs" id="14_r6l07"]
+[ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
 
 [node name="ForestScene" type="Node2D"]
 
 [node name="Camera" type="Camera2D" parent="."]
+
+[node name="UserInterface" type="CanvasLayer" parent="."]
+follow_viewport_enabled = true
+
+[node name="HUD" type="Control" parent="UserInterface"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -576.0
+offset_top = -324.0
+offset_right = -576.0
+offset_bottom = -324.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="LifeHearts" parent="UserInterface/HUD" instance=ExtResource("7_gfl13")]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.511285
+anchor_top = 0.487654
+anchor_right = 0.511285
+anchor_bottom = 0.487654
+offset_left = -564.0
+offset_top = -316.0
+metadata/_edit_use_anchors_ = true
+
+[node name="ManaBar" parent="UserInterface/HUD" instance=ExtResource("8_manabar")]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.511285
+anchor_top = 0.37963
+anchor_right = 0.511285
+anchor_bottom = 0.37963
+offset_left = -564.0
+metadata/_edit_use_anchors_ = true
+
+[node name="Overlays" type="Control" parent="UserInterface"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -568.0
+offset_top = -329.0
+offset_right = -568.0
+offset_bottom = -329.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="GameOverUI" parent="UserInterface/Overlays" instance=ExtResource("8_4xied")]
+visible = false
+layout_mode = 1
 
 [node name="Environment" type="Node2D" parent="."]
 
@@ -62,38 +118,6 @@ position = Vector2(-327, 116)
 [node name="Monster" parent="GameEntities/Enemies" instance=ExtResource("5_wjun0")]
 position = Vector2(301, 69)
 
-[node name="UserInterface" type="CanvasLayer" parent="."]
-follow_viewport_enabled = true
-
-[node name="HUD" type="Control" parent="UserInterface"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="LifeBarUI" parent="UserInterface/HUD" instance=ExtResource("7_gfl13")]
-offset_left = -564.0
-offset_top = -316.0
-metadata/_edit_use_anchors_ = true
-
-[node name="Overlays" type="Control" parent="UserInterface"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -573.0
-offset_top = -322.0
-offset_right = -573.0
-offset_bottom = -322.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="GameOverUI" parent="UserInterface/Overlays" instance=ExtResource("8_4xied")]
-visible = false
-layout_mode = 1
-
 [node name="GameSystems" type="Node" parent="."]
 
 [node name="Managers" type="Node" parent="GameSystems"]
@@ -110,17 +134,18 @@ script = ExtResource("13_r6l07")
 [node name="EnemyManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("7_r6l07")
 
-[node name="ReplaySystem" type="Node" parent="GameSystems"]
-
-[node name="ReplaySystemManager" type="Node" parent="GameSystems/ReplaySystem"]
+[node name="ReplaySystemManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("14_r6l07")
+
+[node name="ReplaySystem" type="Node" parent="GameSystems"]
 
 [node name="ReplayRecorder" type="Node" parent="GameSystems/ReplaySystem"]
 script = ExtResource("10_r6l07")
 
-[node name="Audio" type="Node" parent="GameSystems"]
+[node name="AudioSystem" type="Node" parent="GameSystems"]
 
-[node name="BackgroundMusic" type="AudioStreamPlayer2D" parent="GameSystems/Audio"]
+[node name="AudioManager" type="AudioStreamPlayer2D" parent="GameSystems/AudioSystem"]
 stream = ExtResource("9_r6l07")
 volume_db = 6.038
 autoplay = true
+script = ExtResource("15_r6l07")

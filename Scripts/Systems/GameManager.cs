@@ -60,6 +60,11 @@ public partial class GameManager : Node
     private void LogSystemInitialized()
     {
         Log.System("Logging system initialized", "GameManager");
+        
+        // Configure logging for production performance
+        #if !DEBUG
+            Log.ReduceVerboseLogging();
+        #endif
     }
     
     private void InitializeManagers()
@@ -88,7 +93,7 @@ public partial class GameManager : Node
     private void SubscribeToEvents()
     {
         // Listen to key events for game flow coordination
-        GameEvents.GameRestart += OnGameRestart;
+        GameEventSystem.GameRestart += OnGameRestart;
         
         Log.System("Event subscriptions active", "GameManager");
     }
@@ -134,7 +139,7 @@ public partial class GameManager : Node
         IsPaused = true;
         GetTree().Paused = true;
         
-        GameEvents.OnGameStateChanged("Paused");
+        GameEventSystem.OnGameStateChanged("Paused");
         Log.Gameplay("Game paused", "GameManager");
     }
     
@@ -145,14 +150,14 @@ public partial class GameManager : Node
         IsPaused = false;
         GetTree().Paused = false;
         
-        GameEvents.OnGameStateChanged("Active");
+        GameEventSystem.OnGameStateChanged("Active");
         Log.Gameplay("Game resumed", "GameManager");
     }
     
     public void RestartGame()
     {
         Log.Gameplay("Restart requested", "GameManager");
-        GameEvents.OnGameRestart();
+        GameEventSystem.OnGameRestart();
     }
     
     public void QuitGame()
@@ -186,7 +191,7 @@ public partial class GameManager : Node
         if (Instance == this)
         {
             // Cleanup subscriptions
-            GameEvents.GameRestart -= OnGameRestart;
+            GameEventSystem.GameRestart -= OnGameRestart;
             
             Instance = null;
             Log.System("Cleaned up", "GameManager");

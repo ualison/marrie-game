@@ -1,0 +1,311 @@
+using Godot;
+
+/// <summary>
+/// Factory for creating replay-related entities
+/// Handles instantiation of replay gems, ghost players, and ghost monsters
+/// </summary>
+public static class ReplayEntityFactory
+{
+    private static PackedScene _replayGemScene;
+    private static PackedScene _ghostPlayerScene;
+    private static PackedScene _ghostMonsterScene;
+    
+    #region Scene Loading
+    private static PackedScene GetReplayGemScene()
+    {
+        if (_replayGemScene == null)
+        {
+            string[] possiblePaths = {
+                "res://Prefabs/ReplayGem.tscn",
+                "res://prefabs/ReplayGem.tscn", 
+                "res://Scenes/ReplayGem.tscn",
+                "res://scenes/ReplayGem.tscn"
+            };
+            
+            foreach (string path in possiblePaths)
+            {
+                try
+                {
+                    if (ResourceLoader.Exists(path))
+                    {
+                        _replayGemScene = GD.Load<PackedScene>(path);
+                        if (_replayGemScene != null)
+                        {
+#if DEBUG
+                            Log.Debug($"ReplayEntityFactory: Loaded ReplayGem scene from {path}", "ReplayEntityFactory");
+#endif
+                            break;
+                        }
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Error($"ReplayEntityFactory: Failed to load scene from {path}: {ex.Message}", "ReplayEntityFactory");
+                }
+            }
+            
+            if (_replayGemScene == null)
+            {
+                Log.Error("ReplayEntityFactory: Could not find ReplayGem.tscn in any expected location", "ReplayEntityFactory");
+            }
+        }
+        return _replayGemScene;
+    }
+    
+    private static PackedScene GetGhostPlayerScene()
+    {
+        if (_ghostPlayerScene == null)
+        {
+            try
+            {
+                if (ResourceLoader.Exists("res://Prefabs/GhostPlayer.tscn"))
+                {
+                    _ghostPlayerScene = GD.Load<PackedScene>("res://Prefabs/GhostPlayer.tscn");
+                    if (_ghostPlayerScene != null)
+                    {
+#if DEBUG
+                        Log.Debug("ReplayEntityFactory: Loaded GhostPlayer scene", "ReplayEntityFactory");
+#endif
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error($"ReplayEntityFactory: Failed to load GhostPlayer scene: {ex.Message}", "ReplayEntityFactory");
+            }
+        }
+        return _ghostPlayerScene;
+    }
+    
+    private static PackedScene GetGhostMonsterScene()
+    {
+        if (_ghostMonsterScene == null)
+        {
+            try
+            {
+                if (ResourceLoader.Exists("res://Prefabs/GhostMonster.tscn"))
+                {
+                    _ghostMonsterScene = GD.Load<PackedScene>("res://Prefabs/GhostMonster.tscn");
+                    if (_ghostMonsterScene != null)
+                    {
+#if DEBUG
+                        Log.Debug("ReplayEntityFactory: Loaded GhostMonster scene", "ReplayEntityFactory");
+#endif
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error($"ReplayEntityFactory: Failed to load GhostMonster scene: {ex.Message}", "ReplayEntityFactory");
+            }
+        }
+        return _ghostMonsterScene;
+    }
+    #endregion
+    
+    #region Entity Creation
+    public static ReplayGem CreateReplayGem(Vector2 position, Node parent)
+    {
+        var scene = GetReplayGemScene();
+        if (scene == null)
+        {
+            Log.Error("ReplayEntityFactory: CRITICAL - Could not load ReplayGem scene!", "ReplayEntityFactory");
+            return null;
+        }
+        
+        var gem = scene.Instantiate() as ReplayGem;
+        if (gem == null)
+        {
+            Log.Error("ReplayEntityFactory: CRITICAL - ReplayGem scene did not instantiate properly!", "ReplayEntityFactory");
+            return null;
+        }
+        
+        // Set position before adding to tree
+        gem.GlobalPosition = position;
+#if DEBUG
+        Log.Debug($"ReplayEntityFactory: Set gem GlobalPosition to {position}", "ReplayEntityFactory");
+#endif
+        
+        // Use call_deferred to avoid physics flush conflicts
+        parent.CallDeferred(Node.MethodName.AddChild, gem);
+        
+        // Show the gem after it's added to the tree
+        gem.CallDeferred(nameof(ReplayGem.ShowGem), position);
+        
+        // Fire event immediately since we just want to notify
+        GameEventSystem.OnReplayGemCreated(position);
+#if DEBUG
+        Log.Debug($"ReplayEntityFactory: Created ReplayGem at {position} - showing deferred", "ReplayEntityFactory");
+#endif
+        
+        return gem;
+    }
+    
+    public static GhostPlayer CreateGhostPlayer(Vector2 position, Node parent)
+    {
+        var scene = GetGhostPlayerScene();
+        GhostPlayer ghost = null;
+        
+        if (scene != null)
+        {
+            ghost = scene.Instantiate() as GhostPlayer;
+        }
+        
+        // Fallback to programmatic creation
+        if (ghost == null)
+        {
+            ghost = CreateGhostPlayerProgrammatically(parent);
+        }
+        
+        // ONLY copy sprites if we had to fall back to programmatic creation
+        if (ghost != null)
+        {
+            // Only copy sprites if we created the ghost programmatically (scene loading failed)
+            if (scene == null)
+            {
+                var originalPlayer = parent.GetTree().GetFirstNodeInGroup("player") as Player;
+                if (originalPlayer != null)
+                {
+                    CopyPlayerSprite(originalPlayer, ghost);
+                }
+            }
+            
+            // Add ghost to scene first
+            parent.CallDeferred(Node.MethodName.AddChild, ghost);
+            
+            // Use a timer to call setup after the ghost is properly added
+            var timer = parent.GetTree().CreateTimer(0.01f);
+            timer.Timeout += () => {
+                if (GodotObject.IsInstanceValid(ghost))
+                {
+                    ghost._on_ghost_setup_complete(position);
+                }
+            };
+        }
+        
+        return ghost;
+    }
+    
+    public static GhostMonster CreateGhostMonster(Vector2 position, Node parent)
+    {
+        var scene = GetGhostMonsterScene();
+        GhostMonster ghost = null;
+        
+        if (scene != null)
+        {
+            ghost = scene.Instantiate() as GhostMonster;
+        }
+        
+        // Fallback to programmatic creation
+        if (ghost == null)
+        {
+            ghost = CreateGhostMonsterProgrammatically(parent);
+        }
+        
+        // ONLY copy sprites if we had to fall back to programmatic creation
+        if (ghost != null)
+        {
+            // Only copy sprites if we created the ghost programmatically (scene loading failed)
+            if (scene == null)
+            {
+                var originalMonster = parent.GetTree().GetFirstNodeInGroup("enemies") as Monster;
+                if (originalMonster != null)
+                {
+                    CopyMonsterSprite(originalMonster, ghost);
+                }
+            }
+            
+            // Add ghost to scene first
+            parent.CallDeferred(Node.MethodName.AddChild, ghost);
+            
+            // Use a timer to call setup after the ghost is properly added
+            var timer = parent.GetTree().CreateTimer(0.01f);
+            timer.Timeout += () => {
+                if (GodotObject.IsInstanceValid(ghost))
+                {
+                    ghost._on_ghost_setup_complete(position);
+                }
+            };
+        }
+        
+        return ghost;
+    }
+    #endregion
+    
+    #region Programmatic Creation Fallbacks
+    private static GhostPlayer CreateGhostPlayerProgrammatically(Node parent)
+    {
+        var ghost = new GhostPlayer { Name = "GhostPlayer" };
+        
+        // Note: Sprite copying is now done in the main CreateGhostPlayer method
+        return ghost;
+    }
+    
+    private static GhostMonster CreateGhostMonsterProgrammatically(Node parent)
+    {
+        var ghost = new GhostMonster { Name = "GhostMonster" };
+        
+        // Note: Sprite copying is now done in the main CreateGhostMonster method
+        return ghost;
+    }
+    
+    private static void CopyPlayerSprite(Player original, GhostPlayer ghost)
+    {
+        var originalSprite = original.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
+        if (originalSprite != null)
+        {
+            var ghostSprite = new AnimatedSprite2D
+            {
+                Name = "AnimatedSprite2D",
+                SpriteFrames = originalSprite.SpriteFrames,
+                Animation = "idle",
+                Scale = originalSprite.Scale,
+                Position = originalSprite.Position,
+                Rotation = originalSprite.Rotation,
+                FlipH = originalSprite.FlipH,
+                FlipV = originalSprite.FlipV,
+                Offset = originalSprite.Offset
+            };
+            ghost.AddChild(ghostSprite);
+        }
+    }
+    
+    private static void CopyMonsterSprite(Monster original, GhostMonster ghost)
+    {
+        var sprite2D = original.GetNodeOrNull<Sprite2D>("MonsterSprite");
+        var animSprite = original.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
+        
+        if (sprite2D != null)
+        {
+            var ghostSprite = new Sprite2D
+            {
+                Name = "MonsterSprite",
+                Texture = sprite2D.Texture,
+                Scale = sprite2D.Scale,
+                Position = sprite2D.Position,
+                Rotation = sprite2D.Rotation,
+                FlipH = sprite2D.FlipH,
+                FlipV = sprite2D.FlipV,
+                Offset = sprite2D.Offset
+            };
+            ghost.AddChild(ghostSprite);
+        }
+        else if (animSprite != null)
+        {
+            var ghostSprite = new AnimatedSprite2D
+            {
+                Name = "AnimatedSprite2D",
+                SpriteFrames = animSprite.SpriteFrames,
+                Animation = "idle",
+                Scale = animSprite.Scale,
+                Position = animSprite.Position,
+                Rotation = animSprite.Rotation,
+                FlipH = animSprite.FlipH,
+                FlipV = animSprite.FlipV,
+                Offset = animSprite.Offset
+            };
+            ghost.AddChild(ghostSprite);
+        }
+    }
+    #endregion
+}

@@ -10,8 +10,9 @@ public partial class UIManager : Node
     public static UIManager Instance { get; private set; }
     
     #region UI Components
-    private GameOverUI _gameOverUI;
-    private LifeBarUI _lifeBarUI;
+    private GameOver _gameOverUI;
+    private LifeBar _lifeBarUI;
+    private ManaBar _manaBarUI;
     #endregion
     
     public override void _Ready()
@@ -73,17 +74,20 @@ public partial class UIManager : Node
     
     private void DiscoverUIComponents()
     {
-        _gameOverUI = GetTree().GetFirstNodeInGroup("game_over_ui") as GameOverUI;
-        _lifeBarUI = GetTree().GetFirstNodeInGroup("life_bar_ui") as LifeBarUI;
+        _gameOverUI = GetTree().GetFirstNodeInGroup("game_over_ui") as GameOver;
+        _lifeBarUI = GetTree().GetFirstNodeInGroup("life_bar_ui") as LifeBar;
+        _manaBarUI = GetTree().GetFirstNodeInGroup("mana_bar_ui") as ManaBar;
         
-        Log.System($"GameOverUI found: {_gameOverUI != null}, LifeBarUI found: {_lifeBarUI != null}", "UIManager");
+        Log.System($"GameOverUI found: {_gameOverUI != null}, LifeBarUI found: {_lifeBarUI != null}, ManaBarUI found: {_manaBarUI != null}", "UIManager");
         
         // Debug: List all nodes in the game_over_ui group
         var gameOverNodes = GetTree().GetNodesInGroup("game_over_ui");
         Log.System($"Found {gameOverNodes.Count} nodes in 'game_over_ui' group", "UIManager");
         foreach (Node node in gameOverNodes)
         {
+            #if DEBUG
             Log.Debug($"  - {node.Name} ({node.GetType().Name})", "UIManager");
+            #endif
         }
         
         // If not found by group, try to find by common names
@@ -94,7 +98,7 @@ public partial class UIManager : Node
             foreach (var name in possibleNames)
             {
                 var node = GetTree().CurrentScene.FindChild(name, true, false);
-                if (node is GameOverUI gameOverUI)
+                if (node is GameOver gameOverUI)
                 {
                     _gameOverUI = gameOverUI;
                     Log.System($"Found GameOverUI by name search: {name}", "UIManager");
@@ -110,7 +114,7 @@ public partial class UIManager : Node
             if (interfaceNode != null)
             {
                 var gameOverNode = interfaceNode.FindChild("GameOverScr", false, false);
-                if (gameOverNode is GameOverUI gameOverUI)
+                if (gameOverNode is GameOver gameOverUI)
                 {
                     _gameOverUI = gameOverUI;
                     Log.System("Found GameOverUI at Interface/GameOverScr", "UIManager");
@@ -125,7 +129,7 @@ public partial class UIManager : Node
             if (interfaceNode != null)
             {
                 var lifeBarNode = interfaceNode.FindChild("LifeBarUI", false, false);
-                if (lifeBarNode is LifeBarUI lifeBarUI)
+                if (lifeBarNode is LifeBar lifeBarUI)
                 {
                     _lifeBarUI = lifeBarUI;
                     Log.System("Found LifeBarUI at Interface/LifeBarUI", "UIManager");
@@ -133,18 +137,42 @@ public partial class UIManager : Node
             }
         }
         
+        // Similar search for ManaBarUI
+        if (_manaBarUI == null)
+        {
+            var interfaceNode = GetTree().CurrentScene.FindChild("Interface", false, false);
+            if (interfaceNode != null)
+            {
+                var manaBarNode = interfaceNode.FindChild("ManaBarUI", false, false);
+                if (manaBarNode is ManaBar manaBarUI)
+                {
+                    _manaBarUI = manaBarUI;
+                    Log.System("Found ManaBarUI at Interface/ManaBarUI", "UIManager");
+                }
+            }
+        }
+        
         // Last resort: search all nodes recursively
         if (_gameOverUI == null)
         {
-            _gameOverUI = FindNodeByType<GameOverUI>(GetTree().CurrentScene);
+            _gameOverUI = FindNodeByType<GameOver>(GetTree().CurrentScene);
             if (_gameOverUI != null)
             {
                 Log.System($"Found GameOverUI by recursive search: {_gameOverUI.Name}", "UIManager");
             }
         }
         
+        if (_manaBarUI == null)
+        {
+            _manaBarUI = FindNodeByType<ManaBar>(GetTree().CurrentScene);
+            if (_manaBarUI != null)
+            {
+                Log.System($"Found ManaBarUI by recursive search: {_manaBarUI.Name}", "UIManager");
+            }
+        }
+        
         // Final status
-        Log.System($"Final result - GameOverUI: {_gameOverUI?.Name ?? "null"}, LifeBarUI: {_lifeBarUI?.Name ?? "null"}", "UIManager");
+        Log.System($"Final result - GameOverUI: {_gameOverUI?.Name ?? "null"}, LifeBarUI: {_lifeBarUI?.Name ?? "null"}, ManaBarUI: {_manaBarUI?.Name ?? "null"}", "UIManager");
     }
     
     private T FindNodeByType<T>(Node startNode) where T : class
@@ -167,7 +195,7 @@ public partial class UIManager : Node
         if (_gameOverUI != null)
         {
             // Disconnect first to avoid duplicates
-            if (_gameOverUI.IsConnected(GameOverUI.SignalName.RestartRequested, new Callable(this, nameof(OnRestartRequested))))
+            if (_gameOverUI.IsConnected(GameOver.SignalName.RestartRequested, new Callable(this, nameof(OnRestartRequested))))
             {
                 _gameOverUI.RestartRequested -= OnRestartRequested;
             }
@@ -231,11 +259,12 @@ public partial class UIManager : Node
         HideGameOverUI();
         
         // Notify game restart
-        GameEvents.OnGameRestart();
+        GameEventSystem.OnGameRestart();
     }
     
-    public GameOverUI GetGameOverUI() => _gameOverUI;
-    public LifeBarUI GetLifeBarUI() => _lifeBarUI;
+    public GameOver GetGameOverUI() => _gameOverUI;
+    public LifeBar GetLifeBarUI() => _lifeBarUI;
+    public ManaBar GetManaBarUI() => _manaBarUI;
     
     public override void _ExitTree()
     {

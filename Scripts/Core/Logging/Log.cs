@@ -98,5 +98,33 @@ public static class Log
         if (Logger is MarrieGame.Core.Logging.GameLogger gameLogger)
             gameLogger.EnableReleaseMode();
     }
+    
+    public static void SetCategoryFilter(LogCategory category, bool enabled)
+    {
+        if (Logger is MarrieGame.Core.Logging.GameLogger gameLogger)
+            gameLogger.SetCategoryFilter(category, enabled);
+    }
+    
+    /// <summary>
+    /// Enable minimal logging for production (only warnings, errors, and critical events)
+    /// </summary>
+    public static void EnableMinimalLogging()
+    {
+        SetLogLevel(LogLevel.Warning);
+        Info("Minimal logging enabled - only warnings and errors will be shown", "Logger");
+    }
+    
+    /// <summary>
+    /// Only log critical events for systems that generate too much noise
+    /// </summary>
+    public static void ReduceVerboseLogging()
+    {
+        if (Logger is MarrieGame.Core.Logging.GameLogger gameLogger)
+        {
+            gameLogger.SetCategoryFilter(LogCategory.Debug, false);
+            gameLogger.SetCategoryFilter(LogCategory.Performance, false);
+            Info("Reduced verbose logging for debug and performance categories", "Logger");
+        }
+    }
     #endregion
 }

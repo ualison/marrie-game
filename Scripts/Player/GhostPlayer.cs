@@ -8,13 +8,13 @@ public partial class GhostPlayer : CharacterBody2D
     private const float RECORD_INTERVAL = 0.1f; // Match ReplayRecorder interval
     private const float MIN_MOVEMENT = 0.5f; // Minimum distance to filter stationary frames
     private const float SMOOTH_SPEED = 10.0f; // Position interpolation speed
-    private static readonly Color GHOST_TINT = new(0.5f, 0.5f, 1.0f, 0.7f); // Semi-transparent blue
+    private static readonly Color GHOST_TINT = new(0.6f, 0.3f, 0.9f, 0.7f); // Purple gem-like color
     #endregion
 
     #region State Variables
     private List<ReplayFrame> _replayFrames;
     private int _currentFrameIndex;
-    private float _replayStartTime;
+    private float _elapsedTime; // FIXED: Use delta-based timing for better sync
     private bool _isReplaying;
     #endregion
 
@@ -39,6 +39,27 @@ public partial class GhostPlayer : CharacterBody2D
 
         Log.Replay($"GhostPlayer ready: {Name}, Parent: {GetParent()?.Name}", "GhostPlayer");
     }
+
+    public void _on_ghost_setup_complete(Vector2 position)
+    {
+        // Called after the ghost is added to scene and sprites are ready
+        GlobalPosition = position;
+        AddToGroup("ghost_player");
+        
+        // Refresh sprite discovery since factory may have added sprites after _Ready
+        SetupGhostVisuals();
+        
+        Log.Replay($"Ghost setup complete at position {position}", "GhostPlayer");
+        Log.Replay($"Ghost children count: {GetChildCount()}, Active sprite: {_activeSprite?.Name ?? "null"}", "GhostPlayer");
+        
+        // Force visibility for debugging
+        Show();
+        if (_activeSprite != null)
+        {
+            _activeSprite.Show();
+            Log.Replay($"Ghost sprite shown: {_activeSprite.Name}, Visible: {_activeSprite.Visible}, Modulate: {_activeSprite.Modulate}", "GhostPlayer");
+        }
+    }
     #endregion
 
     #region Core Update Loop
@@ -47,15 +68,28 @@ public partial class GhostPlayer : CharacterBody2D
         // Skip processing if not replaying or no data available
         if (!_isReplaying || _replayFrames == null) return;
 
-        // Calculate elapsed time since replay started
-        float elapsedTime = Time.GetTicksMsec() / 1000.0f - _replayStartTime;
-        var targetFrame = FindFrameAtTime(elapsedTime);
+        // FIXED: Use delta-based timing for consistent synchronization
+        _elapsedTime += (float)delta;
+        var targetFrame = FindFrameAtTime(_elapsedTime);
 
         if (targetFrame.HasValue)
         {
-            // Update target position and apply frame data
+            // Update target position and apply frame data immediately
             _targetPosition = targetFrame.Value.Position;
             ApplyFrameToGhost(targetFrame.Value);
+            
+            // FIXED: For immediate response, set position directly for first few frames
+            if (_elapsedTime < 0.2f) // First 200ms for immediate response
+            {
+                _currentPosition = _targetPosition;
+                GlobalPosition = _currentPosition;
+            }
+            else
+            {
+                // Normal smooth interpolation after initial period
+                _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * (float)delta);
+                GlobalPosition = _currentPosition;
+            }
         }
         else if (_currentFrameIndex >= _replayFrames.Count)
         {
@@ -63,10 +97,12 @@ public partial class GhostPlayer : CharacterBody2D
             StopReplay();
             return;
         }
-
-        // Smoothly interpolate to target position for fluid movement
-        _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * (float)delta);
-        GlobalPosition = _currentPosition;
+        else
+        {
+            // Continue smooth movement even when no new frame is found
+            _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * (float)delta);
+            GlobalPosition = _currentPosition;
+        }
     }
     #endregion
 
@@ -80,8 +116,9 @@ public partial class GhostPlayer : CharacterBody2D
             return;
         }
 
-        // Remove stationary sequences to eliminate pause periods
-        var filteredFrames = FilterStatinaryFrames(frames);
+        // FIXED: Use original frames to prevent aggressive filtering that causes delays
+        // Only do minimal filtering to preserve immediate start
+        var filteredFrames = FilterFramesMinimal(frames);
         if (filteredFrames.Count == 0)
         {
             Log.Warning("No movement frames after filtering", "GhostPlayer");
@@ -91,16 +128,21 @@ public partial class GhostPlayer : CharacterBody2D
         // Initialize replay state
         _replayFrames = filteredFrames;
         _currentFrameIndex = 0;
-        _replayStartTime = Time.GetTicksMsec() / 1000.0f;
+        _elapsedTime = 0f; // FIXED: Start from zero with delta-based timing
         _isReplaying = true;
 
-        // Set initial position and make ghost visible
-        GlobalPosition = filteredFrames[0].Position;
+        // FIXED: Set initial position and immediately apply first frame to eliminate delay
+        var firstFrame = filteredFrames[0];
+        GlobalPosition = firstFrame.Position;
         _currentPosition = GlobalPosition;
         _targetPosition = GlobalPosition;
+        
+        // Apply first frame immediately to show correct initial state
+        ApplyFrameToGhost(firstFrame);
 
         Show();
-        Log.Replay($"Started replay with {filteredFrames.Count} filtered frames (was {frames.Count})", "GhostPlayer");
+        Log.Replay($"Started replay with {filteredFrames.Count} filtered frames (was {frames.Count}) - immediate start at {firstFrame.Position}", "GhostPlayer");
+        Log.Replay($"Ghost visible after StartReplay: {Visible}, Active sprite: {_activeSprite?.Name ?? "null"}, Sprite visible: {_activeSprite?.Visible ?? false}", "GhostPlayer");
     }
 
     public void StopReplay()
@@ -115,8 +157,67 @@ public partial class GhostPlayer : CharacterBody2D
     #endregion
 
     #region Frame Processing
+    private List<ReplayFrame> FilterFramesMinimal(List<ReplayFrame> originalFrames)
+    {
+        // FIXED: Optimized filtering to preserve immediate replay start with better performance
+        // Only remove excessive stationary periods while keeping initial frames
+        var filtered = new List<ReplayFrame>();
+        
+        if (originalFrames.Count == 0) return filtered;
+        
+        // Always keep first frame for immediate start
+        filtered.Add(originalFrames[0]);
+        
+        Vector2 lastPos = originalFrames[0].Position;
+        int stationaryCount = 0;
+        const int MAX_STATIONARY_FRAMES = 5; // Only skip after 5 consecutive stationary frames
+        const float MIN_MOVEMENT_SQUARED = MIN_MOVEMENT * MIN_MOVEMENT; // Avoid sqrt calculations
+        
+        for (int i = 1; i < originalFrames.Count; i++)
+        {
+            var frame = originalFrames[i];
+            float distanceSquared = (frame.Position - lastPos).LengthSquared(); // PERFORMANCE: Use squared distance
+            
+            if (distanceSquared > MIN_MOVEMENT_SQUARED)
+            {
+                // Movement detected - reset timer and add frame
+                stationaryCount = 0;
+                filtered.Add(frame);
+                lastPos = frame.Position;
+            }
+            else
+            {
+                // Stationary frame
+                stationaryCount++;
+                
+                // Keep some stationary frames to preserve timing, skip only excessive ones
+                if (stationaryCount <= MAX_STATIONARY_FRAMES || i == originalFrames.Count - 1)
+                {
+                    filtered.Add(frame);
+                }
+            }
+        }
+        
+        // Ensure we always have at least the first and last frames
+        if (filtered.Count > 0 && originalFrames.Count > 1)
+        {
+            var lastOriginal = originalFrames[originalFrames.Count - 1];
+            var lastFiltered = filtered[filtered.Count - 1];
+            if (lastOriginal.Timestamp != lastFiltered.Timestamp)
+            {
+                filtered.Add(lastOriginal);
+            }
+        }
+        
+#if DEBUG
+        Log.Debug($"Optimized filtering: {originalFrames.Count} -> {filtered.Count} frames", "GhostPlayer");
+#endif
+        return filtered;
+    }
+
     private List<ReplayFrame> FilterStatinaryFrames(List<ReplayFrame> originalFrames)
     {
+        // DEPRECATED: This method was too aggressive and caused delays
         // Remove frames where player is stationary to compress timeline
         var filtered = new List<ReplayFrame>();
         Vector2 lastPos = Vector2.Zero;
@@ -163,6 +264,14 @@ public partial class GhostPlayer : CharacterBody2D
 
     private ReplayFrame? FindFrameAtTime(float time)
     {
+        // FIXED: Improved frame finding to ensure immediate playback
+        // Handle negative time (should show first frame immediately)
+        if (time <= 0f && _replayFrames.Count > 0)
+        {
+            _currentFrameIndex = 0;
+            return _replayFrames[0];
+        }
+        
         // Find frame that should be playing at current time
         for (int i = _currentFrameIndex; i < _replayFrames.Count; i++)
         {
@@ -171,6 +280,12 @@ public partial class GhostPlayer : CharacterBody2D
                 _currentFrameIndex = i;
                 return _replayFrames[i];
             }
+        }
+
+        // If no frame found for current time, return the last frame we should have played
+        if (_currentFrameIndex > 0 && _currentFrameIndex < _replayFrames.Count)
+        {
+            return _replayFrames[_currentFrameIndex];
         }
 
         // Return null when past all frames to signal end
@@ -182,14 +297,36 @@ public partial class GhostPlayer : CharacterBody2D
         // Apply rotation from frame data
         GlobalRotation = frame.Rotation;
 
-        // Apply sprite flip state
+        // Apply sprite flip state with enhanced debugging
         if (_activeSprite != null)
         {
             var currentScale = _activeSprite.Scale;
-            _activeSprite.Scale = new Vector2(
-                frame.SpriteFlip ? -Mathf.Abs(currentScale.X) : Mathf.Abs(currentScale.X),
-                currentScale.Y
-            );
+            var newScaleX = frame.SpriteFlip ? -Mathf.Abs(currentScale.X) : Mathf.Abs(currentScale.X);
+            
+            // Always update scale to ensure consistency
+            _activeSprite.Scale = new Vector2(newScaleX, currentScale.Y);
+            
+            // Also handle FlipH property if it's an AnimatedSprite2D
+            if (_animatedSprite != null)
+            {
+                // Apply FlipH property directly for more accurate reproduction
+                _animatedSprite.FlipH = frame.SpriteFlip;
+            }
+        }
+        else
+        {
+            Log.Warning("Cannot apply flip - _activeSprite is null", "GhostPlayer");
+        }
+
+        // Apply visibility state
+        if (_activeSprite != null)
+        {
+            _activeSprite.Visible = frame.IsVisible;
+            if (Mathf.Abs(frame.Alpha - _activeSprite.Modulate.A) > 0.01f)
+            {
+                var currentColor = _activeSprite.Modulate;
+                _activeSprite.Modulate = new Color(currentColor.R, currentColor.G, currentColor.B, frame.Alpha * GHOST_TINT.A);
+            }
         }
 
         // Play animation if available and valid
@@ -198,7 +335,9 @@ public partial class GhostPlayer : CharacterBody2D
             if (_animatedSprite.SpriteFrames?.HasAnimation(frame.Animation) == true)
             {
                 if (_animatedSprite.Animation != frame.Animation)
+                {
                     _animatedSprite.Play(frame.Animation);
+                }
             }
         }
     }
@@ -219,7 +358,6 @@ public partial class GhostPlayer : CharacterBody2D
         if (_animatedSprite != null)
         {
             _activeSprite = _animatedSprite;
-            Log.Debug($"Found AnimatedSprite2D: {_animatedSprite.Name}", "GhostPlayer");
             return;
         }
 
@@ -231,7 +369,6 @@ public partial class GhostPlayer : CharacterBody2D
         if (_sprite != null)
         {
             _activeSprite = _sprite;
-            Log.Debug($"Found Sprite2D: {_sprite.Name}", "GhostPlayer");
             return;
         }
 
@@ -242,7 +379,6 @@ public partial class GhostPlayer : CharacterBody2D
         if (_animatedSprite != null)
         {
             _activeSprite = _animatedSprite;
-            Log.Debug($"Found custom AnimatedSprite2D: {_animatedSprite.Name}", "GhostPlayer");
         }
         else
         {
@@ -259,7 +395,6 @@ public partial class GhostPlayer : CharacterBody2D
         {
             _activeSprite.Modulate = GHOST_TINT;
             _activeSprite.Show();
-            Log.Debug($"Applied ghost effect to '{_activeSprite.Name}'", "GhostPlayer");
         }
         else
         {
@@ -285,8 +420,6 @@ public partial class GhostPlayer : CharacterBody2D
 
         AddChild(fallbackSprite);
         _activeSprite = fallbackSprite;
-
-        Log.Debug("Created fallback visual", "GhostPlayer");
     }
 
     private void DisableCollisions()
@@ -301,11 +434,13 @@ public partial class GhostPlayer : CharacterBody2D
     private void LogAvailableChildren()
     {
         // List all children for debugging sprite discovery issues
+#if DEBUG
         Log.Debug("GhostPlayer children:", "GhostPlayer");
         foreach (Node child in GetChildren())
         {
             Log.Debug($"  - {child.Name} ({child.GetType().Name})", "GhostPlayer");
         }
+#endif
     }
     #endregion
 }

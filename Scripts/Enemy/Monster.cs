@@ -163,7 +163,9 @@ public partial class Monster : CharacterBody2D
         if (ShowForTesting)
         {
             Show();
+            #if DEBUG
             Log.Debug("Monster: Ready for contact damage", "Monster");
+            #endif
         }
         else
         {
@@ -294,8 +296,6 @@ public partial class Monster : CharacterBody2D
 
         _stateTimer.WaitTime = InitialWaitTime;
         _stateTimer.Start();
-
-        Log.Debug($"Monster waiting at scene position {_initialPosition} for {InitialWaitTime} seconds - fully visible", "Monster");
     }
 
     private void StartFollowing()
@@ -391,8 +391,6 @@ public partial class Monster : CharacterBody2D
         bool shouldFaceLeft = _player.GlobalPosition.X > GlobalPosition.X;
         var scale = _spriteNode.Scale;
         _spriteNode.Scale = new Vector2(shouldFaceLeft ? -Mathf.Abs(scale.X) : Mathf.Abs(scale.X), scale.Y);
-
-        Log.Debug($"Monster facing player: {(shouldFaceLeft ? "left (flipped)" : "right (normal)")}", "Monster");
     }
 
     private void PositionBehindPlayerOnGround()
@@ -411,7 +409,9 @@ public partial class Monster : CharacterBody2D
         GlobalPosition = targetPosition;
         Velocity = Vector2.Zero;
 
+        #if DEBUG
         Log.Debug($"Monster positioned on {(_shouldSpawnOnRight ? "right" : "left")} side at distance {safeDistance}", "Monster");
+        #endif
     }
     #endregion
 

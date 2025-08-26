@@ -8,6 +8,7 @@ public class DeathRecord
     public string DeathId { get; private set; }
     public Vector2 DeathPosition { get; private set; }
     public float DeathTime { get; private set; }
+    public int DeathSequence { get; private set; } // Added to break timestamp ties
     #endregion
 
     #region Replay Data
@@ -21,12 +22,13 @@ public class DeathRecord
     #endregion
 
     #region Constructor
-    public DeathRecord(string deathId, Vector2 deathPosition)
+    public DeathRecord(string deathId, Vector2 deathPosition, int deathSequence = 0)
     {
-        // Initialize death record with ID, position, and timestamp
+        // Initialize death record with ID, position, timestamp, and sequence number
         DeathId = deathId ?? throw new System.ArgumentNullException(nameof(deathId));
         DeathPosition = deathPosition;
         DeathTime = (float)Time.GetUnixTimeFromSystem();
+        DeathSequence = deathSequence; // Used to break timestamp ties
     }
     #endregion
 

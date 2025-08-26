@@ -118,7 +118,7 @@ public partial class PlayerLife : Node, IHealthSystem
         EmitSignal(SignalName.LifeChanged, CurrentLife, MaxLife);
         
         // Also notify through simple event bus
-        GameEvents.OnPlayerHealthChanged(CurrentLife, MaxLife);
+        GameEventSystem.OnPlayerHealthChanged(CurrentLife, MaxLife);
     }
     #endregion
 }
