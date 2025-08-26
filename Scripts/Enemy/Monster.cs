@@ -228,6 +228,13 @@ public partial class Monster : CharacterBody2D
         
         IsDisabledForReplay = true;
         SetProcessMode(ProcessModeEnum.Disabled);
+        
+        // Hide MonsterLifeBar during replay
+        if (_monsterLifeBar != null)
+        {
+            _monsterLifeBar.Hide();
+        }
+        
         Hide();
     }
 
@@ -243,6 +250,12 @@ public partial class Monster : CharacterBody2D
             _spriteNode.Visible = true;
             _spriteNode.Modulate = Colors.White;
             Show();
+        }
+        
+        // Show MonsterLifeBar when enabling after replay
+        if (_monsterLifeBar != null)
+        {
+            _monsterLifeBar.Show();
         }
         
         _stateTimer.Stop();
@@ -466,9 +479,31 @@ public partial class Monster : CharacterBody2D
         GlobalPosition = targetPosition;
         Velocity = Vector2.Zero;
 
+        // Update MonsterLifeBar position immediately after teleport, even if hidden
+        // This prevents the life bar from appearing at the old position when fading back in
+        UpdateLifeBarPosition();
+
         #if DEBUG
         Log.Debug($"Monster positioned on {(_shouldSpawnOnRight ? "right" : "left")} side at distance {safeDistance}", "Monster");
         #endif
+    }
+
+    private void UpdateLifeBarPosition()
+    {
+        if (_monsterLifeBar != null && _monsterLifeBar.FollowMonster)
+        {
+            // Force the life bar to update its position to match the monster's new position
+            var camera = GetViewport().GetCamera2D();
+            if (camera != null)
+            {
+                Vector2 screenPos = camera.GetScreenCenterPosition() + (GlobalPosition - camera.GlobalPosition) * camera.Zoom;
+                _monsterLifeBar.GlobalPosition = screenPos + _monsterLifeBar.OffsetFromMonster;
+            }
+            else
+            {
+                _monsterLifeBar.GlobalPosition = GlobalPosition + _monsterLifeBar.OffsetFromMonster;
+            }
+        }
     }
     #endregion
 
@@ -524,11 +559,18 @@ public partial class Monster : CharacterBody2D
 
     public void PlayDamageEffect()
     {
+        // Default damage effect - determine color based on current reality
+        Color effectColor = CurrentReality == MonsterReality.CurrentReality ? Colors.Red : Colors.Purple;
+        PlayDamageEffect(effectColor);
+    }
+
+    public void PlayDamageEffect(Color damageColor)
+    {
         var targetSprite = _sprite ?? _spriteNode;
         if (targetSprite == null) return;
 
         var tween = CreateTween();
-        tween.TweenProperty(targetSprite, "modulate", Colors.Purple, 0.2f);
+        tween.TweenProperty(targetSprite, "modulate", damageColor, 0.2f);
         tween.TweenProperty(targetSprite, "modulate", Colors.White, 0.3f);
     }
 
@@ -550,7 +592,12 @@ public partial class Monster : CharacterBody2D
     public void ForceHide() { if (EnableFollowerBehavior) { _stateTimer.Stop(); StartHiding(); } }
     public void ForceShow() { if (EnableFollowerBehavior) { _stateTimer.Stop(); StartFollowing(); } }
 
-    public bool CanTakeDamage() => EnableFollowerBehavior ? (_isFullyVisible && _currentState == MonsterState.Following) : true;
+    public bool CanTakeDamage() 
+    {
+        bool result = EnableFollowerBehavior ? (_isFullyVisible && (_currentState == MonsterState.Following || _currentState == MonsterState.InitialWait)) : true;
+        Log.Debug($"CanTakeDamage - EnableFollowerBehavior: {EnableFollowerBehavior}, IsFullyVisible: {_isFullyVisible}, CurrentState: {_currentState}, Result: {result}", "Monster");
+        return result;
+    }
 
     public MonsterLife GetLifeSystem() => _monsterLife;
 
@@ -564,7 +611,7 @@ public partial class Monster : CharacterBody2D
         bool damaged = _monsterLife.TakePhysicalDamage(damage);
         if (damaged)
         {
-            PlayDamageEffect();
+            PlayDamageEffect(Colors.Red); // Physical damage = red flash
             Log.Debug($"Monster took {damage} physical damage", "Monster");
         }
         return damaged;
@@ -578,7 +625,7 @@ public partial class Monster : CharacterBody2D
         bool damaged = _monsterLife.TakeMagicalDamage(damage);
         if (damaged)
         {
-            PlayDamageEffect();
+            PlayDamageEffect(Colors.Purple); // Magical damage = purple flash
             Log.Debug($"Monster took {damage} magical damage", "Monster");
         }
         return damaged;
@@ -587,7 +634,13 @@ public partial class Monster : CharacterBody2D
     public bool TakeRockDamage(int damage = 1)
     {
         // Rock damage based on current reality
-        if (!CanTakeDamage() || _monsterLife == null) return false;
+        Log.Debug($"TakeRockDamage called - CanTakeDamage: {CanTakeDamage()}, MonsterLife: {_monsterLife != null}, CurrentReality: {CurrentReality}", "Monster");
+        
+        if (!CanTakeDamage() || _monsterLife == null) 
+        {
+            Log.UI($"Rock damage blocked - CanTakeDamage: {CanTakeDamage()}, MonsterLife exists: {_monsterLife != null}", "Monster");
+            return false;
+        }
         
         bool damaged = false;
         
@@ -595,6 +648,7 @@ public partial class Monster : CharacterBody2D
         {
             case MonsterReality.CurrentReality:
                 // In current reality, rocks damage red hearts only
+                Log.Debug($"Attempting physical damage - CurrentRedHearts: {_monsterLife.CurrentRedHearts}", "Monster");
                 damaged = _monsterLife.TakePhysicalDamage(damage);
                 if (damaged)
                 {
@@ -629,7 +683,9 @@ public partial class Monster : CharacterBody2D
         
         if (damaged)
         {
-            PlayDamageEffect();
+            // Use appropriate color based on which reality and what type of damage was dealt
+            Color damageColor = CurrentReality == MonsterReality.CurrentReality ? Colors.Red : Colors.Purple;
+            PlayDamageEffect(damageColor);
             Log.Debug($"Monster took {damage} rock damage in {CurrentReality} reality", "Monster");
         }
         

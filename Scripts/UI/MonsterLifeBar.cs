@@ -132,6 +132,22 @@ public partial class MonsterLifeBar : Control
         if (FollowMonster && _monster != null && IsInstanceValid(_monster))
         {
             UpdatePosition();
+            
+            // Only sync visibility if the monster is explicitly hidden (not just in certain states)
+            if (_monster.Visible && !Visible)
+            {
+                #if DEBUG
+                Log.Debug($"MonsterLifeBar showing - Monster is visible", "MonsterLifeBarUI");
+                #endif
+                Visible = true;
+            }
+            else if (!_monster.Visible && Visible)
+            {
+                #if DEBUG
+                Log.Debug($"MonsterLifeBar hiding - Monster is hidden", "MonsterLifeBarUI");
+                #endif
+                Visible = false;
+            }
         }
     }
 
@@ -195,21 +211,27 @@ public partial class MonsterLifeBar : Control
     private void CreateTextureHearts(int currentLife, int maxLife, int purpleHearts)
     {
         // Create hearts using texture images for polished visual appearance
+        // Purple hearts replace the last N hearts in the display, not add to them
         int redHearts = maxLife - purpleHearts;
         
-        // Create red hearts first
-        for (int i = 0; i < redHearts; i++)
+        #if DEBUG
+        Log.Debug($"Monster Hearts - Current: {currentLife}, Max: {maxLife}, Purple: {purpleHearts}", "MonsterLifeBarUI");
+        Log.Debug($"Calculated - Red slots: {redHearts}, Purple slots: {purpleHearts}", "MonsterLifeBarUI");
+        #endif
+        
+        // Create purple hearts first (leftmost positions 0 to purpleHearts-1)
+        for (int i = 0; i < purpleHearts; i++)
         {
-            bool isFull = i < Mathf.Max(0, currentLife - purpleHearts);
-            var heart = CreateTextureHeart(isFull, true); // true for red
+            bool isFull = currentLife > i; // Purple hearts are filled first (highest priority)
+            var heart = CreateTextureHeart(isFull, false); // false for purple
             _heartsContainer.AddChild(heart);
         }
         
-        // Create purple hearts last (so they appear on the right)
-        for (int i = 0; i < purpleHearts; i++)
+        // Create red hearts after purple hearts (positions purpleHearts to maxLife-1)
+        for (int i = 0; i < redHearts; i++)
         {
-            bool isFull = (redHearts + i) < currentLife;
-            var heart = CreateTextureHeart(isFull, false); // false for purple
+            bool isFull = currentLife > (purpleHearts + i); // Red hearts are filled after purple hearts
+            var heart = CreateTextureHeart(isFull, true); // true for red
             _heartsContainer.AddChild(heart);
         }
     }
@@ -238,21 +260,22 @@ public partial class MonsterLifeBar : Control
     private void CreateTextHearts(int currentLife, int maxLife, int purpleHearts)
     {
         // Fallback display using Unicode heart characters
+        // Purple hearts replace the last N hearts in the display, not add to them
         int redHearts = maxLife - purpleHearts;
         
-        // Create red hearts first
-        for (int i = 0; i < redHearts; i++)
+        // Create purple hearts first (leftmost positions 0 to purpleHearts-1)
+        for (int i = 0; i < purpleHearts; i++)
         {
-            bool isFull = i < Mathf.Max(0, currentLife - purpleHearts);
-            var heartLabel = CreateTextHeart(isFull, true); // true for red
+            bool isFull = currentLife > i; // Purple hearts are filled first (highest priority)
+            var heartLabel = CreateTextHeart(isFull, false); // false for purple
             _heartsContainer.AddChild(heartLabel);
         }
         
-        // Create purple hearts last
-        for (int i = 0; i < purpleHearts; i++)
+        // Create red hearts after purple hearts (positions purpleHearts to maxLife-1)
+        for (int i = 0; i < redHearts; i++)
         {
-            bool isFull = (redHearts + i) < currentLife;
-            var heartLabel = CreateTextHeart(isFull, false); // false for purple
+            bool isFull = currentLife > (purpleHearts + i); // Red hearts are filled after purple hearts
+            var heartLabel = CreateTextHeart(isFull, true); // true for red
             _heartsContainer.AddChild(heartLabel);
         }
     }

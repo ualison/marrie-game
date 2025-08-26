@@ -80,11 +80,15 @@ public partial class MonsterLife : Node, IHealthSystem
     public bool TakePhysicalDamage(int damage = 1)
     {
         // Physical damage can only affect red hearts
+        Log.Debug($"TakePhysicalDamage called - IsDead: {IsDead}, IsInvulnerable: {IsInvulnerable}, CurrentRedHearts: {CurrentRedHearts}", "MonsterLife");
+        
         if (IsDead || IsInvulnerable) return false;
         
         // Calculate how much red heart damage can be applied
         int maxPhysicalDamage = CurrentRedHearts;
         int actualDamage = Mathf.Min(damage, maxPhysicalDamage);
+        
+        Log.Debug($"Physical damage calculation - MaxPhysicalDamage: {maxPhysicalDamage}, ActualDamage: {actualDamage}", "MonsterLife");
         
         if (actualDamage <= 0) return false; // No red hearts to damage
         
