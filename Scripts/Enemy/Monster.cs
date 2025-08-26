@@ -33,6 +33,7 @@ public partial class Monster : CharacterBody2D
 
     #region Components
     private Player _player;
+    private MonsterLife _monsterLife;
     private Timer _stateTimer;
     private AudioStreamPlayer2D _footstepAudio;
     private Sprite2D _sprite;
@@ -63,6 +64,7 @@ public partial class Monster : CharacterBody2D
     private void InitializeSimpleComponents()
     {
         FindSprite();
+        FindMonsterLife();
         SetupDamageArea();
     }
 
@@ -70,6 +72,7 @@ public partial class Monster : CharacterBody2D
     {
         SetupTimer();
         FindSprite();
+        FindMonsterLife();
         SetupAudio();
         SetupDamageArea();
         CallDeferred(nameof(FindPlayerAndStart));
@@ -100,6 +103,21 @@ public partial class Monster : CharacterBody2D
         if (_spriteNode == null)
         {
             Log.Error("Monster: No sprite component found!", "Monster");
+        }
+    }
+
+    private void FindMonsterLife()
+    {
+        // Find MonsterLife component
+        _monsterLife = GetNodeOrNull<MonsterLife>("MonsterLife");
+        
+        if (_monsterLife == null)
+        {
+            Log.Warning("Monster: No MonsterLife component found!", "Monster");
+        }
+        else
+        {
+            Log.Debug("Monster: MonsterLife component found and connected", "Monster");
         }
     }
 
@@ -204,6 +222,9 @@ public partial class Monster : CharacterBody2D
         
         SetCollisionMask(1u);
         SetCollisionLayer(1u);
+        
+        // Reset MonsterLife to full health
+        _monsterLife?.Reset();
         
         GetTree().CreateTimer(3.0f).Timeout += () =>
         {
@@ -483,6 +504,36 @@ public partial class Monster : CharacterBody2D
 
     public bool CanTakeDamage() => EnableFollowerBehavior ? (_isFullyVisible && _currentState == MonsterState.Following) : true;
 
+    public MonsterLife GetLifeSystem() => _monsterLife;
+
+    public bool TakePhysicalDamage(int damage = 1)
+    {
+        // Physical damage to red hearts only
+        if (!CanTakeDamage() || _monsterLife == null) return false;
+        
+        bool damaged = _monsterLife.TakePhysicalDamage(damage);
+        if (damaged)
+        {
+            PlayDamageEffect();
+            Log.Debug($"Monster took {damage} physical damage", "Monster");
+        }
+        return damaged;
+    }
+
+    public bool TakeMagicalDamage(int damage = 1)
+    {
+        // Magical damage to any hearts
+        if (!CanTakeDamage() || _monsterLife == null) return false;
+        
+        bool damaged = _monsterLife.TakeMagicalDamage(damage);
+        if (damaged)
+        {
+            PlayDamageEffect();
+            Log.Debug($"Monster took {damage} magical damage", "Monster");
+        }
+        return damaged;
+    }
+
     public void Reset()
     {
         if (!EnableFollowerBehavior) return;
@@ -505,6 +556,9 @@ public partial class Monster : CharacterBody2D
 
         SetCollisionMask(0u);
         SetCollisionLayer(0u);
+
+        // Reset MonsterLife
+        _monsterLife?.Reset();
 
         PlayAudio(false);
         FacePlayer();

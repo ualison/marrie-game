@@ -143,12 +143,13 @@ public partial class Rock : Node2D
         
         // Ensure proper layer setup for thrown rocks
         _collisionArea.CollisionLayer = 8;  // Rock is on layer 8
-        _collisionArea.CollisionMask = 4;   // Rock detects apples on layer 4
+        _collisionArea.CollisionMask = 4 | 16;   // Rock detects apples on layer 4 and monsters on layer 16
         
-        // Connect to area entered signal so rock disappears when hitting apple
+        // Connect to area entered signal so rock disappears when hitting apple or monster
         _collisionArea.AreaEntered += OnRockHitArea;
+        _collisionArea.BodyEntered += OnRockHitBody;
         
-        Log.System($"Rock collision area set up - Layer: {_collisionArea.CollisionLayer}, Mask: {_collisionArea.CollisionMask}, AreaEntered signal connected", "Rock");
+        Log.System($"Rock collision area set up - Layer: {_collisionArea.CollisionLayer}, Mask: {_collisionArea.CollisionMask}", "Rock");
     }
 
     private void OnRockHitArea(Area2D area)
@@ -160,6 +161,34 @@ public partial class Rock : Node2D
         if (area.CollisionLayer == 4)
         {
             Log.System("Rock confirmed hit apple detection area", "Rock");
+        }
+        
+        // Stop movement and disappear
+        _isMoving = false;
+        CreateImpactEffect();
+    }
+
+    private void OnRockHitBody(Node2D body)
+    {
+        // Rock hit a CharacterBody2D (like a monster)
+        Log.System($"Rock hit body: {body.Name} ({body.GetType().Name})", "Rock");
+        
+        // Check if this is a monster
+        if (body is Monster monster)
+        {
+            Log.System("Rock hit monster - dealing physical damage", "Rock");
+            
+            // Deal physical damage to the monster (affects red hearts only)
+            bool damaged = monster.TakePhysicalDamage(1);
+            
+            if (damaged)
+            {
+                Log.UI("Rock successfully damaged monster!", "Rock");
+            }
+            else
+            {
+                Log.UI("Rock hit monster but no damage dealt (invulnerable or no red hearts)", "Rock");
+            }
         }
         
         // Stop movement and disappear

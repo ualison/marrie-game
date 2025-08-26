@@ -1,7 +1,9 @@
-[gd_scene load_steps=5 format=3 uid="uid://djryvxjy0bkfe"]
+[gd_scene load_steps=7 format=3 uid="uid://djryvxjy0bkfe"]
 
 [ext_resource type="Script" uid="uid://c0o15dmumujxy" path="res://Scripts/Enemy/Monster.cs" id="1_x8qak"]
 [ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monsterv3.png" id="2_x8qak"]
+[ext_resource type="Script" uid="uid://2hx87sinu6t" path="res://Scripts/Enemy/MonsterLife.cs" id="3_monsterlife"]
+[ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wqfq0"]
 size = Vector2(284, 369)
@@ -13,6 +15,7 @@ size = Vector2(262, 365)
 
 [node name="CharacterBody2D" type="CharacterBody2D" parent="."]
 position = Vector2(0, 4)
+collision_layer = 16
 script = ExtResource("1_x8qak")
 EnableFollowerBehavior = true
 MinSpawnDistance = 100.0
@@ -39,3 +42,16 @@ shape = SubResource("RectangleShape2D_kyqiw")
 position = Vector2(5.99999, 27.625)
 scale = Vector2(0.302734, 0.309408)
 texture = ExtResource("2_x8qak")
+
+[node name="MonsterLifeBar" parent="CharacterBody2D" instance=ExtResource("4_lifebar")]
+offset_left = -53.0
+offset_top = -236.0
+offset_right = 47.0
+offset_bottom = -186.0
+OffsetFromMonster = Vector2(-80, -220)
+
+[node name="MonsterLife" type="Node2D" parent="CharacterBody2D"]
+position = Vector2(0, -195)
+script = ExtResource("3_monsterlife")
+MaxLife = 4
+StartingLife = 2
