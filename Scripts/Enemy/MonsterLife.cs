@@ -97,6 +97,20 @@ public partial class MonsterLife : Node, IHealthSystem
         return TakeDamage(damage);
     }
 
+    public bool TakePurpleHeartDamage(int damage = 1)
+    {
+        // Purple heart damage can only affect purple hearts
+        if (IsDead || IsInvulnerable) return false;
+        
+        // Calculate how much purple heart damage can be applied
+        int maxPurpleDamage = CurrentPurpleHearts;
+        int actualDamage = Mathf.Min(damage, maxPurpleDamage);
+        
+        if (actualDamage <= 0) return false; // No purple hearts to damage
+        
+        return TakeDamage(actualDamage);
+    }
+
     public void Heal(int amount = 1)
     {
         // Cannot heal when dead

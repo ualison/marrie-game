@@ -143,7 +143,7 @@ public partial class Rock : Node2D
         
         // Ensure proper layer setup for thrown rocks
         _collisionArea.CollisionLayer = 8;  // Rock is on layer 8
-        _collisionArea.CollisionMask = 4 | 16;   // Rock detects apples on layer 4 and monsters on layer 16
+        _collisionArea.CollisionMask = 1 | 4;   // Rock detects bodies/monsters on layer 1 and apples on layer 4
         
         // Connect to area entered signal so rock disappears when hitting apple or monster
         _collisionArea.AreaEntered += OnRockHitArea;
@@ -154,32 +154,81 @@ public partial class Rock : Node2D
 
     private void OnRockHitArea(Area2D area)
     {
-        // Rock hit something with an Area2D (like an apple)
+        // Rock hit something with an Area2D (like an apple or monster's damage area)
         Log.System($"Rock's area hit another area: {area.Name} on layer {area.CollisionLayer}, mask {area.CollisionMask}", "Rock");
+        
+        string areaName = area.Name.ToString();
         
         // Check if this is an apple's rock detection area
         if (area.CollisionLayer == 4)
         {
             Log.System("Rock confirmed hit apple detection area", "Rock");
+            // Stop movement and disappear when hitting apple area
+            _isMoving = false;
+            CreateImpactEffect();
         }
-        
-        // Stop movement and disappear
-        _isMoving = false;
-        CreateImpactEffect();
+        else if (areaName.Contains("HurtBox") || areaName.Contains("DamageArea"))
+        {
+            // This is likely a monster's area - find the parent monster and deal damage
+            Log.System($"Rock hit monster area: {area.Name} - looking for parent monster", "Rock");
+            
+            // Try to find the monster parent
+            Node current = area;
+            Monster monster = null;
+            
+            // Search up the node tree for a Monster
+            while (current != null && monster == null)
+            {
+                monster = current as Monster;
+                current = current.GetParent();
+            }
+            
+            if (monster != null)
+            {
+                Log.System($"Found parent monster: {monster.Name} - dealing rock damage", "Rock");
+                
+                // Deal rock damage to the monster (damage type depends on monster's reality)
+                bool damaged = monster.TakeRockDamage(1);
+                
+                if (damaged)
+                {
+                    Log.UI("Rock successfully damaged monster via area detection!", "Rock");
+                }
+                else
+                {
+                    Log.UI("Rock hit monster but no damage dealt (invulnerable or no appropriate hearts)", "Rock");
+                }
+                
+                // Stop movement and disappear after hitting monster
+                _isMoving = false;
+                CreateImpactEffect();
+            }
+            else
+            {
+                Log.System($"No parent monster found for area: {area.Name} - continuing trajectory", "Rock");
+            }
+        }
+        else
+        {
+            Log.System($"Rock hit unknown area: {area.Name} - stopping", "Rock");
+            // Stop movement and disappear for other unknown areas
+            _isMoving = false;
+            CreateImpactEffect();
+        }
     }
 
     private void OnRockHitBody(Node2D body)
     {
         // Rock hit a CharacterBody2D (like a monster)
-        Log.System($"Rock hit body: {body.Name} ({body.GetType().Name})", "Rock");
+        Log.System($"Rock Area2D hit body: {body.Name} ({body.GetType().Name}) at position {GlobalPosition}", "Rock");
         
         // Check if this is a monster
         if (body is Monster monster)
         {
-            Log.System("Rock hit monster - dealing physical damage", "Rock");
+            Log.System("Rock hit monster via Area2D - dealing rock damage based on reality", "Rock");
             
-            // Deal physical damage to the monster (affects red hearts only)
-            bool damaged = monster.TakePhysicalDamage(1);
+            // Deal rock damage to the monster (damage type depends on monster's reality)
+            bool damaged = monster.TakeRockDamage(1);
             
             if (damaged)
             {
@@ -187,11 +236,11 @@ public partial class Rock : Node2D
             }
             else
             {
-                Log.UI("Rock hit monster but no damage dealt (invulnerable or no red hearts)", "Rock");
+                Log.UI("Rock hit monster but no damage dealt (invulnerable or no appropriate hearts)", "Rock");
             }
         }
         
-        // Stop movement and disappear
+        // Stop movement and disappear when hitting any body
         _isMoving = false;
         CreateImpactEffect();
     }
@@ -330,17 +379,36 @@ public partial class Rock : Node2D
 
     private bool CheckCollisionAtPosition(Vector2 worldPoint)
     {
-        // Use PhysicsServer2D to check only for ground collisions
+        // Use PhysicsServer2D to check for ground/static objects but exclude monsters
         var spaceState = GetWorld2D().DirectSpaceState;
         
-        // Check for ground/static objects (layer 1) - let Area2D handle apple collisions
+        // Check for ground/static objects (layer 1) but exclude monsters
         var query = new PhysicsPointQueryParameters2D();
         query.Position = worldPoint;
-        query.CollisionMask = 1; // Check only for ground
+        query.CollisionMask = 1; // Check layer 1 (ground and monsters)
         query.Exclude = new Godot.Collections.Array<Rid>();
         
         var result = spaceState.IntersectPoint(query);
-        return result.Count > 0;
+        
+        // If we found collisions, check if any are NOT monsters
+        foreach (var collision in result)
+        {
+            var collider = collision["collider"].AsGodotObject();
+            
+            // If the collider is not a monster, it's ground/static - collision detected
+            if (collider is not Monster)
+            {
+                Log.System($"Rock trajectory collision with ground/static object: {collider?.GetType().Name ?? "unknown"}", "Rock");
+                return true;
+            }
+            else
+            {
+                Log.System($"Rock trajectory passed through monster: {((Monster)collider).Name} - letting Area2D handle interaction", "Rock");
+            }
+        }
+        
+        // No ground/static collisions found (only monsters if any)
+        return false;
     }
 
     private void OnTrajectoryComplete()

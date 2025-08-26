@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Enums;
 
 // Unified Monster class supporting both simple and follower behaviors
 public partial class Monster : CharacterBody2D
@@ -6,6 +7,7 @@ public partial class Monster : CharacterBody2D
     #region Exported Properties
     [Export] public int DamageAmount { get; set; } = 1;
     [Export] public bool ShowForTesting { get; set; } = true;
+    [Export] public MonsterReality CurrentReality { get; set; } = MonsterReality.CurrentReality;
     
     // Follower behavior properties
     [Export] public bool EnableFollowerBehavior { get; set; } = false;
@@ -552,6 +554,8 @@ public partial class Monster : CharacterBody2D
 
     public MonsterLife GetLifeSystem() => _monsterLife;
 
+    public MonsterReality GetCurrentReality() => CurrentReality;
+
     public bool TakePhysicalDamage(int damage = 1)
     {
         // Physical damage to red hearts only
@@ -578,6 +582,64 @@ public partial class Monster : CharacterBody2D
             Log.Debug($"Monster took {damage} magical damage", "Monster");
         }
         return damaged;
+    }
+
+    public bool TakeRockDamage(int damage = 1)
+    {
+        // Rock damage based on current reality
+        if (!CanTakeDamage() || _monsterLife == null) return false;
+        
+        bool damaged = false;
+        
+        switch (CurrentReality)
+        {
+            case MonsterReality.CurrentReality:
+                // In current reality, rocks damage red hearts only
+                damaged = _monsterLife.TakePhysicalDamage(damage);
+                if (damaged)
+                {
+                    Log.UI($"Rock hit monster in Current Reality - damaged red hearts", "Monster");
+                }
+                else
+                {
+                    Log.UI($"Rock hit monster in Current Reality but no red hearts to damage", "Monster");
+                }
+                break;
+                
+            case MonsterReality.PurpleGemReality:
+                // In purple gem reality, rocks damage purple hearts only
+                damaged = _monsterLife.TakePurpleHeartDamage(damage);
+                if (damaged)
+                {
+                    Log.UI($"Rock hit monster in Purple Gem Reality - damaged purple hearts", "Monster");
+                    
+                    // Check if all purple hearts are lost (monster should die)
+                    if (_monsterLife.CurrentPurpleHearts <= 0)
+                    {
+                        Log.UI($"Monster died - all purple hearts lost in Purple Gem Reality", "Monster");
+                        // The MonsterLife system will handle the death signal
+                    }
+                }
+                else
+                {
+                    Log.UI($"Rock hit monster in Purple Gem Reality but no purple hearts to damage", "Monster");
+                }
+                break;
+        }
+        
+        if (damaged)
+        {
+            PlayDamageEffect();
+            Log.Debug($"Monster took {damage} rock damage in {CurrentReality} reality", "Monster");
+        }
+        
+        return damaged;
+    }
+
+    public void SetReality(MonsterReality reality)
+    {
+        CurrentReality = reality;
+        Log.Debug($"Monster reality changed to {reality}", "Monster");
     }
 
     public void Reset()
