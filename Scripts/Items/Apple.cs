@@ -1,4 +1,5 @@
 using Godot;
+using Core.Enums;
 
 /// <summary>
 /// Apple item with different state cycles for tree vs fallen apples:
@@ -38,21 +39,12 @@ public partial class Apple : Node2D
     #region State
     private bool _playerNearby = false;
     private AppleState _currentState = AppleState.RedLife; // Current apple state
+    private ApplePosition _currentPosition = ApplePosition.OnTree; // Current apple position
     private Timer _transitionTimer;
     private Tween _fadeTween;
     private Vector2 _originalScale; // Store original scale for transitions
     private bool _isFalling = false; // Track if apple is falling
     private bool _hasLanded = false; // Track if apple has landed on ground
-    #endregion
-
-    #region Apple State Enum
-    public enum AppleState
-    {
-        RedLife,           // Red color - Life phase (collectible, restores health)
-        GrayKnockable,     // Gray color - Knockable phase (can be hit by rocks to fall)
-        PurpleMana,        // Purple color - Mana phase (collectible, restores mana)
-        GrayNotCollectible // Gray color - Fallen apple phase (not collectible after being knocked down)
-    }
     #endregion
 
     #region Initialization
@@ -150,17 +142,14 @@ public partial class Apple : Node2D
 
     private void HandleAppleConsumption()
     {
-        Log.System($"HandleAppleConsumption called - state: {_currentState}, hasLanded: {_hasLanded}", "Apple");
-        
         // Only allow consumption during RedLife and PurpleMana phases
         if (_currentState != AppleState.RedLife && _currentState != AppleState.PurpleMana)
         {
-            Log.UI("Apple is not collectible in current state", "Apple");
             return;
         }
         
-        // Only allow pickup if apple has fallen and landed (prevent tree cheating)
-        if (!_hasLanded)
+        // Only allow pickup if apple is on ground (prevent tree cheating)
+        if (_currentPosition != ApplePosition.OnGround)
         {
             Log.UI("Cannot pickup apple from tree - must be knocked down first", "Apple");
             return;
@@ -225,7 +214,6 @@ public partial class Apple : Node2D
     #region Color Transition
     private void OnTransitionTimeout()
     {
-        Log.System($"Apple transitioning from {_currentState} state", "Apple");
         TransitionColor();
     }
 
@@ -256,20 +244,20 @@ public partial class Apple : Node2D
 
     private void SwitchTexture()
     {
-        // Different cycles based on whether apple has fallen or not
-        if (_isFalling || !_rigidBody.Freeze)
+        // Different cycles based on apple position
+        if (_currentPosition == ApplePosition.OnGround)
         {
-            // Fallen apple cycle: RedLife → GrayNotCollectible → PurpleMana → RedLife
+            // Ground apple cycle: RedLife → GrayNotCollectible → PurpleMana → RedLife
             _currentState = _currentState switch
             {
                 AppleState.RedLife => AppleState.GrayNotCollectible,
                 AppleState.GrayNotCollectible => AppleState.PurpleMana,
                 AppleState.PurpleMana => AppleState.RedLife,
-                AppleState.GrayKnockable => AppleState.GrayNotCollectible, // Transition from tree to fallen
+                AppleState.GrayKnockable => AppleState.GrayNotCollectible, // Transition from tree to ground
                 _ => AppleState.RedLife
             };
         }
-        else
+        else // ApplePosition.OnTree
         {
             // Tree apple cycle: RedLife → GrayKnockable → PurpleMana → RedLife
             _currentState = _currentState switch
@@ -297,8 +285,6 @@ public partial class Apple : Node2D
             
             // Apply visual effects for different states
             ApplyStateVisualEffects();
-            
-            Log.System($"Apple switched to {_currentState} state", "Apple");
         }
 
         // Update timer for the new phase
@@ -333,51 +319,33 @@ public partial class Apple : Node2D
     #region Player Detection
     private void OnPlayerEntered(Node2D body)
     {
-        Log.System($"OnPlayerEntered called - body: {body.Name}, is player group: {body.IsInGroup("player")}", "Apple");
-        
         if (body.IsInGroup("player"))
         {
             _playerNearby = true;
             UpdatePromptDisplay();
-            Log.UI("Player nearby apple - showing prompt", "Apple");
         }
     }
 
     private void OnPlayerExited(Node2D body)
     {
-        Log.System($"OnPlayerExited called - body: {body.Name}, is player group: {body.IsInGroup("player")}", "Apple");
-        
         if (body.IsInGroup("player"))
         {
             _playerNearby = false;
             _promptLabel.Hide();
-            Log.UI("Player left apple - hiding prompt", "Apple");
         }
     }
 
     private void OnProjectileImpact(Area2D area)
     {
         // Generic projectile impact detection - any Area2D on layer 8 is considered a projectile
-        Log.System($"OnProjectileImpact called - area: {area.Name}, layer: {area.CollisionLayer}, apple state: {_currentState}, falling: {_isFalling}", "Apple");
-        
         if (area.CollisionLayer == 8)
         {
-            Log.System($"Projectile impact on apple in {_currentState} state", "Apple");
-            
             // Apple should fall ONLY when hit in GrayKnockable state
             if (_currentState == AppleState.GrayKnockable && !_isFalling)
             {
-                Log.System("Apple is in GrayKnockable state - triggering fall", "Apple");
+                Log.System("Apple hit by rock - triggering fall", "Apple");
                 MakeAppleFall();
             }
-            else
-            {
-                Log.System($"Apple not falling - state: {_currentState}, falling: {_isFalling}", "Apple");
-            }
-        }
-        else
-        {
-            Log.System($"Area layer {area.CollisionLayer} is not a projectile (expected layer 8)", "Apple");
         }
     }
 
@@ -386,7 +354,7 @@ public partial class Apple : Node2D
         // Check if apple hit the ground (StaticBody2D)
         if (body is StaticBody2D && _isFalling && !_hasLanded)
         {
-            Log.System("Apple hit ground - landing detected (deferred)", "Apple");
+            Log.System("Apple landed on ground", "Apple");
             // Use CallDeferred to avoid physics state change during collision detection
             CallDeferred(nameof(OnGroundLanding));
         }
@@ -396,34 +364,25 @@ public partial class Apple : Node2D
     {
         if (_isFalling) 
         {
-            Log.System("MakeAppleFall called but apple is already falling", "Apple");
             return;
         }
         
-        Log.System("MakeAppleFall called - apple will fall", "Apple");
         _isFalling = true;
         
         // Use call_deferred to change physics properties safely during collision detection
         CallDeferred(nameof(DeferredMakeAppleFall));
-        
-        Log.System("Apple fall initiated (deferred)", "Apple");
     }
     
     private void DeferredMakeAppleFall()
     {
-        Log.System($"DeferredMakeAppleFall called - Before: Freeze={_rigidBody.Freeze}, GravityScale={_rigidBody.GravityScale}", "Apple");
-        
         // Ensure the RigidBody2D can move and respond to physics
         _rigidBody.Freeze = false; // Unfreeze to allow physics
         _rigidBody.GravityScale = 1.0f; // Enable gravity
         
-        Log.System($"DeferredMakeAppleFall - After: Freeze={_rigidBody.Freeze}, GravityScale={_rigidBody.GravityScale}", "Apple");
-        
-        // Change state to GrayNotCollectible when apple falls
+        // Change position to OnGround and state to GrayNotCollectible when apple falls
+        _currentPosition = ApplePosition.OnGround;
         _currentState = AppleState.GrayNotCollectible;
         ApplyStateVisualEffects();
-        
-        Log.System("Apple is now falling with physics enabled - will disable when hitting ground", "Apple");
         
         // Add some impulse for more dramatic effect
         Vector2 randomImpulse = new Vector2(
@@ -431,14 +390,10 @@ public partial class Apple : Node2D
             (float)GD.RandRange(-20, 0)
         );
         _rigidBody.ApplyImpulse(randomImpulse);
-        
-        Log.System($"Applied impulse: {randomImpulse}", "Apple");
     }
 
     public void OnGroundLanding()
     {
-        Log.System("Apple has landed on ground - disabling physics and collisions", "Apple");
-        
         _hasLanded = true;
         
         // Disable RigidBody2D physics
@@ -453,24 +408,21 @@ public partial class Apple : Node2D
         {
             physicsCollision.Disabled = true;
         }
-        
-        Log.System("Apple is now settled on ground - physics disabled, detection area active", "Apple");
     }
 
     private void UpdatePromptDisplay()
     {
-        Log.System($"UpdatePromptDisplay called - playerNearby: {_playerNearby}, state: {_currentState}, hasLanded: {_hasLanded}", "Apple");
-        
         if (!_playerNearby)
         {
             _promptLabel.Hide();
             return;
         }
 
-        // Only show prompts for red and purple states
-        bool isCollectibleState = (_currentState == AppleState.RedLife || _currentState == AppleState.PurpleMana);
+        // Only show prompts for red and purple states AND only when apple is on ground
+        bool isCollectibleState = _currentState == AppleState.RedLife || _currentState == AppleState.PurpleMana;
+        bool isOnGround = _currentPosition == ApplePosition.OnGround;
         
-        if (isCollectibleState)
+        if (isCollectibleState && isOnGround)
         {
             string promptText = _currentState switch
             {
@@ -480,12 +432,10 @@ public partial class Apple : Node2D
             };
             _promptLabel.Text = promptText;
             _promptLabel.Show();
-            Log.System($"Showing prompt: {promptText}", "Apple");
         }
         else
         {
             _promptLabel.Hide();
-            Log.System($"Hiding prompt - not collectible state: {_currentState}", "Apple");
         }
     }
     #endregion
@@ -513,11 +463,17 @@ public partial class Apple : Node2D
     
     public AppleState GetCurrentState() => _currentState;
     
+    public ApplePosition GetCurrentPosition() => _currentPosition;
+    
     public bool IsInLifePhase() => _currentState == AppleState.RedLife;
     
     public bool IsInManaPhase() => _currentState == AppleState.PurpleMana;
     
-    public bool CanFallFromRockHit() => _currentState == AppleState.GrayKnockable && !_isFalling;
+    public bool IsOnTree() => _currentPosition == ApplePosition.OnTree;
+    
+    public bool IsOnGround() => _currentPosition == ApplePosition.OnGround;
+    
+    public bool CanFallFromRockHit() => _currentState == AppleState.GrayKnockable && _currentPosition == ApplePosition.OnTree && !_isFalling;
     
     public bool IsFalling() => _isFalling;
     #endregion
