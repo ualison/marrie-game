@@ -30,11 +30,10 @@ public partial class GhostMonster : CharacterBody2D
     #endregion
 
     #region Performance Cache
-    private bool _hasAnimationFrames = false;
+    private bool _hasAnimationFrames => _animatedSprite?.SpriteFrames != null;
     private float _lastAlpha = -1f; // Cache to avoid unnecessary updates
     private bool _lastFlipState = false;
     private string _lastAnimation = "";
-    private Vector2 _lastPosition = Vector2.Zero;
     private Tween _currentFadeTween; // Track fade transitions
 
     // State-based behavior (replaces alpha detection)
@@ -319,15 +318,6 @@ public partial class GhostMonster : CharacterBody2D
         bool newIsFullyVisible = frame.IsFullyVisible;
         float finalAlpha = frame.Alpha * GHOST_TINT.A;
 
-        // Detect state transitions
-        bool stateChanged = newMonsterState != _currentMonsterState;
-        bool visibilityChanged = newIsFullyVisible != _isCurrentlyFullyVisible;
-
-        if (stateChanged || visibilityChanged)
-        {
-            HandleStateTransition(newMonsterState, newIsFullyVisible, frame);
-        }
-
         // Update current alpha
         if (Mathf.Abs(_lastAlpha - finalAlpha) > ALPHA_TOLERANCE)
         {
@@ -358,11 +348,6 @@ public partial class GhostMonster : CharacterBody2D
         }
     }
 
-    private void HandleStateTransition(string newState, bool newIsFullyVisible, ReplayFrame frame)
-    {
-        // State transition handling without excessive logging
-        // Logic for handling transitions can be added here if needed
-    }
     #endregion
 
     #region Replay Control
@@ -385,7 +370,6 @@ public partial class GhostMonster : CharacterBody2D
         _lastAlpha = -1f;
         _lastFlipState = false;
         _lastAnimation = "";
-        _lastPosition = Vector2.Zero;
 
         // Reset state tracking
         _currentFadeTween?.Kill();
@@ -397,7 +381,6 @@ public partial class GhostMonster : CharacterBody2D
         GlobalPosition = firstFrame.Position;
         _currentPosition = GlobalPosition;
         _targetPosition = GlobalPosition;
-        _lastPosition = GlobalPosition;
 
         // FIXED: Show the ghost immediately with proper initial state instead of hidden
         Show();
@@ -467,7 +450,6 @@ public partial class GhostMonster : CharacterBody2D
     private void SetupGhostVisuals()
     {
         DiscoverSpriteComponents();
-        CacheAnimationCapability();
         ApplyGhostEffect();
     }
 
@@ -532,12 +514,6 @@ public partial class GhostMonster : CharacterBody2D
             Log.Warning($"GhostMonster: Searched paths: GhostMonsterSprite, AnimatedSprite2D, Sprite2D, MonsterSprite, recursive search", "GhostMonster");
             CreateFallbackVisual();
         }
-    }
-
-    private void CacheAnimationCapability()
-    {
-        // Cache whether we have animation capability to avoid repeated checks
-        _hasAnimationFrames = _animatedSprite != null && _animatedSprite.SpriteFrames != null;
     }
 
     private void ApplyGhostEffect()
@@ -773,11 +749,6 @@ public partial class GhostMonster : CharacterBody2D
         bool damaged = _monsterLife.TakeMagicalDamage(damage);
         if (damaged) PlayDamageEffect(Colors.Purple);
         return damaged;
-    }
-
-    public void Reset()
-    {
-        _monsterLife?.Reset();
     }
     #endregion
 }
