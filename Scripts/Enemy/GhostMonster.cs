@@ -44,7 +44,9 @@ public partial class GhostMonster : CharacterBody2D
     #region Initialization
     public override void _Ready()
     {
-        SetupGhostVisuals();
+    // Note: the scene's PauseMode should be set to PauseModeEnum.Process for reliable replay while tree is paused.
+    Log.Debug("Ensure PauseMode=Process in scene for ghost to process during tree pause", "GhostMonster");
+    SetupGhostVisuals();
         DisableCollisions();
         Hide();
         Log.Debug($"GhostMonster ready: {Name}", "GhostMonster");

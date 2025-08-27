@@ -40,8 +40,8 @@ public partial class GameMessage : Control
     private void InitializeComponents()
     {
         // Get UI components with error handling
-        _messageBackground = GetNode<NinePatchRect>("MessageBackground");
-        _messageLabel = GetNode<Label>("MessageBackground/MessageLabel");
+    _messageBackground = GetNodeOrNull<NinePatchRect>("MessageBackground");
+    _messageLabel = GetNodeOrNull<Label>("MessageBackground/MessageLabel");
         
         if (_messageBackground == null)
         {
@@ -60,8 +60,11 @@ public partial class GameMessage : Control
         _displayTimer = new Timer();
         _displayTimer.WaitTime = DisplayDuration;
         _displayTimer.OneShot = true;
-        _displayTimer.Timeout += OnDisplayTimeout;
-        AddChild(_displayTimer);
+        if (_displayTimer != null)
+        {
+            _displayTimer.Timeout += OnDisplayTimeout;
+            AddChild(_displayTimer);
+        }
     }
 
     private void SetupInitialState()

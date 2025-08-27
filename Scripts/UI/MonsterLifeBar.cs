@@ -29,7 +29,7 @@ public partial class MonsterLifeBar : Control
     private void InitializeContainer()
     {
         // Ensure hearts container exists in scene structure
-        _heartsContainer = GetNode<HBoxContainer>("HeartsContainer");
+        _heartsContainer = GetNodeOrNull<HBoxContainer>("HeartsContainer");
 
         if (_heartsContainer == null)
         {
@@ -202,10 +202,11 @@ public partial class MonsterLifeBar : Control
         // Purple hearts replace the last N hearts in the display, not add to them
         int redHearts = maxLife - purpleHearts;
         
-        #if DEBUG
-        Log.Debug($"Monster Hearts - Current: {currentLife}, Max: {maxLife}, Purple: {purpleHearts}", "MonsterLifeBarUI");
-        Log.Debug($"Calculated - Red slots: {redHearts}, Purple slots: {purpleHearts}", "MonsterLifeBarUI");
-        #endif
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.Debug))
+        {
+            Log.Debug($"Monster Hearts - Current: {currentLife}, Max: {maxLife}, Purple: {purpleHearts}", "MonsterLifeBarUI");
+            Log.Debug($"Calculated - Red slots: {redHearts}, Purple slots: {purpleHearts}", "MonsterLifeBarUI");
+        }
         
         // Create purple hearts first (leftmost positions 0 to purpleHearts-1)
         for (int i = 0; i < purpleHearts; i++)

@@ -2,7 +2,7 @@ using MarrieGame.Core.Logging;
 
 /// <summary>
 /// Static facade for easy logging access throughout the game
-/// Provides simple API while maintaining flexibility of the underlying system
+/// Why: keep call sites concise while allowing the underlying logger to be swapped or configured centrally
 /// </summary>
 public static class Log
 {
@@ -104,6 +104,14 @@ public static class Log
         if (Logger is MarrieGame.Core.Logging.GameLogger gameLogger)
             gameLogger.SetCategoryFilter(category, enabled);
     }
+
+    // Why: allow call sites to avoid constructing expensive log messages when category is disabled
+    public static bool IsCategoryEnabled(LogCategory category)
+    {
+        if (Logger is MarrieGame.Core.Logging.GameLogger gameLogger)
+            return gameLogger.IsCategoryEnabled(category);
+        return false;
+    }
     
     /// <summary>
     /// Enable minimal logging for production - only warnings, errors, and critical events
@@ -112,7 +120,8 @@ public static class Log
     public static void EnableMinimalLogging()
     {
         SetLogLevel(LogLevel.Warning); // Focus on problems, not routine operations
-        Info("Minimal logging enabled - prioritizing warnings and errors for bug detection", "Logger");
+    // Why: notify that logs were reduced so developers can correlate missing entries
+    Info("Minimal logging enabled - prioritizing warnings and errors for bug detection", "Logger");
     }
     
     /// <summary>
@@ -129,6 +138,7 @@ public static class Log
             // Keep error categories active for bug detection
             gameLogger.SetCategoryFilter(LogCategory.Error, true);
             gameLogger.SetCategoryFilter(LogCategory.Warning, true);
+            // Why: explicit message to mark runtime mode change in logs
             Info("Reduced verbose logging - focusing on warnings and errors", "Logger");
         }
     }

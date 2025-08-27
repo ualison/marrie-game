@@ -32,7 +32,7 @@ public partial class GhostPlayer : CharacterBody2D
     #region Initialization
     public override void _Ready()
     {
-        // Setup visual appearance and disable physics interactions
+    // Setup visual appearance and disable physics interactions
         SetupGhostVisuals();
         DisableCollisions();
         Hide();

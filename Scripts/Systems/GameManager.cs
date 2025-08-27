@@ -15,28 +15,28 @@ using MarrieGame.Core.Logging;
 public partial class GameManager : Node
 {
     public static GameManager Instance { get; private set; }
-    
+
     #region Game State
     public bool IsGameActive { get; private set; } = true;
     public bool IsPaused { get; private set; }
     #endregion
-    
+
     public override void _Ready()
     {
         if (Instance == null)
         {
             Instance = this;
             ProcessMode = ProcessModeEnum.Always;
-            
+
             // Initialize logging system first
             InitializeLoggingSystem();
-            
+
             // Initialize all managers in correct order
             InitializeManagers();
-            
+
             // Subscribe to events for coordination
             SubscribeToEvents();
-            
+
             Log.System("Game orchestration active", "GameManager");
         }
         else
@@ -44,7 +44,7 @@ public partial class GameManager : Node
             QueueFree();
         }
     }
-    
+
     private void InitializeLoggingSystem()
     {
         // Create and add the logger to the scene tree if it doesn't exist
@@ -56,32 +56,33 @@ public partial class GameManager : Node
             CallDeferred(nameof(LogSystemInitialized));
         }
     }
-    
+
     private void LogSystemInitialized()
     {
         // Debug level - system initialization is routine
         Log.Debug("Logging system initialized", "GameManager");
-        
+
         // Configure logging for production performance
-        #if !DEBUG
+#if !DEBUG
             Log.ReduceVerboseLogging();
-        #endif
+#endif
     }
-    
+
     private void InitializeManagers()
     {
         Log.StartTimer("ManagerInitialization");
-        
+
         // Ensure all managers exist as children - order matters!
         EnsureManagerExists<SceneLifecycleManager>();  // First - needed for scene events
         EnsureManagerExists<RealityManager>();         // Early - needed for reality-based game logic
-        EnsureManagerExists<PlayerStateManager>();
+        EnsureManagerExists<PlayerStateManager>();     // Now managed by GameManager
+        EnsureManagerExists<EnemyManager>();           // Add EnemyManager for consistency
         EnsureManagerExists<UIManager>();
         EnsureManagerExists<ReplaySystemManager>();
-        
+
         Log.EndTimer("ManagerInitialization", "All managers initialized");
     }
-    
+
     private void EnsureManagerExists<T>() where T : Node, new()
     {
         if (GetChildren().OfType<T>().FirstOrDefault() == null)
@@ -90,7 +91,7 @@ public partial class GameManager : Node
             AddChild(manager);
             // Debug level - routine component creation
             Log.Debug($"Created {typeof(T).Name}", "GameManager");
-            
+
             // Special logging for RealityManager to verify it's working
             if (typeof(T) == typeof(RealityManager))
             {
@@ -103,7 +104,7 @@ public partial class GameManager : Node
             Log.System($"{typeof(T).Name} already exists", "GameManager");
         }
     }
-    
+
     private void VerifyRealityManagerInitialization()
     {
         Log.System($"Verifying RealityManager initialization - IsInstanceAvailable: {RealityManager.IsInstanceAvailable}", "GameManager");
@@ -116,98 +117,98 @@ public partial class GameManager : Node
             Log.Error("RealityManager failed to initialize properly!", "GameManager");
         }
     }
-    
+
     private void SubscribeToEvents()
     {
         // Listen to key events for game flow coordination
         GameEventSystem.GameRestart += OnGameRestart;
-        
+
         Log.System("Event subscriptions active", "GameManager");
     }
-    
+
     private void OnPlayerDied(Vector2 deathPosition, int remainingHealth)
     {
         // Important game event - always log player deaths for analysis
         Log.Error($"Coordinating player death response at {deathPosition} (Health: {remainingHealth})", "GameManager");
-        
+
         // Pause the game
         PauseGame();
-        
+
         // All specific handling is done by specialized managers
         // GameManager just coordinates the overall flow
     }
-    
+
     private void OnGameRestart()
     {
         Log.Gameplay("Coordinating game restart", "GameManager");
-        
+
         // Reset game state
         IsGameActive = true;
         ResumeGame();
-        
+
         // Reset player
         PlayerStateManager.Instance?.RespawnPlayer();
-        
+
         // Reset enemies
         if (EnemyManager.Instance != null)
         {
             EnemyManager.Instance.ResetAllEnemies();
         }
-        
+
         Log.Gameplay("Game restart coordination complete", "GameManager");
     }
-    
+
     #region Game State Management
     public bool IsGameOver => !IsGameActive;
-    
+
     public void PauseGame()
     {
         if (IsPaused) return;
-        
+
         IsPaused = true;
         GetTree().Paused = true;
-        
+
         GameEventSystem.OnGameStateChanged("Paused");
         Log.Gameplay("Game paused", "GameManager");
     }
-    
+
     public void ResumeGame()
     {
         if (!IsPaused) return;
-        
+
         IsPaused = false;
         GetTree().Paused = false;
-        
+
         GameEventSystem.OnGameStateChanged("Active");
         Log.Gameplay("Game resumed", "GameManager");
     }
-    
+
     public void RestartGame()
     {
         Log.Gameplay("Restart requested", "GameManager");
-        
+
         // Reset reality state when restarting
         if (RealityManager.IsInstanceAvailable)
         {
             RealityManager.Instance.Reset();
             Log.System("Reality state reset for game restart", "GameManager");
         }
-        
+
         GameEventSystem.OnGameRestart();
     }
-    
+
     public void QuitGame()
     {
         Log.System("Quit requested", "GameManager");
         GetTree().Quit();
     }
-    
+
     public bool GetGameState()
     {
         return IsGameActive && !IsPaused;
     }
     #endregion
-    
+
     #region Input Handling
     public override void _Input(InputEvent @event)
     {
@@ -221,14 +222,14 @@ public partial class GameManager : Node
         }
     }
     #endregion
-    
+
     public override void _ExitTree()
     {
         if (Instance == this)
         {
             // Cleanup subscriptions
             GameEventSystem.GameRestart -= OnGameRestart;
-            
+
             Instance = null;
             Log.System("Cleaned up", "GameManager");
         }

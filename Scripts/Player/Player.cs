@@ -361,14 +361,14 @@ private void ProcessDamageFromEnemy(Node2D enemy)
 
     private void OnPlayerDied()
     {
-        // Critical game event - always log player death
-        Log.Warning("Player died!", "Player");
-        Velocity = Vector2.Zero;
+    // Critical game event - always log player death
+    Log.Warning("Player died!", "Player");
+    Velocity = Vector2.Zero;
 
-        ApplyDeathVisuals();
-        
-        // Notify death through event system instead of direct GameManager call
-        GameEventSystem.OnPlayerDied(GlobalPosition, _playerLife?.CurrentHealth ?? 0);
+    ApplyDeathVisuals();
+
+    // Notify PlayerStateManager instead of firing global event directly
+    PlayerStateManager.Instance?.HandlePlayerDeath(GlobalPosition);
     }
 
     private void ApplyDeathVisuals()

@@ -13,7 +13,9 @@ namespace MarrieGame.Core.Logging
         public static GameLogger Instance { get; private set; }
         
         private LogLevel _currentLogLevel = LogLevel.Debug;
-        private readonly Dictionary<LogCategory, bool> _categoryFilters = new();
+    // Keep a simple category filter to allow selective enabling/disabling
+    // Why: reduce noisy logs in production while keeping important categories active
+    private readonly Dictionary<LogCategory, bool> _categoryFilters = new();
         
         // Performance tracking
         private readonly Dictionary<string, DateTime> _performanceTimers = new();
@@ -58,7 +60,14 @@ namespace MarrieGame.Core.Logging
             _categoryFilters[LogCategory.Error] = true;
             _categoryFilters[LogCategory.Critical] = true;
             
+            // Why: inform developers during startup that log filtering is active
             LogInfo("GameLogger initialized - prioritizing warnings and errors for bug detection", "Logger");
+        }
+
+        // Why: allow call sites to test category-level filtering before constructing expensive messages
+        public bool IsCategoryEnabled(LogCategory category)
+        {
+            return _categoryFilters.GetValueOrDefault(category, true);
         }
         
         #region Core Logging Methods

@@ -150,10 +150,18 @@ public partial class PlayerStateManager : Node
         
         IsPlayerDead = true;
         
-        // Notify other systems
-        Log.System("Firing PlayerDied event", "PlayerStateManager");
-        PlayerDied?.Invoke(deathPosition, _playerLife?.CurrentHealth ?? 0);
-        GameEventSystem.OnPlayerDied(deathPosition, _playerLife?.CurrentHealth ?? 0);
+    // Notify other systems
+    // Pause recording first to reduce race window where recorder might still be writing frames
+    if (ReplayRecorder.Instance != null)
+    {
+        ReplayRecorder.Instance.PauseRecording();
+#if DEBUG
+        Log.Debug("Paused ReplayRecorder before firing PlayerDied", "PlayerStateManager");
+#endif
+    }
+    Log.System("Firing PlayerDied event", "PlayerStateManager");
+    PlayerDied?.Invoke(deathPosition, _playerLife?.CurrentHealth ?? 0);
+    GameEventSystem.OnPlayerDied(deathPosition, _playerLife?.CurrentHealth ?? 0);
     }
     
     public void RespawnPlayer()

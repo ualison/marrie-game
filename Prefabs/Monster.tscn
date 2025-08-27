@@ -20,6 +20,7 @@ script = ExtResource("1_x8qak")
 EnableFollowerBehavior = true
 MinSpawnDistance = 100.0
 MinimumFollowDistance = 100.0
+WalkSpeed = 35.0
 InitialWaitTime = 3.0
 MinVisibleTime = 3.0
 MaxVisibleTime = 5.0

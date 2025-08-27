@@ -25,6 +25,8 @@ public partial class ReplayGem : Node2D
     public override void _Ready()
     {
         // Setup components and hide gem initially
+    // Note: for reliable behavior during paused state, set the scene PauseMode to PauseModeEnum.Process
+    Log.Replay("ReplayGem _Ready - ensure scene PauseMode is set to Process if replay should run while tree is paused", "ReplayGem");
         InitializeComponents();
         ConnectSignals();
         SetupPromptLabel();
@@ -57,16 +59,16 @@ public partial class ReplayGem : Node2D
     private void InitializeComponents()
     {
         // Get required child nodes with error handling
-        _detectionArea = GetNode<Area2D>("DetectionArea");
-        _gemSprite = GetNode<Sprite2D>("GemSprite");
-        _promptLabel = GetNode<Label>("PromptLabel");
+    _detectionArea = GetNodeOrNull<Area2D>("DetectionArea");
+    _gemSprite = GetNodeOrNull<Sprite2D>("GemSprite");
+    _promptLabel = GetNodeOrNull<Label>("PromptLabel");
         
         // Store original gem position for floating animation
-        _originalGemPosition = _gemSprite.Position;
-        
-        // Create tween for floating animation
-        _floatingTween = CreateTween();
-        _floatingTween.SetLoops(); // Loop infinitely
+        if (_gemSprite != null)
+            _originalGemPosition = _gemSprite.Position;
+
+        // Create tween for floating animation when needed
+        _floatingTween = null;
     }
 
     private void ConnectSignals()

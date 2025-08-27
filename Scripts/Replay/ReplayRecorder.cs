@@ -21,7 +21,10 @@ public partial class ReplayRecorder : Node
     #region State
     public bool IsRecording { get; private set; }
     public bool IsPausedForReplay { get; private set; }
-    public bool HasRecordedData => _playerFrames.Count > 0 || _monsterFrames.Count > 0;
+    // Include the small prebuffer in the recorded-data check to avoid losing fast deaths
+    private const int PREBUFFER_CAPACITY = 64;
+    private readonly Queue<ReplayFrame> _playerPreBuffer = new();
+    public bool HasRecordedData => _playerFrames.Count > 0 || _monsterFrames.Count > 0 || _playerPreBuffer.Count > 0;
     #endregion
 
     #region Data Storage
@@ -51,8 +54,8 @@ public partial class ReplayRecorder : Node
     #region Lifecycle
     public override void _Ready()
     {
-        Instance = this;
-        ProcessMode = ProcessModeEnum.Always;
+    Instance = this;
+    ProcessMode = ProcessModeEnum.Always;
         AddToGroup("replay_recorder");
         
         CallDeferred(nameof(Initialize));
@@ -175,6 +178,15 @@ public partial class ReplayRecorder : Node
     public void StopRecording()
     {
         IsRecording = false;
+        // If we have no primary frames but the prebuffer holds data (very short session), promote it
+        if (_playerFrames.Count == 0 && _playerPreBuffer.Count > 0)
+        {
+            while (_playerPreBuffer.Count > 0)
+            {
+                _playerFrames.Add(_playerPreBuffer.Dequeue());
+            }
+        }
+
         Log.Debug($"Recording stopped - Player: {_playerFrames.Count}, Monster: {_monsterFrames.Count} frames", "ReplayRecorder");
     }
 
@@ -212,6 +224,11 @@ public partial class ReplayRecorder : Node
         if (_cachedPlayer != null)
         {
             var frame = CreatePlayerFrame();
+            // Keep a short rolling prebuffer to preserve the last frames in case recording stops quickly
+            _playerPreBuffer.Enqueue(frame);
+            while (_playerPreBuffer.Count > PREBUFFER_CAPACITY)
+                _playerPreBuffer.Dequeue();
+
             _playerFrames.Add(frame);
             _lastPlayerPos = _cachedPlayer.GlobalPosition;
         }

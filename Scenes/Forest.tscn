@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=18 format=3 uid="uid://bnv528gs1hngu"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
@@ -11,7 +11,6 @@
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
 [ext_resource type="Script" uid="uid://bb2ife872jlja" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
-[ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="12_r6l07"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
 [ext_resource type="Script" uid="uid://cf5q88b7yl5la" path="res://Scripts/Systems/ReplaySystemManager.cs" id="14_r6l07"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
@@ -122,9 +121,6 @@ position = Vector2(286, 68)
 
 [node name="SceneLifecycleManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("11_r6l07")
-
-[node name="PlayerStateManager" type="Node" parent="GameSystems/Managers"]
-script = ExtResource("12_r6l07")
 
 [node name="UIManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("13_r6l07")

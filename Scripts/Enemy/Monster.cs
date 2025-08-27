@@ -837,45 +837,74 @@ public partial class Monster : CharacterBody2D
 
     public void Reset()
     {
-        if (!EnableFollowerBehavior) return;
-        
-        _stateTimer?.Stop();
-        _currentTween?.Kill();
-
-        GlobalPosition = _initialPosition;
-        Velocity = Vector2.Zero;
-
-        _currentState = MonsterState.Visible;
-        _isVisible = true;
-        _isFullyVisible = true;
-        _isTransitioning = false;
-
-        if (_spriteNode != null)
+        // Reset logic for both follower and regular monsters
+        if (EnableFollowerBehavior)
         {
-            _spriteNode.Visible = true;
-            _spriteNode.Modulate = Colors.White;
-        }
+            _stateTimer?.Stop();
+            _currentTween?.Kill();
 
-        // Show MonsterLifeBar when resetting
-        if (_monsterLifeBar != null)
+            GlobalPosition = _initialPosition;
+            Velocity = Vector2.Zero;
+
+            _currentState = MonsterState.Visible;
+            _isVisible = true;
+            _isFullyVisible = true;
+            _isTransitioning = false;
+
+            if (_spriteNode != null)
+            {
+                _spriteNode.Visible = true;
+                _spriteNode.Modulate = Colors.White;
+            }
+
+            // Show MonsterLifeBar when resetting
+            if (_monsterLifeBar != null)
+            {
+                _monsterLifeBar.Show();
+            }
+
+            // Keep ground collision during reset
+            SetCollisionMask(1u); // Ground collision
+            SetCollisionLayer(2u); // Layer 2 during reset
+
+            // Reset MonsterLife
+            _monsterLife?.Reset();
+
+            PlayAudio(false);
+            FacePlayer();
+
+            _stateTimer.WaitTime = InitialWaitTime;
+            _stateTimer.Start();
+
+            Log.Debug($"Monster reset to initial position {_initialPosition}", "Monster");
+        }
+        else
         {
-            _monsterLifeBar.Show();
+            // Regular monster reset logic
+            GlobalPosition = _initialPosition;
+            Velocity = Vector2.Zero;
+            _currentState = MonsterState.Visible;
+            _isVisible = true;
+            _isFullyVisible = true;
+            _isTransitioning = false;
+
+            if (_spriteNode != null)
+            {
+                _spriteNode.Visible = true;
+                _spriteNode.Modulate = Colors.White;
+            }
+
+            if (_monsterLifeBar != null)
+            {
+                _monsterLifeBar.Show();
+            }
+
+            SetCollisionMask(1u);
+            SetCollisionLayer(2u);
+            _monsterLife?.Reset();
+            PlayAudio(false);
+            Log.Debug($"Regular monster reset to initial position {_initialPosition}", "Monster");
         }
-
-        // Keep ground collision during reset
-        SetCollisionMask(1u); // Ground collision
-        SetCollisionLayer(2u); // Layer 2 during reset
-
-        // Reset MonsterLife
-        _monsterLife?.Reset();
-
-        PlayAudio(false);
-        FacePlayer();
-
-        _stateTimer.WaitTime = InitialWaitTime;
-        _stateTimer.Start();
-
-        Log.Debug($"Monster reset to initial position {_initialPosition}", "Monster");
     }
 
     private void OnPlayerEntered(Node2D body)

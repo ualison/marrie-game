@@ -255,8 +255,15 @@ public partial class RockThrower : Node2D
     {
         if (_inventory == null || !_inventory.HasRocks(1))
         {
-            // Debug level - routine successful operations don't need logging
             Log.Debug("No rocks available to throw", "RockThrower");
+            return;
+        }
+
+        // Check trajectory validity before removing rock or creating projectile
+        if (_currentGlobalTrajectory == null || _currentGlobalTrajectory.Length == 0)
+        {
+            Log.Warning("Cannot throw rock: no valid trajectory.", "RockThrower");
+            CancelTrajectory();
             return;
         }
 
@@ -269,8 +276,7 @@ public partial class RockThrower : Node2D
 
         // Create and launch projectile
         CreateRockProjectile();
-        
-        // Debug level - successful rock throwing is routine gameplay
+
         Log.Debug($"Rock thrown! Remaining rocks: {_inventory.GetRockCount()}", "RockThrower");
     }
 

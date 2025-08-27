@@ -24,7 +24,7 @@ public partial class ManaBar : Control
     private void InitializeContainer()
     {
         // Ensure mana container exists in scene structure
-        _manaContainer = GetNode<HBoxContainer>("ManaContainer");
+        _manaContainer = GetNodeOrNull<HBoxContainer>("ManaContainer");
 
         if (_manaContainer == null)
         {

@@ -63,34 +63,42 @@ public partial class Apple : Node2D
 
     private void InitializeComponents()
     {
-        _detectionArea = GetNode<Area2D>("RigidBody2D/DetectionArea");
-        _rigidBody = GetNode<RigidBody2D>("RigidBody2D");
-        _appleSprite = GetNode<Sprite2D>("RigidBody2D/AppleSprite");
-        _promptLabel = GetNode<Label>("RigidBody2D/PromptLabel");
-        _rockDetectionArea = GetNode<Area2D>("RigidBody2D/RockDetectionArea");
-        _groundDetectionArea = GetNode<Area2D>("RigidBody2D/GroundDetectionArea");
+    _detectionArea = GetNodeOrNull<Area2D>("RigidBody2D/DetectionArea");
+    _rigidBody = GetNodeOrNull<RigidBody2D>("RigidBody2D");
+    _appleSprite = GetNodeOrNull<Sprite2D>("RigidBody2D/AppleSprite");
+    _promptLabel = GetNodeOrNull<Label>("RigidBody2D/PromptLabel");
+    _rockDetectionArea = GetNodeOrNull<Area2D>("RigidBody2D/RockDetectionArea");
+    _groundDetectionArea = GetNodeOrNull<Area2D>("RigidBody2D/GroundDetectionArea");
     }
 
     private void SetupRigidBody()
     {
         // Connect rock hit detection - the Area2D is already set up in the scene
-        _rockDetectionArea.AreaEntered += OnProjectileImpact;
+        if (_rockDetectionArea != null)
+            _rockDetectionArea.AreaEntered += OnProjectileImpact;
         
         // Connect to ground collision detection via dedicated ground detection area
-        _groundDetectionArea.BodyEntered += OnGroundCollision;
+        if (_groundDetectionArea != null)
+            _groundDetectionArea.BodyEntered += OnGroundCollision;
     }
 
     private void ConnectSignals()
     {
-        _detectionArea.BodyEntered += OnPlayerEntered;
-        _detectionArea.BodyExited += OnPlayerExited;
+        if (_detectionArea != null)
+        {
+            _detectionArea.BodyEntered += OnPlayerEntered;
+            _detectionArea.BodyExited += OnPlayerExited;
+        }
     }
 
     private void SetupPromptLabel()
     {
-        _promptLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        _promptLabel.Text = "Press E";
-        _promptLabel.Hide();
+        if (_promptLabel != null)
+        {
+            _promptLabel.HorizontalAlignment = HorizontalAlignment.Center;
+            _promptLabel.Text = "Press E";
+            _promptLabel.Hide();
+        }
     }
 
     private void SetupTransitionTimer()
@@ -98,9 +106,12 @@ public partial class Apple : Node2D
         _transitionTimer = new Timer();
         _transitionTimer.WaitTime = GetCurrentPhaseTime();
         _transitionTimer.OneShot = false;
-        _transitionTimer.Timeout += OnTransitionTimeout;
-        AddChild(_transitionTimer);
-        _transitionTimer.Start();
+        if (_transitionTimer != null)
+        {
+            _transitionTimer.Timeout += OnTransitionTimeout;
+            AddChild(_transitionTimer);
+            _transitionTimer.Start();
+        }
     }
 
     private float GetCurrentPhaseTime()

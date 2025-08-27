@@ -24,7 +24,7 @@ public partial class LifeBar : Control
     private void InitializeContainer()
     {
         // Ensure hearts container exists in scene structure
-        _heartsContainer = GetNode<HBoxContainer>("HeartsContainer");
+        _heartsContainer = GetNodeOrNull<HBoxContainer>("HeartsContainer");
 
         if (_heartsContainer == null)
         {

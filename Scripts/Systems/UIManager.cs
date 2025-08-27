@@ -14,6 +14,7 @@ public partial class UIManager : Node
     private LifeBar _lifeBarUI;
     private ManaBar _manaBarUI;
     private GameMessage _gameMessageUI;
+    private bool _gameOverShown = false;
     #endregion
     
     public override void _Ready()
@@ -189,7 +190,10 @@ public partial class UIManager : Node
         }
         
         // Final status - debug level for initialization tracking
-        Log.Debug($"Final result - GameOverUI: {_gameOverUI?.Name ?? "null"}, LifeBarUI: {_lifeBarUI?.Name ?? "null"}, ManaBarUI: {_manaBarUI?.Name ?? "null"}, GameMessageUI: {_gameMessageUI?.Name ?? "null"}", "UIManager");
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.Debug))
+        {
+            Log.Debug($"Final result - GameOverUI: {_gameOverUI?.Name ?? "null"}, LifeBarUI: {_lifeBarUI?.Name ?? "null"}, ManaBarUI: {_manaBarUI?.Name ?? "null"}, GameMessageUI: {_gameMessageUI?.Name ?? "null"}", "UIManager");
+        }
     }
     
     private T FindNodeByType<T>(Node startNode) where T : class
@@ -222,10 +226,11 @@ public partial class UIManager : Node
     
     private void OnPlayerDied(Vector2 deathPosition, int remainingHealth)
     {
-        Log.UI($"Received player death event at {deathPosition}", "UIManager");
-        
-        // Wait 1 second before showing game over UI
-        GetTree().CreateTimer(1.0f).Timeout += () => ShowGameOverUIWithFade();
+    Log.UI($"Received player death event at {deathPosition}", "UIManager");
+    if (_gameOverShown) return;
+    _gameOverShown = true;
+    // Wait 1 second before showing game over UI
+    GetTree().CreateTimer(1.0f).Timeout += () => ShowGameOverUIWithFade();
     }
     
     private void ShowGameOverUIWithFade()
@@ -272,11 +277,11 @@ public partial class UIManager : Node
     
     private void OnRestartRequested()
     {
-        Log.UI("Restart requested via GameOverUI", "UIManager");
-        HideGameOverUI();
-        
-        // Notify game restart
-        GameEventSystem.OnGameRestart();
+    Log.UI("Restart requested via GameOverUI", "UIManager");
+    HideGameOverUI();
+    _gameOverShown = false;
+    // Notify game restart
+    GameEventSystem.OnGameRestart();
     }
     
     public GameOver GetGameOverUI() => _gameOverUI;
