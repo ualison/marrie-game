@@ -1,5 +1,7 @@
 using Godot;
 using System.Collections.Generic;
+using GodotCollections = Godot.Collections;
+using MarrieGame.Core.Enums;
 
 // Ghost version of monster that replays recorded movements and interactions - Performance Optimized
 public partial class GhostMonster : CharacterBody2D
@@ -22,6 +24,9 @@ public partial class GhostMonster : CharacterBody2D
     private AnimatedSprite2D _animatedSprite;
     private Sprite2D _sprite;
     private Node2D _activeSprite;
+    // Monster life for the ghost so UI and damage work like real Monster
+    private MonsterLife _monsterLife;
+    private MonsterLifeBar _monsterLifeBar;
     #endregion
 
     #region Performance Cache
@@ -71,6 +76,102 @@ public partial class GhostMonster : CharacterBody2D
             _activeSprite.Show();
             Log.Debug($"Ghost monster sprite shown: {_activeSprite.Name}, Visible: {_activeSprite.Visible}, Modulate: {_activeSprite.Modulate}", "GhostMonster");
         }
+
+    // Setup a MonsterLife and LifeBar so ghost displays health like a real monster
+    SetupLifeSystem();
+
+    // Connect to reality changes so life bar visibility and following behavior update
+    // Use Godot signal Connect because RealityManager emits the signal with an int payload
+    CallDeferred(nameof(EnsureRealitySubscription));
+    }
+
+    private bool _realityConnected = false;
+
+    private void EnsureRealitySubscription()
+    {
+        if (_realityConnected) return;
+
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+        {
+            // Connect using Godot signals to receive the raw emitted value
+            RealityManager.Instance.Connect("RealityChanged", new Callable(this, nameof(OnRealityChangedSignal)));
+            _realityConnected = true;
+            // Immediately apply current reality state to life bar
+            ApplyRealityToLifeBar(RealityManager.Instance.CurrentReality);
+        }
+        else
+        {
+            // Try again shortly after (deferred) if RealityManager isn't ready yet
+            CallDeferred(nameof(EnsureRealitySubscription));
+        }
+    }
+
+    // Wrapper for the Godot signal which emits an int; convert it to the Reality enum and forward
+    private void OnRealityChangedSignal(object rawValue)
+    {
+        try
+        {
+            int intVal = -1;
+
+            // Godot may send signal args as an object array or Godot.Collections.Array
+            if (rawValue is object[] objArr && objArr.Length > 0)
+            {
+                intVal = System.Convert.ToInt32(objArr[0]);
+            }
+            else if (rawValue is GodotCollections.Array gdArr && gdArr.Count > 0)
+            {
+                intVal = System.Convert.ToInt32(gdArr[0]);
+            }
+            else
+            {
+                intVal = System.Convert.ToInt32(rawValue);
+            }
+
+            var reality = (MarrieGame.Core.Enums.Reality)intVal;
+            OnRealityChanged(reality);
+        }
+        catch (System.Exception ex)
+        {
+            Log.Warning($"GhostMonster: Received RealityChanged signal with unexpected value - {ex.Message}", "GhostMonster");
+        }
+    }
+
+    private void OnRealityChanged(Reality newReality)
+    {
+        ApplyRealityToLifeBar(newReality);
+    }
+
+    private void ApplyRealityToLifeBar(Reality reality)
+    {
+        if (_monsterLifeBar == null)
+            return;
+
+        if (reality == Reality.CurrentReality)
+        {
+            // Detach and hide life bar in current reality to avoid lingering UI
+            try
+            {
+                _monsterLifeBar.ConnectToLifeSystem(null); // disconnect from any life system
+            }
+            catch { }
+            _monsterLifeBar.Hide();
+            _monsterLifeBar.SetFollowMonster(false);
+            // Ensure fully invisible (defensive)
+            var mbMod = _monsterLifeBar.Modulate;
+            _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, 0.0f);
+        }
+    else if (reality == Reality.PastReality)
+        {
+            // Show and make life bar follow ghost during past reality replay
+            // Reconnect to the monster life system and show
+            _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
+            _monsterLifeBar.SetFollowMonster(true);
+            _monsterLifeBar.Show();
+            // Ensure visible alpha matches ghost
+            var mbMod = _monsterLifeBar.Modulate;
+            float targetAlpha = _activeSprite != null ? _activeSprite.Modulate.A : 1.0f;
+            _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, targetAlpha);
+        }
     }
     #endregion
 
@@ -94,6 +195,9 @@ public partial class GhostMonster : CharacterBody2D
             {
                 _currentPosition = _targetPosition;
                 GlobalPosition = _currentPosition;
+                // Keep life bar following exactly with ghost (defensive override)
+                if (_monsterLifeBar != null && _monsterLifeBar.FollowMonster)
+                    UpdateLifeBarPosition();
             }
             else
             {
@@ -136,6 +240,9 @@ public partial class GhostMonster : CharacterBody2D
                 _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * (float)delta);
             }
             GlobalPosition = _currentPosition;
+            // Keep life bar following exactly with ghost (defensive override)
+            if (_monsterLifeBar != null && _monsterLifeBar.FollowMonster)
+                UpdateLifeBarPosition();
         }
     }
     #endregion
@@ -254,6 +361,13 @@ public partial class GhostMonster : CharacterBody2D
             _lastAlpha = finalAlpha;
         }
 
+        // Keep life bar alpha in sync with ghost when the life bar is active
+        if (_monsterLifeBar != null && _monsterLifeBar.Visible)
+        {
+            var mbMod = _monsterLifeBar.Modulate;
+            _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, finalAlpha);
+        }
+
         // Update state tracking
         _currentMonsterState = newMonsterState;
         _isCurrentlyFullyVisible = newIsFullyVisible;
@@ -315,6 +429,12 @@ public partial class GhostMonster : CharacterBody2D
             // Start with first frame's alpha instead of 0 to eliminate delay
             var initialAlpha = firstFrame.Alpha * GHOST_TINT.A;
             _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, initialAlpha);
+            if (_monsterLifeBar != null)
+            {
+                var mbMod = _monsterLifeBar.Modulate;
+                _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, initialAlpha);
+                _monsterLifeBar.Visible = initialAlpha > 0.0f;
+            }
         }
 
         // Apply first frame immediately to show correct initial state
@@ -342,6 +462,10 @@ public partial class GhostMonster : CharacterBody2D
 
         var tween = CreateTween();
         tween.TweenProperty(_activeSprite, "modulate:a", 0.0f, 0.5f);
+        if (_monsterLifeBar != null)
+        {
+            tween.TweenProperty(_monsterLifeBar, "modulate:a", 0.0f, 0.5f);
+        }
         tween.TweenCallback(Callable.From(() =>
         {
             Log.Debug("Ghost monster faded out and destroyed", "GhostMonster");
@@ -417,6 +541,24 @@ public partial class GhostMonster : CharacterBody2D
         _activeSprite = fallbackSprite;
     }
 
+    private void UpdateLifeBarPosition()
+    {
+        if (_monsterLifeBar == null || _monsterLifeBar == null) return;
+
+        // MonsterLifeBar expects to compute screen coordinates; replicate that logic
+        var camera = GetViewport().GetCamera2D();
+        Vector2 screenPos;
+        if (camera != null)
+        {
+            screenPos = camera.GetScreenCenterPosition() + (GlobalPosition - camera.GlobalPosition) * camera.Zoom;
+            _monsterLifeBar.GlobalPosition = screenPos + _monsterLifeBar.OffsetFromMonster;
+        }
+        else
+        {
+            _monsterLifeBar.GlobalPosition = GlobalPosition + _monsterLifeBar.OffsetFromMonster;
+        }
+    }
+
     private void DisableCollisions()
     {
         SetCollisionLayerValue(1, false);
@@ -441,6 +583,106 @@ public partial class GhostMonster : CharacterBody2D
                 area.SetCollisionMaskValue(1, false);
             }
         }
+    }
+
+    private void SetupLifeSystem()
+    {
+        // Try to find an existing MonsterLife child (factory may have attached one)
+        _monsterLife = GetNodeOrNull<MonsterLife>("MonsterLife");
+
+        if (_monsterLife == null)
+        {
+            // Create a lightweight MonsterLife for ghost - keep defaults small
+            _monsterLife = new MonsterLife { Name = "MonsterLife" };
+            AddChild(_monsterLife);
+            Log.Debug("GhostMonster: Created internal MonsterLife for ghost", "GhostMonster");
+        }
+
+        // Try to find a MonsterLifeBar instance (UI). If not present, instance the prefab under the ghost.
+        _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>("MonsterLifeBar");
+        if (_monsterLifeBar == null)
+        {
+            // Try to create a life bar instance from the existing prefab scene resource
+            var lifeBarScene = GD.Load<PackedScene>("res://Prefabs/UI/MonsterLifeBar.tscn");
+            if (lifeBarScene != null)
+            {
+                var lifeBarInstance = lifeBarScene.Instantiate() as MonsterLifeBar;
+                if (lifeBarInstance != null)
+                {
+                    lifeBarInstance.Name = "MonsterLifeBar";
+                    // Place life bar under current scene root so it renders in UI layer
+                    GetTree().CurrentScene.AddChild(lifeBarInstance);
+                    // Disable auto-discovery so the life bar doesn't attach to other monsters
+                    lifeBarInstance.AutoDiscover = false;
+                    // Explicitly connect the life bar to this ghost's life system and ensure it follows this ghost
+                    lifeBarInstance.ConnectToLifeSystem(_monsterLife);
+                    lifeBarInstance.SetFollowMonster(true);
+                    // Match initial alpha to current ghost sprite tint if available
+                    float initialAlphaForBar = _activeSprite != null ? _activeSprite.Modulate.A : 1.0f;
+                    var mbModTemp = lifeBarInstance.Modulate;
+                    lifeBarInstance.Modulate = new Color(mbModTemp.R, mbModTemp.G, mbModTemp.B, initialAlphaForBar);
+                    _monsterLifeBar = lifeBarInstance;
+                    Log.Debug("GhostMonster: Instantiated MonsterLifeBar for ghost", "GhostMonster");
+                }
+            }
+        }
+        else
+        {
+            // If found in scene tree as child, connect it
+            _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
+        }
+    }
+
+    // Allow external systems (like rocks) to apply rock damage to ghost
+    public bool TakeRockDamage(int damage = 1)
+    {
+        // Only purple heart damage should be consumed when in PastReality
+        var currentReality = RealityManager.Instance?.CurrentReality ?? MarrieGame.Core.Enums.Reality.CurrentReality;
+        if (currentReality == MarrieGame.Core.Enums.Reality.PastReality)
+        {
+            bool damaged = _monsterLife?.TakePurpleHeartDamage(damage) ?? false;
+            if (damaged) PlayDamageEffect(Colors.Purple);
+            return damaged;
+        }
+
+        // In current reality, treat like physical damage (red hearts)
+        bool damagedCurrent = _monsterLife?.TakePhysicalDamage(damage) ?? false;
+        if (damagedCurrent) PlayDamageEffect(Colors.Red);
+        return damagedCurrent;
+    }
+
+    public void PlayDamageEffect(Color damageColor)
+    {
+        if (_activeSprite != null)
+        {
+            var tween = CreateTween();
+            tween.TweenProperty(_activeSprite, "modulate", damageColor, 0.15f);
+            tween.TweenProperty(_activeSprite, "modulate", GHOST_TINT, 0.25f);
+        }
+    }
+
+    // Compatibility API to match Monster's public interface
+    public MonsterLife GetLifeSystem() => _monsterLife;
+
+    public bool TakePhysicalDamage(int damage = 1)
+    {
+        if (_monsterLife == null) return false;
+        bool damaged = _monsterLife.TakePhysicalDamage(damage);
+        if (damaged) PlayDamageEffect(Colors.Red);
+        return damaged;
+    }
+
+    public bool TakeMagicalDamage(int damage = 1)
+    {
+        if (_monsterLife == null) return false;
+        bool damaged = _monsterLife.TakeMagicalDamage(damage);
+        if (damaged) PlayDamageEffect(Colors.Purple);
+        return damaged;
+    }
+
+    public void Reset()
+    {
+        _monsterLife?.Reset();
     }
     #endregion
 }

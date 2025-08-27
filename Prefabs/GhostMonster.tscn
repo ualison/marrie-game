@@ -1,7 +1,9 @@
-[gd_scene load_steps=4 format=3 uid="uid://bqj7y8lk5uq60"]
+[gd_scene load_steps=6 format=3 uid="uid://bqj7y8lk5uq60"]
 
 [ext_resource type="Script" uid="uid://d0e7xcevrndxm" path="res://Scripts/Enemy/GhostMonster.cs" id="1_uqgqf"]
-[ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monsterv3.png" id="2_uqgqf"]
+[ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monster.png" id="2_uqgqf"]
+[ext_resource type="Script" uid="uid://2hx87sinu6t" path="res://Scripts/Enemy/MonsterLife.cs" id="3_monsterlife"]
+[ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
 size = Vector2(302, 376)
@@ -17,3 +19,16 @@ shape = SubResource("RectangleShape2D_kyqiw")
 position = Vector2(12.5, 9.00002)
 scale = Vector2(0.31543, 0.317708)
 texture = ExtResource("2_uqgqf")
+
+[node name="MonsterLifeBar" parent="." instance=ExtResource("4_lifebar")]
+offset_left = -53.0
+offset_top = -236.0
+offset_right = 47.0
+offset_bottom = -186.0
+OffsetFromMonster = Vector2(-80, -220)
+
+[node name="MonsterLife" type="Node2D" parent="."]
+position = Vector2(-2, -221)
+script = ExtResource("3_monsterlife")
+MaxLife = 3
+StartingLife = 3

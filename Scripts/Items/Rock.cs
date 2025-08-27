@@ -172,35 +172,45 @@ public partial class Rock : Node2D
             // This is likely a monster's area - find the parent monster and deal damage
             Log.System($"Rock hit monster area: {area.Name} - looking for parent monster", "Rock");
             
-            // Try to find the monster parent
+            // Try to find a GhostMonster first, then a Monster in the parents
             Node current = area;
+            GhostMonster ghost = null;
             Monster monster = null;
-            
-            // Search up the node tree for a Monster
-            while (current != null && monster == null)
+
+            while (current != null && ghost == null && monster == null)
             {
+                ghost = current as GhostMonster;
                 monster = current as Monster;
                 current = current.GetParent();
             }
-            
-            if (monster != null)
+
+            if (ghost != null)
             {
-                Log.System($"Found parent monster: {monster.Name} - dealing rock damage", "Rock");
-                
-                // Deal rock damage to the monster (damage type depends on monster's reality)
-                bool damaged = monster.TakeRockDamage(1);
-                
+                Log.System($"Found parent ghost monster: {ghost.Name} - dealing rock damage", "Rock");
+                bool damaged = ghost.TakeRockDamage(1);
                 if (damaged)
                 {
-                // Info level - important combat feedback for balance
-                Log.Info("Rock successfully damaged monster via area detection!", "Rock");
+                    Log.Info("Rock successfully damaged ghost monster via area detection!", "Rock");
+                }
+                else
+                {
+                    Log.UI("Rock hit ghost monster but no damage dealt (invulnerable or no appropriate hearts)", "Rock");
+                }
+                _isMoving = false;
+                CreateImpactEffect();
+            }
+            else if (monster != null)
+            {
+                Log.System($"Found parent monster: {monster.Name} - dealing rock damage", "Rock");
+                bool damaged = monster.TakeRockDamage(1);
+                if (damaged)
+                {
+                    Log.Info("Rock successfully damaged monster via area detection!", "Rock");
                 }
                 else
                 {
                     Log.UI("Rock hit monster but no damage dealt (invulnerable or no appropriate hearts)", "Rock");
                 }
-                
-                // Stop movement and disappear after hitting monster
                 _isMoving = false;
                 CreateImpactEffect();
             }
@@ -223,14 +233,24 @@ public partial class Rock : Node2D
         // Rock hit a CharacterBody2D (like a monster)
         Log.System($"Rock Area2D hit body: {body.Name} ({body.GetType().Name}) at position {GlobalPosition}", "Rock");
         
-        // Check if this is a monster
-        if (body is Monster monster)
+        // Check if this is a ghost monster first, then a real Monster
+        if (body is GhostMonster ghost)
+        {
+            Log.System("Rock hit ghost monster via Area2D - dealing rock damage based on reality", "Rock");
+            bool damaged = ghost.TakeRockDamage(1);
+            if (damaged)
+            {
+                Log.UI("Rock successfully damaged ghost monster!", "Rock");
+            }
+            else
+            {
+                Log.UI("Rock hit ghost monster but no damage dealt (invulnerable or no appropriate hearts)", "Rock");
+            }
+        }
+        else if (body is Monster monster)
         {
             Log.System("Rock hit monster via Area2D - dealing rock damage based on reality", "Rock");
-            
-            // Deal rock damage to the monster (damage type depends on monster's reality)
             bool damaged = monster.TakeRockDamage(1);
-            
             if (damaged)
             {
                 Log.UI("Rock successfully damaged monster!", "Rock");

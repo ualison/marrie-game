@@ -160,9 +160,9 @@ public partial class ReplayOrchestrator : Node
         var player = GetTree().GetFirstNodeInGroup("player") as Player;
         if (player != null)
         {
-            player.PausePlayer();
-            player.Hide();
-            Log.Debug("Player paused and hidden for replay", "ReplayOrchestrator");
+            // Keep the real player active during PastReality replay so the player can still move and interact.
+            // The ghost player will replay recorded frames independently.
+            Log.Debug("Player left active during replay (ghost will replay past frames)", "ReplayOrchestrator");
         }
 
         var monsters = GetTree().GetNodesInGroup("enemies");
@@ -186,9 +186,16 @@ public partial class ReplayOrchestrator : Node
         var player = GetTree().GetFirstNodeInGroup("player") as Player;
         if (player != null)
         {
-            player.ResumePlayer();
-            player.Show();
-            Log.Debug("Player resumed and shown after replay", "ReplayOrchestrator");
+            // Only resume the player if it was paused by an external system.
+            if (player.IsPaused())
+            {
+                player.ResumePlayer();
+                Log.Debug("Player resumed after replay", "ReplayOrchestrator");
+            }
+            else
+            {
+                Log.Debug("Player remained active during replay; no resume needed", "ReplayOrchestrator");
+            }
         }
 
         var monsters = GetTree().GetNodesInGroup("enemies");

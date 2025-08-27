@@ -10,6 +10,10 @@ public partial class MonsterLifeBar : Control
     [Export] public Texture2D EmptyPurpleHeartTexture { get; set; }
     [Export] public Vector2 OffsetFromMonster { get; set; } = new Vector2(0, -50);
     [Export] public bool FollowMonster { get; set; } = true;
+    // When false, the life bar will not try to auto-discover a MonsterLife in the scene.
+    // Useful when a caller (like GhostMonster) instantiates the bar and wants to
+    // explicitly connect it to a specific MonsterLife instance.
+    [Export] public bool AutoDiscover { get; set; } = true;
     #endregion
 
     #region Components
@@ -40,7 +44,13 @@ public partial class MonsterLifeBar : Control
 
     private void FindLifeSystem()
     {
-        // Automatically discover and connect to monster's MonsterLife
+        // Automatically discover and connect to monster's MonsterLife unless auto-discovery is disabled
+        if (!AutoDiscover)
+        {
+            // Auto-discovery disabled by caller; defer until an explicit ConnectToLifeSystem is invoked.
+            return;
+        }
+
         _lifeSystem = DiscoverMonsterLife();
 
         if (_lifeSystem != null)
