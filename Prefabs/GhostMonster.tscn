@@ -8,26 +8,29 @@
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
 size = Vector2(302, 376)
 
-[node name="GhostMonster" type="CharacterBody2D"]
+[node name="Root" type="Node2D"]
+
+[node name="CharacterBody2D" type="CharacterBody2D" parent="."]
 script = ExtResource("1_uqgqf")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]
 position = Vector2(10, -20)
 shape = SubResource("RectangleShape2D_kyqiw")
 
-[node name="GhostMonsterSprite" type="Sprite2D" parent="."]
+[node name="GhostMonsterSprite" type="Sprite2D" parent="CharacterBody2D"]
 position = Vector2(12.5, 9.00002)
 scale = Vector2(0.31543, 0.317708)
 texture = ExtResource("2_uqgqf")
 
-[node name="GhostMonsterLifeBar" parent="." instance=ExtResource("4_lifebar")]
+[node name="GhostMonsterLifeBar" parent="CharacterBody2D" instance=ExtResource("4_lifebar")]
 offset_left = -53.0
 offset_top = -236.0
 offset_right = 47.0
 offset_bottom = -186.0
-OffsetFromMonster = Vector2(-80, -220)
+OffsetFromMonster = Vector2(-80, -240)
+RequiredReality = 1
 
-[node name="GhostMonsterLife" type="Node2D" parent="."]
+[node name="GhostMonsterLife" type="Node2D" parent="CharacterBody2D"]
 position = Vector2(-2, -221)
 script = ExtResource("3_monsterlife")
 MaxLife = 3

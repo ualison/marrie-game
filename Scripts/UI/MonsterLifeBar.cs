@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Enums;
 
 // Monster health display with red and purple hearts that follows the monster
 public partial class MonsterLifeBar : Control
@@ -14,6 +15,9 @@ public partial class MonsterLifeBar : Control
     // Useful when a caller (like GhostMonster) instantiates the bar and wants to
     // explicitly connect it to a specific MonsterLife instance.
     [Export] public bool AutoDiscover { get; set; } = true;
+    
+    // Reality-specific configuration
+    [Export] public Reality RequiredReality { get; set; } = Reality.CurrentReality;
     #endregion
 
     #region Components
@@ -28,6 +32,25 @@ public partial class MonsterLifeBar : Control
         // Setup hearts container and find life system
         InitializeContainer();
         CallDeferred(nameof(FindLifeSystem));
+        
+        // Connect to reality changes
+        if (RealityManager.IsInstanceAvailable)
+        {
+            RealityManager.Instance.RealityChanged += OnRealityChanged;
+        }
+        else
+        {
+            // If RealityManager isn't ready yet, try to connect later
+            CallDeferred(nameof(ConnectToRealityManager));
+        }
+    }
+    
+    private void ConnectToRealityManager()
+    {
+        if (RealityManager.IsInstanceAvailable)
+        {
+            RealityManager.Instance.RealityChanged += OnRealityChanged;
+        }
     }
 
     private void InitializeContainer()
@@ -75,12 +98,34 @@ public partial class MonsterLifeBar : Control
 
     private MonsterLife FindLifeSystemViaParent()
     {
-        // Strategy 1: Check parent node for MonsterLife
+        // Strategy 1: Check parent node for MonsterLife or GhostMonsterLife
         var parent = GetParent();
-        if (parent is Monster monster)
+        
+        if (parent != null)
         {
-            _monster = monster;
-            return monster.GetNodeOrNull<MonsterLife>("MonsterLife");
+            // First, try to find the monster node directly
+            _monster = parent as Node2D;
+            
+            // Check for regular Monster
+            if (parent is Monster monster)
+            {
+                return monster.GetNodeOrNull<MonsterLife>("MonsterLife");
+            }
+            
+            // Check for GhostMonster by looking for GhostMonsterLife node
+            var ghostLife = parent.GetNodeOrNull<MonsterLife>("GhostMonsterLife");
+            if (ghostLife != null)
+            {
+                Log.Debug($"Found GhostMonsterLife in parent: {parent.Name}", "MonsterLifeBarUI");
+                return ghostLife;
+            }
+            
+            // Check for regular MonsterLife as fallback
+            var regularLife = parent.GetNodeOrNull<MonsterLife>("MonsterLife");
+            if (regularLife != null)
+            {
+                return regularLife;
+            }
         }
         
         // Strategy 2: Check parent's parent
@@ -136,11 +181,45 @@ public partial class MonsterLifeBar : Control
     }
     #endregion
 
+    #region Reality Management
+    private void OnRealityChanged(Reality newReality)
+    {
+        Log.Debug($"Reality changed to {newReality}, required reality: {RequiredReality}", "MonsterLifeBarUI");
+        
+        // Show/hide based on reality match
+        bool shouldBeVisible = (newReality == RequiredReality);
+        Visible = shouldBeVisible;
+        
+        if (shouldBeVisible)
+        {
+            Log.Debug($"Showing life bar for {RequiredReality} reality", "MonsterLifeBarUI");
+        }
+        else
+        {
+            Log.Debug($"Hiding life bar (wrong reality)", "MonsterLifeBarUI");
+        }
+    }
+    
+    private bool ShouldFollowMonster()
+    {
+        // Only follow if reality matches and following is enabled
+        if (!FollowMonster) return false;
+        
+        if (RealityManager.IsInstanceAvailable)
+        {
+            return RealityManager.Instance.CurrentReality == RequiredReality;
+        }
+        
+        // Fallback: if RealityManager isn't available, use default behavior
+        return true;
+    }
+    #endregion
+
     #region Position Updates
     public override void _Process(double delta)
     {
-        // Follow the monster if enabled and monster exists
-        if (FollowMonster && _monster != null && IsInstanceValid(_monster))
+        // Follow the monster if enabled, monster exists, and reality is correct
+        if (ShouldFollowMonster() && _monster != null && IsInstanceValid(_monster))
         {
             UpdatePosition();
             
@@ -360,6 +439,37 @@ public partial class MonsterLifeBar : Control
     public void SetOffset(Vector2 offset)
     {
         OffsetFromMonster = offset;
+    }
+    
+    public void SetRequiredReality(Reality reality)
+    {
+        RequiredReality = reality;
+        
+        // Update visibility immediately if RealityManager is available
+        if (RealityManager.IsInstanceAvailable)
+        {
+            OnRealityChanged(RealityManager.Instance.CurrentReality);
+        }
+    }
+    
+    public void SetMonsterReference(Node2D monster)
+    {
+        _monster = monster;
+        Log.Debug($"Monster reference manually set to: {monster?.Name} at {monster?.GlobalPosition}", "MonsterLifeBarUI");
+    }
+    #endregion
+
+    #region Cleanup
+    public override void _ExitTree()
+    {
+        // Clean up reality manager connection
+        if (RealityManager.IsInstanceAvailable)
+        {
+            RealityManager.Instance.RealityChanged -= OnRealityChanged;
+        }
+        
+        // Clean up life system connection
+        DisconnectFromCurrentLifeSystem();
     }
     #endregion
 }

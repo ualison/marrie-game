@@ -8,7 +8,7 @@ public partial class Monster : CharacterBody2D
     [Export] public int DamageAmount { get; set; } = 1;
     [Export] public bool InitiallyVisible { get; set; } = true;
     // Note: Reality is now managed globally by RealityManager, not per-monster
-    
+
     // Follower behavior properties
     [Export] public bool EnableFollowerBehavior { get; set; } = false;
     [Export] public float FollowDistance { get; set; } = 150.0f; // Target distance to maintain behind player
@@ -20,7 +20,7 @@ public partial class Monster : CharacterBody2D
     [Export] public float MaxVisibleTime { get; set; } = 90.0f;
     [Export] public float MinHiddenTime { get; set; } = 10.0f;
     [Export] public float MaxHiddenTime { get; set; } = 45.0f;
-    
+
     public bool IsDisabledForReplay { get; private set; } = false;
     #endregion
 
@@ -50,7 +50,7 @@ public partial class Monster : CharacterBody2D
     public override void _Ready()
     {
         AddToGroup("enemies");
-        
+
         if (EnableFollowerBehavior)
         {
             _gravity = ProjectSettings.GetSetting("physics/2d/default_gravity").AsSingle();
@@ -61,11 +61,24 @@ public partial class Monster : CharacterBody2D
         {
             InitializeSimpleComponents();
         }
-        
+
         SetInitialVisibility();
         // Ensure we respond to global reality changes so the monster's life bar
         // is only visible in CurrentReality and hidden during PastReality.
         CallDeferred(nameof(EnsureRealitySubscription));
+
+        // Configure the MonsterLifeBar for CurrentReality
+        var lifeBar = GetNodeOrNull<MonsterLifeBar>("MonsterLifeBar");
+        if (lifeBar != null)
+        {
+            lifeBar.SetRequiredReality(Reality.CurrentReality);
+            lifeBar.SetMonsterReference(this);
+            Log.Debug($"Monster life bar configured for CurrentReality at position: {GlobalPosition}", "Monster");
+        }
+        else
+        {
+            Log.Warning("MonsterLifeBar not found in Monster scene", "Monster");
+        }
     }
 
     private bool _realityConnected = false;
@@ -135,7 +148,7 @@ public partial class Monster : CharacterBody2D
             // Ensure fully visible
             var mbMod = _monsterLifeBar.Modulate;
             _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, 1.0f);
-            
+
             // Force immediate position update when enabling following
             CallDeferred(nameof(UpdateLifeBarPosition));
         }
@@ -201,7 +214,7 @@ public partial class Monster : CharacterBody2D
     {
         // Find MonsterLife component
         _monsterLife = GetNodeOrNull<MonsterLife>("MonsterLife");
-        
+
         if (_monsterLife == null)
         {
             Log.Warning("Monster: No MonsterLife component found!", "Monster");
@@ -218,7 +231,7 @@ public partial class Monster : CharacterBody2D
         // CRITICAL: Only use the Monster's own life bar, never search globally
         // This prevents conflicts with GhostMonster life bars
         _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>("MonsterLifeBar");
-        
+
         if (_monsterLifeBar == null)
         {
             // Try direct child lookup with common names
@@ -231,7 +244,7 @@ public partial class Monster : CharacterBody2D
                 }
             }
         }
-        
+
         if (_monsterLifeBar == null)
         {
             Log.Warning("Monster: No MonsterLifeBar component found as direct child!", "Monster");
@@ -242,6 +255,7 @@ public partial class Monster : CharacterBody2D
             _monsterLifeBar.AutoDiscover = false;
             _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
             _monsterLifeBar.SetFollowMonster(true);
+            _monsterLifeBar.SetRequiredReality(Reality.CurrentReality);
             Log.Debug("Monster: MonsterLifeBar component found and connected", "Monster");
         }
     }
@@ -249,7 +263,7 @@ public partial class Monster : CharacterBody2D
     private void SetupAudio()
     {
         if (!EnableFollowerBehavior) return;
-        
+
         _footstepAudio = GetNodeOrNull<AudioStreamPlayer2D>("FootstepAudio");
         if (_footstepAudio == null)
         {
@@ -287,7 +301,7 @@ public partial class Monster : CharacterBody2D
     private void FindPlayerAndStart()
     {
         if (!EnableFollowerBehavior) return;
-        
+
         _player = GetTree().GetFirstNodeInGroup("player") as Player;
         if (_player != null)
         {
@@ -306,7 +320,7 @@ public partial class Monster : CharacterBody2D
             // Follower behavior will control visibility
             return;
         }
-        
+
         // Initialize simple monsters based on InitiallyVisible property
         if (InitiallyVisible)
         {
@@ -319,9 +333,9 @@ public partial class Monster : CharacterBody2D
             {
                 _monsterLifeBar.Show();
             }
-            #if DEBUG
+#if DEBUG
             Log.Debug("Monster: Ready for contact damage", "Monster");
-            #endif
+#endif
         }
         else
         {
@@ -342,50 +356,50 @@ public partial class Monster : CharacterBody2D
     public void DisableForReplay()
     {
         if (!EnableFollowerBehavior) return;
-        
+
         IsDisabledForReplay = true;
         SetProcessMode(ProcessModeEnum.Disabled);
-        
+
         // Hide MonsterLifeBar during replay
         if (_monsterLifeBar != null)
         {
             _monsterLifeBar.Hide();
         }
-        
+
         Hide();
     }
 
     public void EnableAfterReplay()
     {
         if (!EnableFollowerBehavior) return;
-        
+
         IsDisabledForReplay = false;
         SetProcessMode(ProcessModeEnum.Always);
-        
+
         if (_spriteNode != null)
         {
             _spriteNode.Visible = true;
             _spriteNode.Modulate = Colors.White;
             Show();
         }
-        
+
         // Show MonsterLifeBar when enabling after replay
         if (_monsterLifeBar != null)
         {
             _monsterLifeBar.Show();
         }
-        
+
         _stateTimer.Stop();
         _currentState = MonsterState.Visible;
         _isVisible = true;
         _isFullyVisible = true;
-        
+
         SetCollisionMask(1u);
         SetCollisionLayer(1u);
-        
+
         // Reset MonsterLife to full health
         _monsterLife?.Reset();
-        
+
         GetTree().CreateTimer(3.0f).Timeout += () =>
         {
             if (!IsDisabledForReplay)
@@ -394,7 +408,7 @@ public partial class Monster : CharacterBody2D
                 StartVisibleBehavior();
             }
         };
-        
+
         Log.Debug("Monster enabled after replay - will resume normal behavior in 3 seconds", "Monster");
     }
 
@@ -402,7 +416,7 @@ public partial class Monster : CharacterBody2D
     {
         if (!EnableFollowerBehavior) return;
         if (IsDisabledForReplay) return;
-        
+
         if (_player?.GetLifeSystem()?.IsDead != false) return;
 
         // Always apply gravity and physics when monster exists
@@ -437,16 +451,16 @@ public partial class Monster : CharacterBody2D
     private void UpdateMovement()
     {
         if (_player == null) return;
-        
+
         float distanceToPlayer = GlobalPosition.DistanceTo(_player.GlobalPosition);
-        
+
         // If too close to player, don't move toward them
         if (distanceToPlayer <= MinimumFollowDistance)
         {
             Velocity = new Vector2(0, Velocity.Y);
             return;
         }
-        
+
         // Normal following behavior - maintain FollowDistance behind player
         Vector2 targetPos = _player.GlobalPosition - new Vector2(FollowDistance, 0);
         float distanceToTarget = GlobalPosition.DistanceTo(targetPos);
@@ -470,7 +484,7 @@ public partial class Monster : CharacterBody2D
 
         bool shouldFaceLeft = _player.GlobalPosition.X > GlobalPosition.X;
         var scale = _spriteNode.Scale;
-        
+
         // Only update scale if direction actually changed to avoid unnecessary updates
         bool currentlyFacingLeft = scale.X < 0;
         if (currentlyFacingLeft != shouldFaceLeft)
@@ -528,9 +542,9 @@ public partial class Monster : CharacterBody2D
         }
 
         PositionBehindPlayerOnGround();
-    // Keep ground collision enabled but stay on layer 2 (avoid player collisions)
-    SetCollisionMask(1u);
-    SetCollisionLayer(2u);
+        // Keep ground collision enabled but stay on layer 2 (avoid player collisions)
+        SetCollisionMask(1u);
+        SetCollisionLayer(2u);
         FacePlayer();
 
         // Ensure life bar position is updated after repositioning
@@ -579,7 +593,7 @@ public partial class Monster : CharacterBody2D
             StartFirstTransition();
             return;
         }
-        
+
         if (_currentState == MonsterState.Visible)
         {
             // Don't hide if monster is too close to player - extend visible time instead
@@ -608,7 +622,7 @@ public partial class Monster : CharacterBody2D
     {
         // First transition: go from initial visible state to hidden, then visible again
         StartHiddenBehavior();
-        
+
         // After a short delay, reposition and become visible
         GetTree().CreateTimer(0.5f).Timeout += () =>
         {
@@ -649,9 +663,9 @@ public partial class Monster : CharacterBody2D
         // This prevents the life bar from appearing at the old position when fading back in
         UpdateLifeBarPosition();
 
-        #if DEBUG
+#if DEBUG
         Log.Debug($"Monster positioned on {(_shouldSpawnOnRight ? "right" : "left")} side at distance {safeDistance}", "Monster");
-        #endif
+#endif
     }
 
     private void UpdateLifeBarPosition()
@@ -680,7 +694,7 @@ public partial class Monster : CharacterBody2D
         // Direct position calculation using the same logic as MonsterLifeBar.cs
         var camera = GetViewport().GetCamera2D();
         Vector2 targetPosition;
-        
+
         if (camera != null)
         {
             // Match MonsterLifeBar positioning exactly
@@ -692,7 +706,7 @@ public partial class Monster : CharacterBody2D
             // Fallback positioning
             targetPosition = GlobalPosition + _monsterLifeBar.OffsetFromMonster;
         }
-        
+
         _monsterLifeBar.GlobalPosition = targetPosition;
     }
     #endregion
@@ -716,7 +730,7 @@ public partial class Monster : CharacterBody2D
             _isTransitioning = false; // No longer transitioning
             SetCollisionMask(1u);
             SetCollisionLayer(1u);
-            
+
             // Delay showing life bar slightly to ensure position is correct
             GetTree().CreateTimer(0.1f).Timeout += () =>
             {
@@ -727,7 +741,7 @@ public partial class Monster : CharacterBody2D
                     _monsterLifeBar.Show();
                 }
             };
-            
+
             Log.Debug("Monster fade in complete - fully visible", "Monster");
         }));
     }
@@ -793,12 +807,12 @@ public partial class Monster : CharacterBody2D
     public new bool IsVisible() => _isVisible;
     public bool IsFullyVisible() => _isFullyVisible;
     public MonsterState GetState() => _currentState;
-    public void ForceHide() 
-    { 
-        if (EnableFollowerBehavior) 
-        { 
-            _stateTimer.Stop(); 
-            StartHiddenBehavior(); 
+    public void ForceHide()
+    {
+        if (EnableFollowerBehavior)
+        {
+            _stateTimer.Stop();
+            StartHiddenBehavior();
         }
         else
         {
@@ -813,13 +827,13 @@ public partial class Monster : CharacterBody2D
             }
         }
     }
-    
-    public void ForceShow() 
-    { 
-        if (EnableFollowerBehavior) 
-        { 
-            _stateTimer.Stop(); 
-            StartVisibleBehavior(); 
+
+    public void ForceShow()
+    {
+        if (EnableFollowerBehavior)
+        {
+            _stateTimer.Stop();
+            StartVisibleBehavior();
         }
         else
         {
@@ -835,7 +849,7 @@ public partial class Monster : CharacterBody2D
         }
     }
 
-    public bool CanTakeDamage() 
+    public bool CanTakeDamage()
     {
         // Use state-based logic consistently for both follower and simple monsters
         bool result = _currentState == MonsterState.Visible && !_isTransitioning;
@@ -850,7 +864,7 @@ public partial class Monster : CharacterBody2D
     {
         // Physical damage to red hearts only
         if (!CanTakeDamage() || _monsterLife == null) return false;
-        
+
         bool damaged = _monsterLife.TakePhysicalDamage(damage);
         if (damaged)
         {
@@ -864,7 +878,7 @@ public partial class Monster : CharacterBody2D
     {
         // Magical damage to any hearts
         if (!CanTakeDamage() || _monsterLife == null) return false;
-        
+
         bool damaged = _monsterLife.TakeMagicalDamage(damage);
         if (damaged)
         {
@@ -879,15 +893,15 @@ public partial class Monster : CharacterBody2D
         // Rock damage based on current reality
         Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
         Log.Debug($"TakeRockDamage called - CanTakeDamage: {CanTakeDamage()}, MonsterLife: {_monsterLife != null}, CurrentReality: {currentReality}", "Monster");
-        
-        if (!CanTakeDamage() || _monsterLife == null) 
+
+        if (!CanTakeDamage() || _monsterLife == null)
         {
             Log.UI($"Rock damage blocked - CanTakeDamage: {CanTakeDamage()}, MonsterLife exists: {_monsterLife != null}", "Monster");
             return false;
         }
-        
+
         bool damaged = false;
-        
+
         switch (currentReality)
         {
             case Reality.CurrentReality:
@@ -905,7 +919,7 @@ public partial class Monster : CharacterBody2D
                     Log.Warning($"Rock hit monster in Current Reality but no red hearts to damage", "Monster");
                 }
                 break;
-                
+
             case Reality.PastReality:
                 // In past reality, rocks damage purple hearts only
                 damaged = _monsterLife.TakePurpleHeartDamage(damage);
@@ -913,7 +927,7 @@ public partial class Monster : CharacterBody2D
                 {
                     // Info level - important purple gem reality feedback
                     Log.Info($"Rock hit monster in Purple Gem Reality - damaged purple hearts", "Monster");
-                    
+
                     // Check if all purple hearts are lost (monster should die)
                     if (_monsterLife.CurrentPurpleHearts <= 0)
                     {
@@ -927,7 +941,7 @@ public partial class Monster : CharacterBody2D
                 }
                 break;
         }
-        
+
         if (damaged)
         {
             // Use appropriate color based on which reality and what type of damage was dealt
@@ -935,7 +949,7 @@ public partial class Monster : CharacterBody2D
             PlayDamageEffect(damageColor);
             Log.Debug($"Monster took {damage} rock damage in {currentReality} reality", "Monster");
         }
-        
+
         return damaged;
     }
 
@@ -1031,7 +1045,7 @@ public partial class Monster : CharacterBody2D
         {
             // Check if we can damage based on behavior mode
             if (EnableFollowerBehavior && !CanTakeDamage()) return;
-            
+
             Log.Debug($"Monster {Name} attempting damage to player", "Monster");
             if (player.TakeDamage(DamageAmount))
             {
