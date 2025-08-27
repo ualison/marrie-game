@@ -1,9 +1,12 @@
-[gd_scene load_steps=6 format=3 uid="uid://bqj7y8lk5uq60"]
+[gd_scene load_steps=7 format=3 uid="uid://bqj7y8lk5uq60"]
 
 [ext_resource type="Script" uid="uid://d0e7xcevrndxm" path="res://Scripts/Enemy/GhostMonster.cs" id="1_uqgqf"]
 [ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monster.png" id="2_uqgqf"]
 [ext_resource type="Script" uid="uid://2hx87sinu6t" path="res://Scripts/Enemy/MonsterLife.cs" id="3_monsterlife"]
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_6ib6h"]
+size = Vector2(322, 387)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
 size = Vector2(302, 376)
@@ -12,6 +15,14 @@ size = Vector2(302, 376)
 
 [node name="CharacterBody2D" type="CharacterBody2D" parent="."]
 script = ExtResource("1_uqgqf")
+
+[node name="DamageArea" type="Area2D" parent="CharacterBody2D"]
+position = Vector2(0, -4)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/DamageArea"]
+position = Vector2(11, -20.5)
+shape = SubResource("RectangleShape2D_6ib6h")
+debug_color = Color(0.764087, 0.04706, 0.125471, 0.42)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]
 position = Vector2(10, -20)

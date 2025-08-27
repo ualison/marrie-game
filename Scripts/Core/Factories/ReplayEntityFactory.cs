@@ -1,9 +1,7 @@
 using Godot;
 
-/// <summary>
-/// Factory for creating replay-related entities
-/// Handles instantiation of replay gems, ghost players, and ghost monsters
-/// </summary>
+// Factory for creating replay-related entities
+// Handles instantiation of replay gems, ghost players, and ghost monsters
 public static class ReplayEntityFactory
 {
     private static PackedScene _replayGemScene;
@@ -15,33 +13,22 @@ public static class ReplayEntityFactory
     {
         if (_replayGemScene == null)
         {
-            string[] possiblePaths = {
-                "res://Prefabs/ReplayGem.tscn",
-                "res://prefabs/ReplayGem.tscn",
-                "res://Scenes/ReplayGem.tscn",
-                "res://scenes/ReplayGem.tscn"
-            };
+            string path = "res://Prefabs/ReplayGem.tscn";
 
-            foreach (string path in possiblePaths)
+            try
             {
-                try
+                if (ResourceLoader.Exists(path))
                 {
-                    if (ResourceLoader.Exists(path))
+                    _replayGemScene = GD.Load<PackedScene>(path);
+                    if (_replayGemScene != null)
                     {
-                        _replayGemScene = GD.Load<PackedScene>(path);
-                        if (_replayGemScene != null)
-                        {
-#if DEBUG
-                            Log.Debug($"ReplayEntityFactory: Loaded ReplayGem scene from {path}", "ReplayEntityFactory");
-#endif
-                            break;
-                        }
+                        Log.Debug($"ReplayEntityFactory: Loaded ReplayGem scene from {path}", "ReplayEntityFactory");
                     }
                 }
-                catch (System.Exception ex)
-                {
-                    Log.Error($"ReplayEntityFactory: Failed to load scene from {path}: {ex.Message}", "ReplayEntityFactory");
-                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error($"ReplayEntityFactory: Failed to load scene from {path}: {ex.Message}", "ReplayEntityFactory");
             }
 
             if (_replayGemScene == null)
@@ -154,7 +141,7 @@ public static class ReplayEntityFactory
         // Fallback to programmatic creation
         if (ghost == null)
         {
-            ghost = CreateGhostPlayerProgrammatically(parent);
+            ghost = CreateGhostPlayerProgrammatically();
         }
 
         // ONLY copy sprites if we had to fall back to programmatic creation
@@ -216,7 +203,7 @@ public static class ReplayEntityFactory
         // Fallback to programmatic creation
         if (ghost == null)
         {
-            var ghostContainer = CreateGhostMonsterProgrammatically(parent);
+            var ghostContainer = CreateGhostMonsterProgrammatically();
             ghost = ghostContainer; // In programmatic creation, we return the CharacterBody2D directly
             nodeToAdd = ghost; // Add the CharacterBody2D directly for programmatic creation
 
@@ -249,7 +236,7 @@ public static class ReplayEntityFactory
     #endregion
 
     #region Programmatic Creation Fallbacks
-    private static GhostPlayer CreateGhostPlayerProgrammatically(Node parent)
+    private static GhostPlayer CreateGhostPlayerProgrammatically()
     {
         var ghost = new GhostPlayer { Name = "GhostPlayer" };
 
@@ -257,7 +244,7 @@ public static class ReplayEntityFactory
         return ghost;
     }
 
-    private static GhostMonster CreateGhostMonsterProgrammatically(Node parent)
+    private static GhostMonster CreateGhostMonsterProgrammatically()
     {
         // Create the GhostMonster directly as CharacterBody2D for programmatic fallback
         // This is simpler than trying to recreate the full .tscn hierarchy programmatically

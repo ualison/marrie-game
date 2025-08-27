@@ -466,8 +466,7 @@ public partial class MonsterLifeBar : Control
         if (RealityManager.IsInstanceAvailable)
         {
             RealityManager.Instance.RealityChanged -= OnRealityChanged;
-        }
-        
+        }   
         // Clean up life system connection
         DisconnectFromCurrentLifeSystem();
     }
