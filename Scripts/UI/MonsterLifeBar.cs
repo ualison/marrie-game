@@ -339,8 +339,17 @@ public partial class MonsterLifeBar : Control
         {
             _lifeSystem.LifeChanged += OnLifeChanged;
             OnLifeChanged(_lifeSystem.CurrentLife, _lifeSystem.MaxLife, _lifeSystem.PurpleHearts);
-            FindMonsterNode();
+            // Defer finding the monster node so caller code can reparent _lifeSystem
+            // before we attempt to resolve its parent. This prevents stale references
+            // when callers move the MonsterLife in the scene tree (see GhostMonster.ReconnectLifeBar).
+            CallDeferred(nameof(FindMonsterNode));
         }
+    }
+
+    // Allow external callers to force Monster discovery after scene-tree changes
+    public void RefreshMonsterNode()
+    {
+        FindMonsterNode();
     }
 
     public void SetFollowMonster(bool follow)

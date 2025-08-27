@@ -63,6 +63,91 @@ public partial class Monster : CharacterBody2D
         }
         
         SetInitialVisibility();
+        // Ensure we respond to global reality changes so the monster's life bar
+        // is only visible in CurrentReality and hidden during PastReality.
+        CallDeferred(nameof(EnsureRealitySubscription));
+    }
+
+    private bool _realityConnected = false;
+
+    private void EnsureRealitySubscription()
+    {
+        if (_realityConnected) return;
+
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+        {
+            RealityManager.Instance.Connect("RealityChanged", new Callable(this, nameof(OnRealityChangedSignal)));
+            _realityConnected = true;
+            // Immediately apply current reality state to life bar
+            ApplyRealityToLifeBar(RealityManager.Instance.CurrentReality);
+        }
+        else
+        {
+            // Try again shortly after (deferred) if RealityManager isn't ready yet
+            CallDeferred(nameof(EnsureRealitySubscription));
+        }
+    }
+
+    private void OnRealityChangedSignal(object rawValue)
+    {
+        try
+        {
+            int intVal = -1;
+
+            if (rawValue is object[] objArr && objArr.Length > 0)
+            {
+                intVal = System.Convert.ToInt32(objArr[0]);
+            }
+            else if (rawValue is Godot.Collections.Array gdArr && gdArr.Count > 0)
+            {
+                intVal = System.Convert.ToInt32(gdArr[0]);
+            }
+            else
+            {
+                intVal = System.Convert.ToInt32(rawValue);
+            }
+
+            var reality = (Reality)intVal;
+            OnRealityChanged(reality);
+        }
+        catch (System.Exception ex)
+        {
+            Log.Warning($"Monster: Received RealityChanged signal with unexpected value - {ex.Message}", "Monster");
+        }
+    }
+
+    private void OnRealityChanged(Reality newReality)
+    {
+        ApplyRealityToLifeBar(newReality);
+    }
+
+    private void ApplyRealityToLifeBar(Reality reality)
+    {
+        if (_monsterLifeBar == null) return;
+
+        // CORRECTED: Monster life bar should be visible in CurrentReality, hidden in PastReality
+        if (reality == Reality.CurrentReality)
+        {
+            // Show and ensure life bar follows the monster in current reality
+            _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
+            _monsterLifeBar.SetFollowMonster(true);
+            _monsterLifeBar.Show();
+            // Ensure fully visible
+            var mbMod = _monsterLifeBar.Modulate;
+            _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, 1.0f);
+            
+            // Force immediate position update when enabling following
+            CallDeferred(nameof(UpdateLifeBarPosition));
+        }
+        else if (reality == Reality.PastReality)
+        {
+            // FIXED: Hide and disconnect the life bar during past reality to avoid conflict with ghost
+            try { _monsterLifeBar.ConnectToLifeSystem(null); } catch { }
+            _monsterLifeBar.Hide();
+            _monsterLifeBar.SetFollowMonster(false);
+            var mbMod = _monsterLifeBar.Modulate;
+            _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, 0.0f);
+        }
     }
 
     private void InitializeSimpleComponents()
@@ -130,15 +215,33 @@ public partial class Monster : CharacterBody2D
 
     private void FindMonsterLifeBar()
     {
-        // Find MonsterLifeBar component
+        // CRITICAL: Only use the Monster's own life bar, never search globally
+        // This prevents conflicts with GhostMonster life bars
         _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>("MonsterLifeBar");
         
         if (_monsterLifeBar == null)
         {
-            Log.Warning("Monster: No MonsterLifeBar component found!", "Monster");
+            // Try direct child lookup with common names
+            foreach (Node child in GetChildren())
+            {
+                if (child is MonsterLifeBar lifeBar)
+                {
+                    _monsterLifeBar = lifeBar;
+                    break;
+                }
+            }
+        }
+        
+        if (_monsterLifeBar == null)
+        {
+            Log.Warning("Monster: No MonsterLifeBar component found as direct child!", "Monster");
         }
         else
         {
+            // Ensure this life bar is dedicated to this monster
+            _monsterLifeBar.AutoDiscover = false;
+            _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
+            _monsterLifeBar.SetFollowMonster(true);
             Log.Debug("Monster: MonsterLifeBar component found and connected", "Monster");
         }
     }
@@ -574,20 +677,23 @@ public partial class Monster : CharacterBody2D
     {
         if (_monsterLifeBar == null || !_monsterLifeBar.FollowMonster) return;
 
-        // Direct position calculation 
+        // Direct position calculation using the same logic as MonsterLifeBar.cs
         var camera = GetViewport().GetCamera2D();
+        Vector2 targetPosition;
+        
         if (camera != null)
         {
+            // Match MonsterLifeBar positioning exactly
             Vector2 screenPos = camera.GetScreenCenterPosition() + (GlobalPosition - camera.GlobalPosition) * camera.Zoom;
-            _monsterLifeBar.GlobalPosition = screenPos + _monsterLifeBar.OffsetFromMonster;
+            targetPosition = screenPos + _monsterLifeBar.OffsetFromMonster;
         }
         else
         {
-            _monsterLifeBar.GlobalPosition = GlobalPosition + _monsterLifeBar.OffsetFromMonster;
+            // Fallback positioning
+            targetPosition = GlobalPosition + _monsterLifeBar.OffsetFromMonster;
         }
         
-        // Remove frequent debug logging that can cause performance issues
-        // Log.Debug($"Life bar position updated to: {_monsterLifeBar.GlobalPosition} (Monster at: {GlobalPosition})", "Monster");
+        _monsterLifeBar.GlobalPosition = targetPosition;
     }
     #endregion
 
@@ -790,13 +896,13 @@ public partial class Monster : CharacterBody2D
                 damaged = _monsterLife.TakePhysicalDamage(damage);
                 if (damaged)
                 {
-            // Info level - combat feedback is important for balance testing
-            Log.Info($"Rock hit monster in Current Reality - damaged red hearts", "Monster");
+                    // Info level - combat feedback is important for balance testing
+                    Log.Info($"Rock hit monster in Current Reality - damaged red hearts", "Monster");
                 }
                 else
                 {
-                // Warning level - indicates potential balance issue
-                Log.Warning($"Rock hit monster in Current Reality but no red hearts to damage", "Monster");
+                    // Warning level - indicates potential balance issue
+                    Log.Warning($"Rock hit monster in Current Reality but no red hearts to damage", "Monster");
                 }
                 break;
                 
@@ -805,8 +911,8 @@ public partial class Monster : CharacterBody2D
                 damaged = _monsterLife.TakePurpleHeartDamage(damage);
                 if (damaged)
                 {
-                // Info level - important purple gem reality feedback
-                Log.Info($"Rock hit monster in Purple Gem Reality - damaged purple hearts", "Monster");
+                    // Info level - important purple gem reality feedback
+                    Log.Info($"Rock hit monster in Purple Gem Reality - damaged purple hearts", "Monster");
                     
                     // Check if all purple hearts are lost (monster should die)
                     if (_monsterLife.CurrentPurpleHearts <= 0)

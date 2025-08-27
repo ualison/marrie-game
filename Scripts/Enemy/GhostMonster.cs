@@ -49,12 +49,9 @@ public partial class GhostMonster : CharacterBody2D
     #region Initialization
     public override void _Ready()
     {
-    // Note: the scene's PauseMode should be set to PauseModeEnum.Process for reliable replay while tree is paused.
-    Log.Debug("Ensure PauseMode=Process in scene for ghost to process during tree pause", "GhostMonster");
-    SetupGhostVisuals();
+        SetupGhostVisuals();
         DisableCollisions();
         Hide();
-        Log.Debug($"GhostMonster ready: {Name}", "GhostMonster");
     }
 
     public void _on_ghost_setup_complete(Vector2 position)
@@ -66,23 +63,25 @@ public partial class GhostMonster : CharacterBody2D
         // Refresh sprite discovery since factory may have added sprites after _Ready
         SetupGhostVisuals();
         
-        Log.Debug($"Ghost monster setup complete at position {position}", "GhostMonster");
-        Log.Debug($"Ghost monster children count: {GetChildCount()}, Active sprite: {_activeSprite?.Name ?? "null"}", "GhostMonster");
-        
         // Force visibility for debugging
         Show();
         if (_activeSprite != null)
         {
             _activeSprite.Show();
-            Log.Debug($"Ghost monster sprite shown: {_activeSprite.Name}, Visible: {_activeSprite.Visible}, Modulate: {_activeSprite.Modulate}", "GhostMonster");
         }
 
-    // Setup a MonsterLife and LifeBar so ghost displays health like a real monster
-    SetupLifeSystem();
+        // Setup a MonsterLife and LifeBar so ghost displays health like a real monster
+        SetupLifeSystem();
 
-    // Connect to reality changes so life bar visibility and following behavior update
-    // Use Godot signal Connect because RealityManager emits the signal with an int payload
-    CallDeferred(nameof(EnsureRealitySubscription));
+        // Connect to reality changes so life bar visibility and following behavior update
+        // CRITICAL FIX: Connect to reality changes BEFORE checking current reality
+        EnsureRealitySubscription();
+        
+        // CRITICAL FIX: Apply current reality state immediately after connection
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+        {
+            ApplyRealityToLifeBar(RealityManager.Instance.CurrentReality);
+        }
     }
 
     private bool _realityConnected = false;
@@ -96,13 +95,11 @@ public partial class GhostMonster : CharacterBody2D
             // Connect using Godot signals to receive the raw emitted value
             RealityManager.Instance.Connect("RealityChanged", new Callable(this, nameof(OnRealityChangedSignal)));
             _realityConnected = true;
-            // Immediately apply current reality state to life bar
-            ApplyRealityToLifeBar(RealityManager.Instance.CurrentReality);
+            Log.Debug("GhostMonster: Successfully connected to RealityManager signals", "GhostMonster");
         }
         else
         {
-            // Try again shortly after (deferred) if RealityManager isn't ready yet
-            CallDeferred(nameof(EnsureRealitySubscription));
+            Log.Warning("GhostMonster: RealityManager not available for subscription", "GhostMonster");
         }
     }
 
@@ -138,17 +135,24 @@ public partial class GhostMonster : CharacterBody2D
 
     private void OnRealityChanged(Reality newReality)
     {
+        Log.Debug($"GhostMonster: Reality changed to {newReality}", "GhostMonster");
         ApplyRealityToLifeBar(newReality);
     }
 
     private void ApplyRealityToLifeBar(Reality reality)
     {
         if (_monsterLifeBar == null)
+        {
+            Log.Warning("GhostMonster: Cannot apply reality - life bar is null", "GhostMonster");
             return;
+        }
 
+        Log.Debug($"GhostMonster: Applying reality {reality} to life bar", "GhostMonster");
+
+        // CORRECTED: GhostMonster life bar should be visible in PastReality, hidden in CurrentReality
         if (reality == Reality.CurrentReality)
         {
-            // Detach and hide life bar in current reality to avoid lingering UI
+            // Hide and disconnect life bar in current reality (when real monster is active)
             try
             {
                 _monsterLifeBar.ConnectToLifeSystem(null); // disconnect from any life system
@@ -156,21 +160,25 @@ public partial class GhostMonster : CharacterBody2D
             catch { }
             _monsterLifeBar.Hide();
             _monsterLifeBar.SetFollowMonster(false);
-            // Ensure fully invisible (defensive)
+            // Ensure fully invisible
             var mbMod = _monsterLifeBar.Modulate;
             _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, 0.0f);
+            Log.Debug("GhostMonster: Life bar hidden in CurrentReality", "GhostMonster");
         }
-    else if (reality == Reality.PastReality)
+        else if (reality == Reality.PastReality)
         {
             // Show and make life bar follow ghost during past reality replay
-            // Reconnect to the monster life system and show
             _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
             _monsterLifeBar.SetFollowMonster(true);
             _monsterLifeBar.Show();
             // Ensure visible alpha matches ghost
+            float targetAlpha = _activeSprite != null ? _activeSprite.Modulate.A : GHOST_TINT.A;
             var mbMod = _monsterLifeBar.Modulate;
-            float targetAlpha = _activeSprite != null ? _activeSprite.Modulate.A : 1.0f;
             _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, targetAlpha);
+            Log.Debug($"GhostMonster: Life bar shown and following in PastReality with alpha {targetAlpha}", "GhostMonster");
+            
+            // CRITICAL FIX: Force immediate position update when enabling following
+            ForceLifeBarPositionUpdate();
         }
     }
     #endregion
@@ -195,9 +203,6 @@ public partial class GhostMonster : CharacterBody2D
             {
                 _currentPosition = _targetPosition;
                 GlobalPosition = _currentPosition;
-                // Keep life bar following exactly with ghost (defensive override)
-                if (_monsterLifeBar != null && _monsterLifeBar.FollowMonster)
-                    UpdateLifeBarPosition();
             }
             else
             {
@@ -225,6 +230,8 @@ public partial class GhostMonster : CharacterBody2D
                 }
                 GlobalPosition = _currentPosition;
             }
+            
+            // Life bar positioning is now handled automatically by MonsterLifeBar._Process()
         }
         else if (_currentFrameIndex >= _replayFrames.Count)
         {
@@ -240,9 +247,6 @@ public partial class GhostMonster : CharacterBody2D
                 _currentPosition = _currentPosition.Lerp(_targetPosition, SMOOTH_SPEED * (float)delta);
             }
             GlobalPosition = _currentPosition;
-            // Keep life bar following exactly with ghost (defensive override)
-            if (_monsterLifeBar != null && _monsterLifeBar.FollowMonster)
-                UpdateLifeBarPosition();
         }
     }
     #endregion
@@ -273,25 +277,6 @@ public partial class GhostMonster : CharacterBody2D
         }
         
         return null;
-    }
-    #endregion
-
-    #region Optimized Frame Processing
-    private ReplayFrame? FindFrameAtTimeOptimized(float time)
-    {
-        // Optimized: Don't search from beginning every time
-        // Most of the time we just need the next frame
-        if (_currentFrameIndex < _replayFrames.Count && _replayFrames[_currentFrameIndex].Timestamp <= time)
-        {
-            // Fast forward to correct frame
-            while (_currentFrameIndex < _replayFrames.Count - 1 && _replayFrames[_currentFrameIndex + 1].Timestamp <= time)
-            {
-                _currentFrameIndex++;
-            }
-            return _replayFrames[_currentFrameIndex];
-        }
-
-        return _currentFrameIndex < _replayFrames.Count ? _replayFrames[_currentFrameIndex] : null;
     }
 
     private void ApplyFrameToGhostOptimized(ReplayFrame frame)
@@ -343,13 +328,6 @@ public partial class GhostMonster : CharacterBody2D
 
         if (stateChanged || visibilityChanged)
         {
-            // Log position changes during transitions for debugging
-            float distance = _currentPosition.DistanceTo(frame.Position);
-            if (distance > 50f) // Log significant position changes
-            {
-                Log.Debug($"GhostMonster: Large position change during transition - Distance: {distance:F1}, From: {_currentPosition} To: {frame.Position}", "GhostMonster");
-            }
-            
             HandleStateTransition(newMonsterState, newIsFullyVisible, frame);
         }
 
@@ -359,13 +337,9 @@ public partial class GhostMonster : CharacterBody2D
             _activeSprite.Visible = frame.Alpha > 0.0f;
             _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, finalAlpha);
             _lastAlpha = finalAlpha;
-        }
-
-        // Keep life bar alpha in sync with ghost when the life bar is active
-        if (_monsterLifeBar != null && _monsterLifeBar.Visible)
-        {
-            var mbMod = _monsterLifeBar.Modulate;
-            _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, finalAlpha);
+            
+            // FIXED: Keep life bar alpha in sync with ghost when the life bar is active and following
+            SynchronizeLifeBarAlpha(finalAlpha);
         }
 
         // Update state tracking
@@ -373,19 +347,25 @@ public partial class GhostMonster : CharacterBody2D
         _isCurrentlyFullyVisible = newIsFullyVisible;
     }
 
-    private void HandleStateTransition(string newState, bool newIsFullyVisible, ReplayFrame frame)
+    private void SynchronizeLifeBarAlpha(float ghostAlpha)
     {
-        // Log state transitions for debugging
-        if (!newIsFullyVisible && _isCurrentlyFullyVisible)
+        if (_monsterLifeBar == null || !_monsterLifeBar.Visible || !_monsterLifeBar.FollowMonster)
+            return;
+
+        // Only update if the reality allows life bar visibility
+        var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        if (currentReality == Reality.PastReality)
         {
-            Log.Debug($"GhostMonster: Starting fade transition - State: {newState} (movement will slow down)", "GhostMonster");
-        }
-        else if (newIsFullyVisible && !_isCurrentlyFullyVisible)
-        {
-            Log.Debug($"GhostMonster: Ending fade transition - State: {newState} (resuming normal movement)", "GhostMonster");
+            var mbMod = _monsterLifeBar.Modulate;
+            _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, ghostAlpha);
         }
     }
 
+    private void HandleStateTransition(string newState, bool newIsFullyVisible, ReplayFrame frame)
+    {
+        // State transition handling without excessive logging
+        // Logic for handling transitions can be added here if needed
+    }
     #endregion
 
     #region Replay Control
@@ -429,16 +409,21 @@ public partial class GhostMonster : CharacterBody2D
             // Start with first frame's alpha instead of 0 to eliminate delay
             var initialAlpha = firstFrame.Alpha * GHOST_TINT.A;
             _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, initialAlpha);
-            if (_monsterLifeBar != null)
-            {
-                var mbMod = _monsterLifeBar.Modulate;
-                _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, initialAlpha);
-                _monsterLifeBar.Visible = initialAlpha > 0.0f;
-            }
+            
+            // FIXED: Synchronize life bar with initial alpha
+            SynchronizeLifeBarAlpha(initialAlpha);
         }
 
         // Apply first frame immediately to show correct initial state
         ApplyFrameToGhostOptimized(firstFrame);
+
+        // CRITICAL: Ensure life bar follows this ghost during replay
+        var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        if (currentReality == Reality.PastReality && _monsterLifeBar != null && _monsterLifeBar.FollowMonster)
+        {
+            // Force the life bar to use the correct monster reference
+            SetLifeBarMonsterReference();
+        }
 
         Log.Replay($"GhostMonster: Started optimized replay with {frames.Count} frames - immediate start at {firstFrame.Position}", "GhostMonster");
     }
@@ -456,6 +441,8 @@ public partial class GhostMonster : CharacterBody2D
     {
         if (_activeSprite == null)
         {
+            // Clean up life bar before destroying
+            CleanupLifeBar();
             QueueFree();
             return;
         }
@@ -469,6 +456,7 @@ public partial class GhostMonster : CharacterBody2D
         tween.TweenCallback(Callable.From(() =>
         {
             Log.Debug("Ghost monster faded out and destroyed", "GhostMonster");
+            CleanupLifeBar();
             QueueFree();
         }));
     }
@@ -541,24 +529,6 @@ public partial class GhostMonster : CharacterBody2D
         _activeSprite = fallbackSprite;
     }
 
-    private void UpdateLifeBarPosition()
-    {
-        if (_monsterLifeBar == null || _monsterLifeBar == null) return;
-
-        // MonsterLifeBar expects to compute screen coordinates; replicate that logic
-        var camera = GetViewport().GetCamera2D();
-        Vector2 screenPos;
-        if (camera != null)
-        {
-            screenPos = camera.GetScreenCenterPosition() + (GlobalPosition - camera.GlobalPosition) * camera.Zoom;
-            _monsterLifeBar.GlobalPosition = screenPos + _monsterLifeBar.OffsetFromMonster;
-        }
-        else
-        {
-            _monsterLifeBar.GlobalPosition = GlobalPosition + _monsterLifeBar.OffsetFromMonster;
-        }
-    }
-
     private void DisableCollisions()
     {
         SetCollisionLayerValue(1, false);
@@ -587,50 +557,178 @@ public partial class GhostMonster : CharacterBody2D
 
     private void SetupLifeSystem()
     {
-        // Try to find an existing MonsterLife child (factory may have attached one)
-        _monsterLife = GetNodeOrNull<MonsterLife>("MonsterLife");
+        // FIXED: Only use GhostMonster's own life component, never share with Monster
+        _monsterLife = GetNodeOrNull<MonsterLife>("GhostMonsterLife");
 
         if (_monsterLife == null)
         {
-            // Create a lightweight MonsterLife for ghost - keep defaults small
-            _monsterLife = new MonsterLife { Name = "MonsterLife" };
+            // Create independent MonsterLife for ghost - completely separate from Monster
+            _monsterLife = new MonsterLife { Name = "GhostMonsterLife" };
             AddChild(_monsterLife);
-            Log.Debug("GhostMonster: Created internal MonsterLife for ghost", "GhostMonster");
+            Log.Debug("GhostMonster: Created independent MonsterLife for ghost", "GhostMonster");
+        }
+        else
+        {
+            Log.Debug("GhostMonster: Using existing GhostMonsterLife component", "GhostMonster");
         }
 
-        // Try to find a MonsterLifeBar instance (UI). If not present, instance the prefab under the ghost.
-        _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>("MonsterLifeBar");
-        if (_monsterLifeBar == null)
+        // FIXED: Only look for GhostMonster's own life bar, never Monster's
+        _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>("GhostMonsterLifeBar");
+        
+        if (_monsterLifeBar != null)
         {
-            // Try to create a life bar instance from the existing prefab scene resource
+            // Use the existing life bar from the scene
+            _monsterLifeBar.AutoDiscover = false;
+            _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
+            _monsterLifeBar.SetFollowMonster(true);
+            _monsterLifeBar.Hide(); // Start hidden
+            
+            // CRITICAL FIX: Ensure the life bar's internal _monster reference points to this GhostMonster
+            // The MonsterLifeBar._Process() method uses _monster.GlobalPosition for positioning
+            // We need to make sure it follows THIS ghost, not the original Monster
+            SetLifeBarMonsterReference();
+            
+            Log.Debug("GhostMonster: Using existing GhostMonsterLifeBar from scene", "GhostMonster");
+        }
+        else
+        {
+            // Create new life bar instance with unique name
             var lifeBarScene = GD.Load<PackedScene>("res://Prefabs/UI/MonsterLifeBar.tscn");
             if (lifeBarScene != null)
             {
                 var lifeBarInstance = lifeBarScene.Instantiate() as MonsterLifeBar;
                 if (lifeBarInstance != null)
                 {
-                    lifeBarInstance.Name = "MonsterLifeBar";
-                    // Place life bar under current scene root so it renders in UI layer
+                    lifeBarInstance.Name = "DynamicGhostLifeBar"; // Unique name to avoid conflicts
                     GetTree().CurrentScene.AddChild(lifeBarInstance);
-                    // Disable auto-discovery so the life bar doesn't attach to other monsters
                     lifeBarInstance.AutoDiscover = false;
-                    // Explicitly connect the life bar to this ghost's life system and ensure it follows this ghost
                     lifeBarInstance.ConnectToLifeSystem(_monsterLife);
                     lifeBarInstance.SetFollowMonster(true);
-                    // Match initial alpha to current ghost sprite tint if available
-                    float initialAlphaForBar = _activeSprite != null ? _activeSprite.Modulate.A : 1.0f;
+                    float initialAlphaForBar = GHOST_TINT.A;
                     var mbModTemp = lifeBarInstance.Modulate;
                     lifeBarInstance.Modulate = new Color(mbModTemp.R, mbModTemp.G, mbModTemp.B, initialAlphaForBar);
+                    lifeBarInstance.Hide();
                     _monsterLifeBar = lifeBarInstance;
-                    Log.Debug("GhostMonster: Instantiated MonsterLifeBar for ghost", "GhostMonster");
+                    Log.Debug("GhostMonster: Created independent MonsterLifeBar instance", "GhostMonster");
                 }
             }
         }
-        else
+    }
+
+    private void SetLifeBarMonsterReference()
+    {
+        // CRITICAL FIX: The MonsterLifeBar has an internal _monster field that determines
+        // which monster it follows in its _Process() method. We need to ensure this
+        // points to the GhostMonster, not the original Monster.
+        
+        if (_monsterLifeBar != null)
         {
-            // If found in scene tree as child, connect it
-            _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
+            // The issue is that MonsterLifeBar.FindMonsterNode() looks for _lifeSystem.GetParent()
+            // But it may not be called automatically when we reconnect
+            
+            // Force a complete reset by disconnecting, then reconnecting
+            _monsterLifeBar.ConnectToLifeSystem(null);
+            _monsterLifeBar.SetFollowMonster(false);
+            
+            // Small delay to ensure disconnection is processed
+            CallDeferred(nameof(ReconnectLifeBar));
         }
+    }
+
+    private void ReconnectLifeBar()
+    {
+        if (_monsterLifeBar != null && _monsterLife != null)
+        {
+            // Reconnect the life system - this should trigger FindMonsterNode()
+            // CRITICAL: Ensure the GhostMonsterLife is a direct child of this GhostMonster
+            // so that MonsterLifeBar.FindMonsterNode (which checks _lifeSystem.GetParent())
+            // will resolve this GhostMonster as the target to follow.
+            if (_monsterLife.GetParent() != this)
+            {
+                Log.Warning($"GhostMonsterLife parent is {_monsterLife.GetParent()?.Name}, should be {Name}", "GhostMonster");
+
+                // If the life system isn't a child of this ghost, move it
+                if (_monsterLife.GetParent() != null)
+                {
+                    _monsterLife.GetParent().RemoveChild(_monsterLife);
+                }
+                AddChild(_monsterLife);
+            }
+
+            // Now connect the life bar to the (reparented) life system and force it to refresh
+            _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
+            _monsterLifeBar.SetFollowMonster(true);
+            _monsterLifeBar.RefreshMonsterNode();
+
+            Log.Debug($"GhostMonster: Life bar reconnected - MonsterLife parent: {_monsterLife.GetParent()?.Name}", "GhostMonster");
+        }
+    }
+
+    private void ForceLifeBarPositionUpdate()
+    {
+        // CRITICAL FIX: Don't manually force positioning - let MonsterLifeBar handle it
+        // The issue was that we were fighting against MonsterLifeBar's own positioning system
+        
+        if (_monsterLifeBar != null)
+        {
+            // Ensure the life bar's monster reference is correct
+            SetLifeBarMonsterReference();
+            
+            Log.Debug($"GhostMonster: Life bar monster reference updated - Ghost at {GlobalPosition}", "GhostMonster");
+            
+            // Ensure visibility
+            if (!_monsterLifeBar.Visible)
+            {
+                Log.Warning("GhostMonster: Life bar was not visible - showing it", "GhostMonster");
+                _monsterLifeBar.Show();
+            }
+        }
+    }
+
+    private void CleanupLifeBar()
+    {
+        // Clean up life bar - but only if it was dynamically created, not from scene
+        if (_monsterLifeBar != null && IsInstanceValid(_monsterLifeBar))
+        {
+            try
+            {
+                _monsterLifeBar.ConnectToLifeSystem(null);
+            }
+            catch { }
+            
+            // Only queue_free if it was dynamically created (not part of original scene)
+            if (_monsterLifeBar.Name == "DynamicGhostLifeBar" && _monsterLifeBar.GetParent() == GetTree().CurrentScene)
+            {
+                _monsterLifeBar.QueueFree();
+            }
+            else
+            {
+                // Just hide scene-based life bar (GhostMonsterLifeBar from .tscn)
+                _monsterLifeBar.Hide();
+            }
+            _monsterLifeBar = null;
+        }
+    }
+
+    public override void _ExitTree()
+    {
+        // Ensure cleanup when ghost is removed from scene
+        CleanupLifeBar();
+        base._ExitTree();
+    }
+
+    // Helper: recursively search descendants for a node of the requested type
+    private T FindDescendantOfType<T>(Node parent) where T : Node
+    {
+        foreach (Node child in parent.GetChildren())
+        {
+            if (child is T found)
+                return found;
+
+            var descendant = FindDescendantOfType<T>(child);
+            if (descendant != null) return descendant;
+        }
+        return null;
     }
 
     // Allow external systems (like rocks) to apply rock damage to ghost
