@@ -35,18 +35,22 @@ public partial class AppleTree : Node2D
         
         // Defer apple spawning to avoid busy setup conflicts
         CallDeferred(nameof(SpawnApples));
-
-        Log.System($"AppleTree ready with {_currentAppleCount}/{MaxApples} apples (spawning deferred)", "AppleTree");
+        
+        // Only log if configuration issues exist
+        if (_applePositions.Count < TOTAL_APPLE_POSITIONS)
+            Log.Warning($"AppleTree missing positions: {_applePositions.Count}/{TOTAL_APPLE_POSITIONS} found", "AppleTree");
     }
 
     private void ValidateMaxApples()
     {
         // Ensure MaxApples is within valid range
+        int originalMax = MaxApples;
         MaxApples = Mathf.Clamp(MaxApples, 0, TOTAL_APPLE_POSITIONS);
         
-        if (MaxApples < 0 || MaxApples > TOTAL_APPLE_POSITIONS)
+        // Only warn if the value was actually clamped
+        if (MaxApples != originalMax)
         {
-            Log.Warning($"MaxApples clamped to {MaxApples} (valid range: 0-{TOTAL_APPLE_POSITIONS})", "AppleTree");
+            Log.Warning($"MaxApples clamped from {originalMax} to {MaxApples} (valid range: 0-{TOTAL_APPLE_POSITIONS})", "AppleTree");
         }
     }
 
@@ -54,6 +58,7 @@ public partial class AppleTree : Node2D
     {
         // Find all ApplePosition nodes - they are now direct children of Root
         _applePositions.Clear();
+        int missingPositions = 0;
         
         for (int i = 1; i <= TOTAL_APPLE_POSITIONS; i++)
         {
@@ -64,11 +69,19 @@ public partial class AppleTree : Node2D
             }
             else
             {
-                Log.Warning($"ApplePostion{i} not found in tree", "AppleTree");
+                missingPositions++;
+                // Only warn for individual missing positions in debug mode
+                #if DEBUG
+                Log.Debug($"ApplePostion{i} not found in tree", "AppleTree");
+                #endif
             }
         }
 
-        Log.System($"Found {_applePositions.Count} apple positions", "AppleTree");
+        // Warn once about total missing positions if any are missing
+        if (missingPositions > 0)
+        {
+            Log.Warning($"{missingPositions} apple positions missing (found {_applePositions.Count}/{TOTAL_APPLE_POSITIONS})", "AppleTree");
+        }
     }
 
     private void LoadTreeState()
@@ -79,14 +92,16 @@ public partial class AppleTree : Node2D
         if (_treeAppleCounts.ContainsKey(treeKey))
         {
             _currentAppleCount = _treeAppleCounts[treeKey];
-            Log.System($"Loaded tree state: {_currentAppleCount} apples", "AppleTree");
+            // Debug level - state loading is routine
+            Log.Debug($"Loaded tree state: {_currentAppleCount} apples", "AppleTree");
         }
         else
         {
             // First time - use MaxApples as starting count
             _currentAppleCount = MaxApples;
             SaveTreeState();
-            Log.System($"New tree initialized with {_currentAppleCount} apples", "AppleTree");
+            // Debug level - new tree initialization is routine
+            Log.Debug($"New tree initialized with {_currentAppleCount} apples", "AppleTree");
         }
 
         // Ensure current count doesn't exceed MaxApples
@@ -113,7 +128,8 @@ public partial class AppleTree : Node2D
 
         if (_currentAppleCount <= 0)
         {
-            Log.System("No apples to spawn", "AppleTree");
+            // Debug level - empty trees are expected
+            Log.Debug("No apples to spawn", "AppleTree");
             return;
         }
 
@@ -126,7 +142,8 @@ public partial class AppleTree : Node2D
         // Spawn apples at selected positions
         SpawnApplesAtPositions();
 
-        Log.System($"Spawned {_spawnedApples.Count} apples on tree", "AppleTree");
+        // Debug level - routine spawning operation
+        Log.Debug($"Spawned {_spawnedApples.Count} apples on tree", "AppleTree");
     }
 
     private void ClearExistingApples()
@@ -156,7 +173,7 @@ public partial class AppleTree : Node2D
             availablePositions.RemoveAt(randomIndex);
         }
 
-        Log.System($"Selected {_activeApplePositions.Count} random positions", "AppleTree");
+        Log.Debug($"Selected {_activeApplePositions.Count} random positions", "AppleTree");
     }
 
     private void SpawnApplesAtPositions()
@@ -205,7 +222,8 @@ public partial class AppleTree : Node2D
         _currentAppleCount = Mathf.Max(0, _currentAppleCount - 1);
         SaveTreeState();
         
-        Log.System($"Apple consumed! Tree now has {_currentAppleCount} apples", "AppleTree");
+        // Important gameplay event - player consumed an apple
+        Log.Info($"Apple consumed! Tree now has {_currentAppleCount} apples", "AppleTree");
     }
 
     private void SaveTreeState()
@@ -214,7 +232,8 @@ public partial class AppleTree : Node2D
         string treeKey = GetTreeKey();
         _treeAppleCounts[treeKey] = _currentAppleCount;
         
-        Log.System($"Tree state saved: {_currentAppleCount} apples", "AppleTree");
+        // Debug level - routine state saving
+        Log.Debug($"Tree state saved: {_currentAppleCount} apples", "AppleTree");
     }
     #endregion
 
@@ -232,7 +251,8 @@ public partial class AppleTree : Node2D
         SaveTreeState();
         SpawnApples();
         
-        Log.System($"Apple count manually set to {_currentAppleCount}", "AppleTree");
+        // Debug level - manual apple count changes are for development/testing
+        Log.Debug($"Apple count manually set to {_currentAppleCount}", "AppleTree");
     }
 
     public int GetCurrentAppleCount() => _currentAppleCount;
@@ -246,14 +266,16 @@ public partial class AppleTree : Node2D
         SaveTreeState();
         SpawnApples();
         
-        Log.System($"Tree state reset to {_currentAppleCount} apples", "AppleTree");
+        // Debug level - reset operations are typically for development/testing
+        Log.Debug($"Tree state reset to {_currentAppleCount} apples", "AppleTree");
     }
 
     public static void ClearAllTreeStates()
     {
         // Clear all persistent tree data (for new game)
         _treeAppleCounts.Clear();
-        Log.System("All tree states cleared", "AppleTree");
+        // Debug level - typically called during development or testing
+        Log.Debug("All tree states cleared", "AppleTree");
     }
     #endregion
 
@@ -261,7 +283,8 @@ public partial class AppleTree : Node2D
     public override void _ExitTree()
     {
         // Cleanup when tree is removed from scene
-        Log.System($"AppleTree removed with {_currentAppleCount} apples remaining", "AppleTree");
+        // Debug level - cleanup operations are routine
+        Log.Debug($"AppleTree removed with {_currentAppleCount} apples remaining", "AppleTree");
     }
 
     public void LogTreeStatus()

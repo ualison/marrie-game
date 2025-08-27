@@ -37,18 +37,14 @@ public partial class UIManager : Node
     
     private void TryImmediateInitialization()
     {
-        Log.System("Attempting immediate initialization", "UIManager");
+        // Only log when initialization completely fails
         DiscoverUIComponents();
         ConnectUIEvents();
         SubscribeToPlayerEvents();
         
-        if (_gameOverUI != null)
+        if (_gameOverUI == null)
         {
-            Log.System("Immediate initialization successful", "UIManager");
-        }
-        else
-        {
-            Log.System("Immediate initialization failed, waiting for SceneReady", "UIManager");
+            Log.Warning("UIManager initialization incomplete - GameOverUI not found", "UIManager");
         }
     }
     
@@ -65,10 +61,12 @@ public partial class UIManager : Node
         if (PlayerStateManager.Instance != null)
         {
             PlayerStateManager.PlayerDied += OnPlayerDied;
-            Log.System("Subscribed to PlayerStateManager.PlayerDied", "UIManager");
+            // Debug level - connection successful
+            Log.Debug("Subscribed to PlayerStateManager.PlayerDied", "UIManager");
         }
         else
         {
+            // Critical error - game won't function properly
             Log.Error("PlayerStateManager.Instance is null!", "UIManager");
         }
     }
@@ -80,17 +78,23 @@ public partial class UIManager : Node
         _manaBarUI = GetTree().GetFirstNodeInGroup("mana_bar_ui") as ManaBar;
         _gameMessageUI = GetTree().GetFirstNodeInGroup("game_message_ui") as GameMessage;
         
-        Log.System($"GameOverUI found: {_gameOverUI != null}, LifeBarUI found: {_lifeBarUI != null}, ManaBarUI found: {_manaBarUI != null}, GameMessageUI found: {_gameMessageUI != null}", "UIManager");
+        // Only log critical missing components
+        if (_gameOverUI == null)
+            Log.Warning("GameOverUI not found in groups, searching by name...", "UIManager");
         
-        // Debug: List all nodes in the game_over_ui group
+        // Debug: List all nodes in the game_over_ui group only when debugging
         var gameOverNodes = GetTree().GetNodesInGroup("game_over_ui");
-        Log.System($"Found {gameOverNodes.Count} nodes in 'game_over_ui' group", "UIManager");
+        if (gameOverNodes.Count == 0 && _gameOverUI == null)
+        {
+            Log.Warning("No nodes found in 'game_over_ui' group", "UIManager");
+        }
+        
+        #if DEBUG
         foreach (Node node in gameOverNodes)
         {
-            #if DEBUG
             Log.Debug($"  - {node.Name} ({node.GetType().Name})", "UIManager");
-            #endif
         }
+        #endif
         
         // If not found by group, try to find by common names
         if (_gameOverUI == null)
@@ -103,7 +107,8 @@ public partial class UIManager : Node
                 if (node is GameOver gameOverUI)
                 {
                     _gameOverUI = gameOverUI;
-                    Log.System($"Found GameOverUI by name search: {name}", "UIManager");
+                    // Debug level - fallback search succeeded
+                    Log.Debug($"Found GameOverUI by name search: {name}", "UIManager");
                     break;
                 }
             }
@@ -119,7 +124,8 @@ public partial class UIManager : Node
                 if (gameOverNode is GameOver gameOverUI)
                 {
                     _gameOverUI = gameOverUI;
-                    Log.System("Found GameOverUI at Interface/GameOverScr", "UIManager");
+                    // Debug level - fallback path search succeeded
+                    Log.Debug("Found GameOverUI at Interface/GameOverScr", "UIManager");
                 }
             }
         }
@@ -134,7 +140,7 @@ public partial class UIManager : Node
                 if (lifeBarNode is LifeBar lifeBarUI)
                 {
                     _lifeBarUI = lifeBarUI;
-                    Log.System("Found LifeBarUI at Interface/LifeBarUI", "UIManager");
+                    Log.Debug("Found LifeBarUI at Interface/LifeBarUI", "UIManager");
                 }
             }
         }
@@ -149,7 +155,7 @@ public partial class UIManager : Node
                 if (manaBarNode is ManaBar manaBarUI)
                 {
                     _manaBarUI = manaBarUI;
-                    Log.System("Found ManaBarUI at Interface/ManaBarUI", "UIManager");
+                    Log.Debug("Found ManaBarUI at Interface/ManaBarUI", "UIManager");
                 }
             }
         }
@@ -160,7 +166,7 @@ public partial class UIManager : Node
             _gameOverUI = FindNodeByType<GameOver>(GetTree().CurrentScene);
             if (_gameOverUI != null)
             {
-                Log.System($"Found GameOverUI by recursive search: {_gameOverUI.Name}", "UIManager");
+                Log.Debug($"Found GameOverUI by recursive search: {_gameOverUI.Name}", "UIManager");
             }
         }
         
@@ -169,7 +175,7 @@ public partial class UIManager : Node
             _manaBarUI = FindNodeByType<ManaBar>(GetTree().CurrentScene);
             if (_manaBarUI != null)
             {
-                Log.System($"Found ManaBarUI by recursive search: {_manaBarUI.Name}", "UIManager");
+                Log.Debug($"Found ManaBarUI by recursive search: {_manaBarUI.Name}", "UIManager");
             }
         }
         
@@ -178,12 +184,12 @@ public partial class UIManager : Node
             _gameMessageUI = FindNodeByType<GameMessage>(GetTree().CurrentScene);
             if (_gameMessageUI != null)
             {
-                Log.System($"Found GameMessageUI by recursive search: {_gameMessageUI.Name}", "UIManager");
+                Log.Debug($"Found GameMessageUI by recursive search: {_gameMessageUI.Name}", "UIManager");
             }
         }
         
-        // Final status
-        Log.System($"Final result - GameOverUI: {_gameOverUI?.Name ?? "null"}, LifeBarUI: {_lifeBarUI?.Name ?? "null"}, ManaBarUI: {_manaBarUI?.Name ?? "null"}, GameMessageUI: {_gameMessageUI?.Name ?? "null"}", "UIManager");
+        // Final status - debug level for initialization tracking
+        Log.Debug($"Final result - GameOverUI: {_gameOverUI?.Name ?? "null"}, LifeBarUI: {_lifeBarUI?.Name ?? "null"}, ManaBarUI: {_manaBarUI?.Name ?? "null"}, GameMessageUI: {_gameMessageUI?.Name ?? "null"}", "UIManager");
     }
     
     private T FindNodeByType<T>(Node startNode) where T : class

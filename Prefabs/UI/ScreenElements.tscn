@@ -29,7 +29,7 @@ offset_bottom = -20.0
 grow_vertical = 0
 theme_override_constants/separation = 10
 
-[node name="RockCountUI" parent="BottomLeftContainer" instance=ExtResource("7_rockcount")]
+[node name="RockCount" parent="BottomLeftContainer" instance=ExtResource("7_rockcount")]
 layout_mode = 2
 
 [node name="ManaBar" type="Control" parent="BottomLeftContainer"]

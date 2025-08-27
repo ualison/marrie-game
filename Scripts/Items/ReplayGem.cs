@@ -31,10 +31,24 @@ public partial class ReplayGem : Node2D
         HideInitially();
         EnableInputProcessing();
 
+        // Check RealityManager availability during initialization
+        Log.Replay($"ReplayGem _Ready - RealityManager availability: {RealityManager.IsInstanceAvailable}", "ReplayGem");
+        if (RealityManager.IsInstanceAvailable)
+        {
+            Log.Replay($"RealityManager found during ReplayGem init - Current reality: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "ReplayGem");
+        }
+        else
+        {
+            Log.Replay("RealityManager not yet available during ReplayGem init - this may be normal if RealityManager initializes later", "ReplayGem");
+        }
+
         // Add delay before allowing interaction to prevent auto-triggering
         GetTree().CreateTimer(1.0f).Timeout += () => {
             _canInteract = true;
             Log.Replay("ReplayGem interaction enabled", "ReplayGem");
+            
+            // Check RealityManager again after delay
+            Log.Replay($"ReplayGem interaction enabled - RealityManager availability: {RealityManager.IsInstanceAvailable}", "ReplayGem");
         };
 
         Log.Replay("ReplayGem ready - hidden until activated", "ReplayGem");
@@ -126,14 +140,18 @@ public partial class ReplayGem : Node2D
         Log.Replay("Consumed 1 mana for replay activation", "ReplayGem");
         
         // Change reality to PastReality when starting replay
-        if (RealityManager.Instance != null)
+        Log.Replay($"Attempting to start replay - RealityManager availability: {RealityManager.IsInstanceAvailable}", "ReplayGem");
+        
+        if (RealityManager.IsInstanceAvailable)
         {
+            Log.Replay($"Current reality before replay: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "ReplayGem");
             RealityManager.Instance.StartReplay();
-            Log.Replay("Reality changed to PastReality for replay", "ReplayGem");
+            Log.Replay($"Reality after StartReplay call: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "ReplayGem");
         }
         else
         {
-            Log.Warning("RealityManager.Instance is null - cannot change reality", "ReplayGem");
+            Log.Warning("RealityManager.Instance is null - cannot change reality. This suggests RealityManager hasn't been initialized yet.", "ReplayGem");
+            Log.Warning("Check that RealityManager is properly added to the scene tree before ReplayGem activation.", "ReplayGem");
         }
         
         // Get death record and start replay through orchestrator
@@ -333,10 +351,13 @@ public partial class ReplayGem : Node2D
         }
         
         // End replay in RealityManager to return to CurrentReality
-        if (RealityManager.Instance != null)
+        Log.Replay($"Attempting to end replay - RealityManager availability: {RealityManager.IsInstanceAvailable}", "ReplayGem");
+        
+        if (RealityManager.IsInstanceAvailable)
         {
+            Log.Replay($"Current reality before ending replay: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "ReplayGem");
             RealityManager.Instance.EndReplay();
-            Log.Replay("Reality changed back to CurrentReality after replay", "ReplayGem");
+            Log.Replay($"Reality after EndReplay call: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "ReplayGem");
         }
         else
         {

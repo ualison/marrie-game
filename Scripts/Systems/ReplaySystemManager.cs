@@ -67,7 +67,8 @@ public partial class ReplaySystemManager : Node
             // Create recorder if it doesn't exist
             _recorder = new ReplayRecorder { Name = "ReplayRecorder" };
             GetTree().CurrentScene.AddChild(_recorder);
-            Log.System("Created ReplayRecorder", "ReplaySystemManager");
+            // Debug level - component creation is routine
+            Log.Debug("Created ReplayRecorder", "ReplaySystemManager");
         }
 
         // Find or create orchestrator
@@ -78,10 +79,12 @@ public partial class ReplaySystemManager : Node
             // Create orchestrator if it doesn't exist
             _orchestrator = new ReplayOrchestrator { Name = "ReplayOrchestrator" };
             GetTree().CurrentScene.AddChild(_orchestrator);
-            Log.System("Created ReplayOrchestrator", "ReplaySystemManager");
+            // Debug level - component creation is routine
+            Log.Debug("Created ReplayOrchestrator", "ReplaySystemManager");
         }
         
-        Log.System("ReplaySystemManager initialized", "ReplaySystemManager");
+        // Debug level - system initialization is routine
+        Log.Debug("ReplaySystemManager initialized", "ReplaySystemManager");
     }
     #endregion
 
@@ -101,7 +104,8 @@ public partial class ReplaySystemManager : Node
         _recorder.StopRecording();
         SaveDeathRecord(deathPosition);
         
-        Log.Replay($"Player death recorded at {deathPosition} (Total deaths: {_deathRecords.Count})", "ReplaySystemManager");
+        // Important event - player deaths should be tracked for debugging
+        Log.Info($"Player death recorded at {deathPosition} (Total deaths: {_deathRecords.Count})", "ReplaySystemManager");
     }
 
     private void OnGameRestart()

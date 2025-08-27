@@ -33,26 +33,32 @@ namespace MarrieGame.Core.Logging
         
         private void InitializeLogger()
         {
-            // Set default log level based on build type
+            // Set default log level to prioritize warnings and errors
             #if DEBUG
-                _currentLogLevel = LogLevel.Debug;
+                _currentLogLevel = LogLevel.Debug; // Show all logs in debug builds for development
             #else
-                _currentLogLevel = LogLevel.Info; // Production: Hide debug logs
+                _currentLogLevel = LogLevel.Warning; // Production: Only show warnings and errors to catch bugs
             #endif
             
-            // Initialize category filters with reduced verbosity
+            // Initialize category filters - prioritize error detection
             foreach (LogCategory category in Enum.GetValues<LogCategory>())
             {
                 _categoryFilters[category] = true;
             }
             
-            // In production builds, disable excessive debug categories
+            // In production builds, disable excessive debug categories but keep error-prone ones
             #if !DEBUG
                 _categoryFilters[LogCategory.Debug] = false;
                 _categoryFilters[LogCategory.Performance] = false;
+                _categoryFilters[LogCategory.System] = false; // Reduce system noise in production
+                _categoryFilters[LogCategory.Gameplay] = false; // Reduce gameplay noise in production
             #endif
             
-            LogInfo("GameLogger initialized with optimized settings", "Logger");
+            // Always prioritize error categories regardless of build type
+            _categoryFilters[LogCategory.Error] = true;
+            _categoryFilters[LogCategory.Critical] = true;
+            
+            LogInfo("GameLogger initialized - prioritizing warnings and errors for bug detection", "Logger");
         }
         
         #region Core Logging Methods
@@ -205,19 +211,21 @@ namespace MarrieGame.Core.Logging
             var levelStr = level.ToString().ToUpper();
             var formattedMessage = $"[{timestamp}] [{levelStr}] [{category}] {message}";
             
-            // Output using appropriate Godot method based on level
+            // Output using appropriate Godot method based on level with color classification
             switch (level)
             {
                 case LogLevel.Debug:
+                    GD.PrintRich($"[color=green]{formattedMessage}[/color]");
+                    break;
                 case LogLevel.Info:
-                    GD.Print(formattedMessage);
+                    GD.Print(formattedMessage); // Stays white
                     break;
                 case LogLevel.Warning:
                     GD.PrintRich($"[color=yellow]{formattedMessage}[/color]");
                     break;
                 case LogLevel.Error:
                 case LogLevel.Critical:
-                    GD.PrintErr(formattedMessage);
+                    GD.PrintRich($"[color=red]{formattedMessage}[/color]");
                     break;
             }
         }

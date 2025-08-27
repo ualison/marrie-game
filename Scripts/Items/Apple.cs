@@ -170,7 +170,8 @@ public partial class Apple : Node2D
 
     private void ConsumeRedApple()
     {
-        Log.UI($"Consumed red apple - restoring {LifeRestoreAmount} life", "Apple");
+        // Debug level - routine apple consumption
+        Log.Debug($"Consumed red apple - restoring {LifeRestoreAmount} life", "Apple");
         
         // Find player and restore life
         var player = GetTree().GetFirstNodeInGroup("player") as Node;
@@ -188,7 +189,8 @@ public partial class Apple : Node2D
 
     private void ConsumePurpleApple()
     {
-        Log.UI($"Consumed purple apple - restoring {ManaRestoreAmount} mana", "Apple");
+        // Debug level - routine apple consumption
+        Log.Debug($"Consumed purple apple - restoring {ManaRestoreAmount} mana", "Apple");
         
         // Find player and restore mana
         var player = GetTree().GetFirstNodeInGroup("player") as Node;

@@ -106,16 +106,18 @@ public static class Log
     }
     
     /// <summary>
-    /// Enable minimal logging for production (only warnings, errors, and critical events)
+    /// Enable minimal logging for production - only warnings, errors, and critical events
+    /// Use this to reduce log noise and focus on potential bugs
     /// </summary>
     public static void EnableMinimalLogging()
     {
-        SetLogLevel(LogLevel.Warning);
-        Info("Minimal logging enabled - only warnings and errors will be shown", "Logger");
+        SetLogLevel(LogLevel.Warning); // Focus on problems, not routine operations
+        Info("Minimal logging enabled - prioritizing warnings and errors for bug detection", "Logger");
     }
     
     /// <summary>
-    /// Only log critical events for systems that generate too much noise
+    /// Reduce verbose logging to focus on errors and important events
+    /// Disables debug and performance categories while keeping error detection active
     /// </summary>
     public static void ReduceVerboseLogging()
     {
@@ -123,7 +125,11 @@ public static class Log
         {
             gameLogger.SetCategoryFilter(LogCategory.Debug, false);
             gameLogger.SetCategoryFilter(LogCategory.Performance, false);
-            Info("Reduced verbose logging for debug and performance categories", "Logger");
+            gameLogger.SetCategoryFilter(LogCategory.System, false); // Reduce system initialization noise
+            // Keep error categories active for bug detection
+            gameLogger.SetCategoryFilter(LogCategory.Error, true);
+            gameLogger.SetCategoryFilter(LogCategory.Warning, true);
+            Info("Reduced verbose logging - focusing on warnings and errors", "Logger");
         }
     }
     #endregion

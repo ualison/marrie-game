@@ -123,6 +123,7 @@ public partial class Monster : CharacterBody2D
         }
         else
         {
+            // Debug level - component discovery success is routine
             Log.Debug("Monster: MonsterLife component found and connected", "Monster");
         }
     }
@@ -203,7 +204,7 @@ public partial class Monster : CharacterBody2D
             return;
         }
         
-        // Initialize simple monsters to use state system consistently
+        // Initialize simple monsters based on InitiallyVisible property
         if (InitiallyVisible)
         {
             _currentState = MonsterState.Visible;
@@ -785,11 +786,13 @@ public partial class Monster : CharacterBody2D
                 damaged = _monsterLife.TakePhysicalDamage(damage);
                 if (damaged)
                 {
-                    Log.UI($"Rock hit monster in Current Reality - damaged red hearts", "Monster");
+            // Info level - combat feedback is important for balance testing
+            Log.Info($"Rock hit monster in Current Reality - damaged red hearts", "Monster");
                 }
                 else
                 {
-                    Log.UI($"Rock hit monster in Current Reality but no red hearts to damage", "Monster");
+                // Warning level - indicates potential balance issue
+                Log.Warning($"Rock hit monster in Current Reality but no red hearts to damage", "Monster");
                 }
                 break;
                 
@@ -798,7 +801,8 @@ public partial class Monster : CharacterBody2D
                 damaged = _monsterLife.TakePurpleHeartDamage(damage);
                 if (damaged)
                 {
-                    Log.UI($"Rock hit monster in Purple Gem Reality - damaged purple hearts", "Monster");
+                // Info level - important purple gem reality feedback
+                Log.Info($"Rock hit monster in Purple Gem Reality - damaged purple hearts", "Monster");
                     
                     // Check if all purple hearts are lost (monster should die)
                     if (_monsterLife.CurrentPurpleHearts <= 0)

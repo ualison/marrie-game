@@ -25,7 +25,9 @@ public partial class Inventory : Node
         // Add this inventory to the inventory group for easy access
         AddToGroup("inventory");
         
-        Log.System("Inventory system ready", "Inventory");
+        // Only log critical inventory issues
+        if (MaxRocks <= 0)
+            Log.Error("Inventory system has invalid max capacity", "Inventory");
     }
     #endregion
 
@@ -52,17 +54,20 @@ public partial class Inventory : Node
             int canAdd = MaxRocks - _rockCount;
             if (canAdd <= 0)
             {
-                Log.UI("Inventory full - cannot add more rocks", "Inventory");
+            // Warning level - player tried to add rocks when full (potential UX issue)
+            Log.Warning("Inventory full - cannot add more rocks", "Inventory");
                 return false;
             }
             
             _rockCount = MaxRocks;
-            Log.UI($"Added {canAdd} rocks (inventory full). Total: {_rockCount}", "Inventory");
+            // Debug level - routine inventory operations
+            Log.Debug($"Added {canAdd} rocks (inventory full). Total: {_rockCount}", "Inventory");
         }
         else
         {
             _rockCount = newTotal;
-            Log.UI($"Added {amount} rocks. Total: {_rockCount}", "Inventory");
+            // Debug level - routine inventory operations
+            Log.Debug($"Added {amount} rocks. Total: {_rockCount}", "Inventory");
         }
 
         // Emit signal for UI updates

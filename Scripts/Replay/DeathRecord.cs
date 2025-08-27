@@ -1,14 +1,16 @@
 using Godot;
 using System.Collections.Generic;
 
-// Data container for storing death-related replay information
+/// <summary>
+/// Data container for storing death-related replay information
+/// </summary>
 public class DeathRecord
 {
     #region Core Properties
     public string DeathId { get; private set; }
     public Vector2 DeathPosition { get; private set; }
     public float DeathTime { get; private set; }
-    public int DeathSequence { get; private set; } // Added to break timestamp ties
+    public int DeathSequence { get; private set; } // Break timestamp ties
     #endregion
 
     #region Replay Data
@@ -24,30 +26,26 @@ public class DeathRecord
     #region Constructor
     public DeathRecord(string deathId, Vector2 deathPosition, int deathSequence = 0)
     {
-        // Initialize death record with ID, position, timestamp, and sequence number
         DeathId = deathId ?? throw new System.ArgumentNullException(nameof(deathId));
         DeathPosition = deathPosition;
         DeathTime = (float)Time.GetUnixTimeFromSystem();
-        DeathSequence = deathSequence; // Used to break timestamp ties
+        DeathSequence = deathSequence;
     }
     #endregion
 
     #region Data Validation
     public bool HasValidReplayData()
     {
-        // Check if record contains usable replay data
         return PlayerFrames.Count > 0 || MonsterFrames.Count > 0;
     }
 
     public bool IsPlayerDataAvailable()
     {
-        // Check if player replay data is available
         return PlayerFrames.Count > 0;
     }
 
     public bool IsMonsterDataAvailable()
     {
-        // Check if monster replay data is available
         return MonsterFrames.Count > 0;
     }
     #endregion
@@ -55,7 +53,6 @@ public class DeathRecord
     #region Utility Methods
     public override string ToString()
     {
-        // Provide readable string representation for debugging
         return $"DeathRecord[{DeathId}] at {DeathPosition} - " +
                $"Player: {PlayerFrames.Count} frames, Monster: {MonsterFrames.Count} frames";
     }

@@ -3,7 +3,7 @@ using Godot;
 /// <summary>
 /// Simple UI element to display the current rock count
 /// </summary>
-public partial class RockCountUI : Label
+public partial class RockCount : Label
 {
     #region State
     private Inventory _inventory;
@@ -24,12 +24,12 @@ public partial class RockCountUI : Label
         if (_inventory != null)
         {
             ConnectToInventory();
-            Log.UI("Successfully connected to Inventory", "RockCountUI");
+            // Only log successful connections at debug level
         }
         else
         {
-            // If inventory not found, try again after a short delay
-            Log.Warning("Inventory not found, retrying...", "RockCountUI");
+            // Warn about inventory connection failures - potential setup issue
+            Log.Warning("Inventory not found, retrying...", "RockCount");
             GetTree().CreateTimer(0.1f).Timeout += () => FindAndConnectInventory();
         }
     }
@@ -61,7 +61,8 @@ public partial class RockCountUI : Label
 
         if (_inventory == null)
         {
-            Log.Warning("Inventory not found for RockCountUI", "RockCountUI");
+            // Critical warning - UI element cannot function without inventory
+            Log.Warning("Inventory not found for RockCount", "RockCount");
         }
     }
 

@@ -32,7 +32,9 @@ public partial class GameMessage : Control
         SetupTimer();
         SetupInitialState();
         
-        Log.UI("GameMessage ready", "GameMessage");
+        // Only log if critical components are missing
+        if (_messageBackground == null || _messageLabel == null)
+            Log.Error("GameMessage components missing - UI will not function properly", "GameMessage");
     }
 
     private void InitializeComponents()
@@ -87,7 +89,8 @@ public partial class GameMessage : Control
         UpdateMessage(message);
         StartShowAnimation();
         
-        Log.UI($"Showing message: {message}", "GameMessage");
+        // Debug level - message display is routine
+        Log.Debug($"Showing message: {message}", "GameMessage");
     }
 
     public void HideMessage()
@@ -95,7 +98,8 @@ public partial class GameMessage : Control
         if (!_isShowing) return;
         
         StartHideAnimation();
-        Log.UI("Hiding message", "GameMessage");
+        // Debug level - hiding messages is routine
+        Log.Debug("Hiding message", "GameMessage");
     }
 
     public bool IsShowingMessage()

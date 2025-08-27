@@ -41,7 +41,8 @@ public partial class ManaBar : Control
         if (_manaSystem != null)
         {
             ConnectToManaSystem();
-            Log.UI("Connected to PlayerMana!", "ManaBarUI");
+            // Debug level - successful connection is routine
+            Log.Debug("Connected to PlayerMana!", "ManaBarUI");
         }
         else
         {

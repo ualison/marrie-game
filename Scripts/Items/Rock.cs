@@ -192,7 +192,8 @@ public partial class Rock : Node2D
                 
                 if (damaged)
                 {
-                    Log.UI("Rock successfully damaged monster via area detection!", "Rock");
+                // Info level - important combat feedback for balance
+                Log.Info("Rock successfully damaged monster via area detection!", "Rock");
                 }
                 else
                 {
@@ -281,7 +282,8 @@ public partial class Rock : Node2D
 
     private void HandleRockCollection()
     {
-        Log.UI($"Collecting rock - adding {RockValue} rocks to inventory", "Rock");
+        // Debug level - routine rock collection
+        Log.Debug($"Collecting rock - adding {RockValue} rocks to inventory", "Rock");
         
         // Find inventory and add rocks
         var inventory = GetTree().GetFirstNodeInGroup("inventory") as Inventory;
@@ -289,7 +291,8 @@ public partial class Rock : Node2D
         if (inventory != null)
         {
             inventory.AddRocks(RockValue);
-            Log.UI($"Rocks added to inventory. Total rocks: {inventory.GetRockCount()}", "Rock");
+            // Debug level - routine inventory updates
+            Log.Debug($"Rocks added to inventory. Total rocks: {inventory.GetRockCount()}", "Rock");
         }
         else
         {

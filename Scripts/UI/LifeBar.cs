@@ -41,7 +41,8 @@ public partial class LifeBar : Control
         if (_lifeSystem != null)
         {
             ConnectToLifeSystem();
-            Log.UI("Connected to PlayerLife!", "LifeBarUI");
+            // Debug level - successful connection is routine
+            Log.Debug("Connected to PlayerLife!", "LifeBarUI");
         }
         else
         {

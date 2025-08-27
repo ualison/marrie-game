@@ -59,7 +59,8 @@ public partial class GameManager : Node
     
     private void LogSystemInitialized()
     {
-        Log.System("Logging system initialized", "GameManager");
+        // Debug level - system initialization is routine
+        Log.Debug("Logging system initialized", "GameManager");
         
         // Configure logging for production performance
         #if !DEBUG
@@ -73,6 +74,7 @@ public partial class GameManager : Node
         
         // Ensure all managers exist as children - order matters!
         EnsureManagerExists<SceneLifecycleManager>();  // First - needed for scene events
+        EnsureManagerExists<RealityManager>();         // Early - needed for reality-based game logic
         EnsureManagerExists<PlayerStateManager>();
         EnsureManagerExists<UIManager>();
         EnsureManagerExists<ReplaySystemManager>();
@@ -86,7 +88,32 @@ public partial class GameManager : Node
         {
             var manager = new T();
             AddChild(manager);
-            Log.System($"Created {typeof(T).Name}", "GameManager");
+            // Debug level - routine component creation
+            Log.Debug($"Created {typeof(T).Name}", "GameManager");
+            
+            // Special logging for RealityManager to verify it's working
+            if (typeof(T) == typeof(RealityManager))
+            {
+                // Use CallDeferred to ensure RealityManager's _Ready has been called
+                CallDeferred(nameof(VerifyRealityManagerInitialization));
+            }
+        }
+        else
+        {
+            Log.System($"{typeof(T).Name} already exists", "GameManager");
+        }
+    }
+    
+    private void VerifyRealityManagerInitialization()
+    {
+        Log.System($"Verifying RealityManager initialization - IsInstanceAvailable: {RealityManager.IsInstanceAvailable}", "GameManager");
+        if (RealityManager.IsInstanceAvailable)
+        {
+            Log.System($"RealityManager successfully initialized with reality: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "GameManager");
+        }
+        else
+        {
+            Log.Error("RealityManager failed to initialize properly!", "GameManager");
         }
     }
     
@@ -100,7 +127,8 @@ public partial class GameManager : Node
     
     private void OnPlayerDied(Vector2 deathPosition, int remainingHealth)
     {
-        Log.Gameplay($"Coordinating player death response at {deathPosition} (Health: {remainingHealth})", "GameManager");
+        // Important game event - always log player deaths for analysis
+        Log.Error($"Coordinating player death response at {deathPosition} (Health: {remainingHealth})", "GameManager");
         
         // Pause the game
         PauseGame();
@@ -157,6 +185,14 @@ public partial class GameManager : Node
     public void RestartGame()
     {
         Log.Gameplay("Restart requested", "GameManager");
+        
+        // Reset reality state when restarting
+        if (RealityManager.IsInstanceAvailable)
+        {
+            RealityManager.Instance.Reset();
+            Log.System("Reality state reset for game restart", "GameManager");
+        }
+        
         GameEventSystem.OnGameRestart();
     }
     

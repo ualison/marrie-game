@@ -45,7 +45,8 @@ public partial class AudioManager : AudioStreamPlayer2D
             PlayBackgroundMusic();
         }
 
-        Log.Audio("AudioManager initialized", "AudioManager");
+        // Debug level - system initialization is routine
+        Log.Debug("AudioManager initialized", "AudioManager");
     }
 
     private void SetupAudioConfiguration()
@@ -94,7 +95,8 @@ public partial class AudioManager : AudioStreamPlayer2D
             Stop(); // Ensure we start from beginning
             Play();
             _isMusicPaused = false;
-            Log.Audio("Background music started", "AudioManager");
+            // Debug level - routine audio operations
+            Log.Debug("Background music started", "AudioManager");
         }
         else
         {

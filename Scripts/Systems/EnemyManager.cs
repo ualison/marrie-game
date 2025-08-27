@@ -29,7 +29,8 @@ public partial class EnemyManager : Node
         }
 
         CallDeferred(nameof(DiscoverEnemies));
-        Log.System("EnemyManager initialized", "EnemyManager");
+        // Debug level - system initialization is routine
+        Log.Debug("EnemyManager initialized", "EnemyManager");
     }
 
     private void DiscoverEnemies()
@@ -38,7 +39,8 @@ public partial class EnemyManager : Node
         FindFollowerMonsters();
         FindRegularMonsters();
         
-        Log.System($"Found {_followerMonsters.Count} follower monsters, {_regularMonsters.Count} regular monsters", "EnemyManager");
+        // Debug level - component discovery is routine
+        Log.Debug($"Found {_followerMonsters.Count} follower monsters, {_regularMonsters.Count} regular monsters", "EnemyManager");
     }
 
     private void FindFollowerMonsters()

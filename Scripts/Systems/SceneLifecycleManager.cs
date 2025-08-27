@@ -1,9 +1,7 @@
 using Godot;
 
-/// <summary>
 /// Handles scene loading, reloading, and lifecycle management
 /// Single Responsibility: Scene Management
-/// </summary>
 public partial class SceneLifecycleManager : Node
 {
     public static SceneLifecycleManager Instance { get; private set; }
@@ -48,7 +46,7 @@ public partial class SceneLifecycleManager : Node
     {
         if (node == GetTree().CurrentScene)
         {
-            Log.System($"Scene reloaded: {node.Name}", "SceneLifecycleManager");
+            Log.Debug($"Scene reloaded: {node.Name}", "SceneLifecycleManager");
             
             // Wait for scene to be fully ready
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -62,15 +60,15 @@ public partial class SceneLifecycleManager : Node
     
     private void HandleSceneReload()
     {
-        Log.System($"Scene reloaded: {GetTree().CurrentScene?.Name}", "SceneLifecycleManager");
+        Log.Debug($"Scene reloaded: {GetTree().CurrentScene?.Name}", "SceneLifecycleManager");
         CallDeferred(nameof(NotifySceneReady));
     }
     
     private void NotifySceneReady()
     {
-        Log.System("Firing SceneReady event", "SceneLifecycleManager");
+        Log.Debug("Firing SceneReady event", "SceneLifecycleManager");
         SceneReady?.Invoke();
-        Log.System("SceneReady event fired", "SceneLifecycleManager");
+        Log.Debug("SceneReady event fired", "SceneLifecycleManager");
     }
     
     public override void _ExitTree()

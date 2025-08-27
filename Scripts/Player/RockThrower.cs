@@ -36,7 +36,9 @@ public partial class RockThrower : Node2D
     {
         SetupTrajectoryLine();
         FindComponents();
-        Log.System("RockThrower ready", "RockThrower");
+        // Only log critical issues that prevent functionality
+        if (_inventory == null)
+            Log.Error("RockThrower cannot function without inventory", "RockThrower");
     }
 
     private void SetupTrajectoryLine()
@@ -133,7 +135,7 @@ public partial class RockThrower : Node2D
         if (!_isDrawingTrajectory) return;
 
         Vector2 currentWorldPos = GetGlobalMousePosition();
-        Vector2 direction = (currentWorldPos - GlobalPosition); // Direction from RockThrower to mouse
+        Vector2 direction = currentWorldPos - GlobalPosition; // Direction from RockThrower to mouse
         
         // Ensure minimum distance for meaningful trajectory
         if (direction.Length() < 50.0f)
@@ -253,7 +255,8 @@ public partial class RockThrower : Node2D
     {
         if (_inventory == null || !_inventory.HasRocks(1))
         {
-            Log.UI("No rocks available to throw", "RockThrower");
+            // Debug level - routine successful operations don't need logging
+            Log.Debug("No rocks available to throw", "RockThrower");
             return;
         }
 
@@ -267,7 +270,8 @@ public partial class RockThrower : Node2D
         // Create and launch projectile
         CreateRockProjectile();
         
-        Log.UI($"Rock thrown! Remaining rocks: {_inventory.GetRockCount()}", "RockThrower");
+        // Debug level - successful rock throwing is routine gameplay
+        Log.Debug($"Rock thrown! Remaining rocks: {_inventory.GetRockCount()}", "RockThrower");
     }
 
     private void CreateRockProjectile()

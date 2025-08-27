@@ -47,7 +47,8 @@ public partial class MonsterLifeBar : Control
         {
             ConnectToLifeSystem();
             FindMonsterNode();
-            Log.UI("Connected to MonsterLife!", "MonsterLifeBarUI");
+            // Debug level - successful connection is routine
+            Log.Debug("Connected to MonsterLife!", "MonsterLifeBarUI");
         }
         else
         {
