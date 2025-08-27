@@ -425,8 +425,9 @@ public partial class Monster : CharacterBody2D
         }
 
         PositionBehindPlayerOnGround();
-        SetCollisionMask(1u);
-        SetCollisionLayer(1u);
+    // Keep ground collision enabled but stay on layer 2 (avoid player collisions)
+    SetCollisionMask(1u);
+    SetCollisionLayer(2u);
         FacePlayer();
 
         // Ensure life bar position is updated after repositioning
@@ -604,8 +605,11 @@ public partial class Monster : CharacterBody2D
         _currentTween.TweenProperty(_spriteNode, "modulate:a", 1.0f, 0.5f);
         _currentTween.TweenCallback(Callable.From(() =>
         {
+            // Now that fade-in finished, allow player interactions again
             _isFullyVisible = true;
             _isTransitioning = false; // No longer transitioning
+            SetCollisionMask(1u);
+            SetCollisionLayer(1u);
             
             // Delay showing life bar slightly to ensure position is correct
             GetTree().CreateTimer(0.1f).Timeout += () =>
