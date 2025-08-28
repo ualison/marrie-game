@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Enums;
 
 // Simplified replay gem - only handles UI interaction and triggers replay
 public partial class ReplayGem : Node2D
@@ -19,6 +20,8 @@ public partial class ReplayGem : Node2D
     private bool _playerNearby = false;
     private bool _canInteract = false; // Prevent immediate auto-triggering
     private Vector2 _originalGemPosition;
+    // Tracks whether the gem was visible before a reality change so we can restore it
+    private bool _wasVisibleBeforeRealityChange = false;
     #endregion
 
     #region Initialization
@@ -38,10 +41,12 @@ public partial class ReplayGem : Node2D
         if (RealityManager.IsInstanceAvailable)
         {
             Log.Replay($"RealityManager found during ReplayGem init - Current reality: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "ReplayGem");
+            RealityManager.Instance.RealityChanged += OnRealityChanged;
         }
         else
         {
             Log.Replay("RealityManager not yet available during ReplayGem init - this may be normal if RealityManager initializes later", "ReplayGem");
+            CallDeferred(nameof(ConnectToRealityManager));
         }
 
         // Add delay before allowing interaction to prevent auto-triggering
@@ -54,6 +59,16 @@ public partial class ReplayGem : Node2D
         };
 
         Log.Replay("ReplayGem ready - hidden until activated", "ReplayGem");
+    }
+
+    private void ConnectToRealityManager()
+    {
+        if (RealityManager.IsInstanceAvailable)
+        {
+            RealityManager.Instance.RealityChanged += OnRealityChanged;
+            // Apply current reality immediately
+            OnRealityChanged(RealityManager.Instance.CurrentReality);
+        }
     }
 
     private void InitializeComponents()
@@ -209,6 +224,15 @@ public partial class ReplayGem : Node2D
     }
     #endregion
 
+    public override void _ExitTree()
+    {
+        // Clean up reality manager connection
+        if (RealityManager.IsInstanceAvailable)
+        {
+            RealityManager.Instance.RealityChanged -= OnRealityChanged;
+        }
+    }
+
     #region Gem Visibility Control
     public void ShowGem(Vector2 position)
     {
@@ -250,6 +274,41 @@ public partial class ReplayGem : Node2D
         }
 
         _playerNearby = false;
+    }
+
+    // Handles reality changes: hide when entering PastReality, restore when leaving
+    private void OnRealityChanged(Reality newReality)
+    {
+        Log.Debug($"ReplayGem OnRealityChanged called - newReality={newReality}", "ReplayGem");
+
+        if (newReality == Reality.PastReality)
+        {
+            // Remember if the gem was visible so we can restore later
+            _wasVisibleBeforeRealityChange = Visible;
+            Log.Replay($"Hiding ReplayGem because reality is PastReality (wasVisible={_wasVisibleBeforeRealityChange})", "ReplayGem");
+            HideGem();
+        }
+        else
+        {
+            // If we were visible before the reality switch, restore visuals
+            if (_wasVisibleBeforeRealityChange)
+            {
+                Log.Replay("Restoring ReplayGem after returning from PastReality", "ReplayGem");
+                // Ensure node and visual children are shown and monitoring restored
+                Show();
+                if (_gemSprite != null)
+                {
+                    _gemSprite.Show();
+                    StartFloatingAnimation();
+                }
+                if (_promptLabel != null)
+                {
+                    _promptLabel.Hide(); // show only when player nearby
+                }
+                _detectionArea?.SetDeferred("monitoring", true);
+            }
+            _wasVisibleBeforeRealityChange = false;
+        }
     }
     #endregion
 
