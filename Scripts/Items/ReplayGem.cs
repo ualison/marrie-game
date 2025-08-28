@@ -1,5 +1,6 @@
 using Godot;
 using MarrieGame.Core.Enums;
+using MarrieGame.Core.Utils;
 
 // Simplified replay gem - only handles UI interaction and triggers replay
 public partial class ReplayGem : Node2D
@@ -74,9 +75,9 @@ public partial class ReplayGem : Node2D
     private void InitializeComponents()
     {
         // Get required child nodes with error handling
-    _detectionArea = GetNodeOrNull<Area2D>("DetectionArea");
-    _gemSprite = GetNodeOrNull<Sprite2D>("GemSprite");
-    _promptLabel = GetNodeOrNull<Label>("PromptLabel");
+    _detectionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "DetectionArea");
+    _gemSprite = NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "GemSprite");
+    _promptLabel = NodeHelpers.GetNodeOrNull<Label>(this, null, "PromptLabel");
         
         // Store original gem position for floating animation
         if (_gemSprite != null)
@@ -349,7 +350,7 @@ public partial class ReplayGem : Node2D
         var player = GetTree().GetFirstNodeInGroup("player") as Player;
         if (player != null)
         {
-            var playerMana = player.GetNodeOrNull<PlayerMana>("PlayerMana");
+            var playerMana = player != null ? NodeHelpers.GetNodeOrNull<PlayerMana>(player, null, "PlayerMana") : null;
             if (playerMana != null) return playerMana;
         }
 

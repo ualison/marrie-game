@@ -1,5 +1,6 @@
 using Godot;
 using System.Collections.Generic;
+using MarrieGame.Core.Utils;
 
 // Ghost version of player that replays recorded movements with smooth interpolation
 public partial class GhostPlayer : CharacterBody2D, IPoolable
@@ -370,18 +371,17 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
 
     private void DiscoverSpriteComponents()
     {
-        // Try animated sprite first (most common)
-        _animatedSprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
+        // Use NodeHelpers to discover sprites with consistent fallbacks
+        _animatedSprite = NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(this, null, "AnimatedSprite2D");
         if (_animatedSprite != null)
         {
             _activeSprite = _animatedSprite;
             return;
         }
 
-        // Check for various sprite node names as fallback
-        _sprite = GetNodeOrNull<Sprite2D>("Sprite2D")
-            ?? GetNodeOrNull<Sprite2D>("GhostMarrieSprite")
-            ?? GetNodeOrNull<Sprite2D>("MarrieSprite");
+        _sprite = NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "Sprite2D")
+            ?? NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "GhostMarrieSprite")
+            ?? NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "MarrieSprite");
 
         if (_sprite != null)
         {
@@ -389,9 +389,8 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
             return;
         }
 
-        // Check if custom names are actually AnimatedSprite2D
-        _animatedSprite = GetNodeOrNull<AnimatedSprite2D>("GhostMarrieSprite")
-            ?? GetNodeOrNull<AnimatedSprite2D>("MarrieSprite");
+        _animatedSprite = NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(this, null, "GhostMarrieSprite")
+            ?? NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(this, null, "MarrieSprite");
 
         if (_animatedSprite != null)
         {

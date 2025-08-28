@@ -1,5 +1,6 @@
 using Godot;
 using MarrieGame.Core.Enums;
+using MarrieGame.Core.Utils;
 
 // Monster health display with red and purple hearts that follows the monster
 // Hearts display differently based on reality - showing which hearts are vulnerable to damage
@@ -73,12 +74,12 @@ public partial class MonsterLifeBar : Control
         // Prefer an editor-assigned NodePath when present
         if (HeartsContainerPath != null && HeartsContainerPath.ToString() != "")
         {
-            _heartsContainer = GetNodeOrNull<HBoxContainer>(HeartsContainerPath);
+            _heartsContainer = NodeHelpers.GetNodeOrNull<HBoxContainer>(this, HeartsContainerPath, "HeartsContainer");
             if (_heartsContainer != null) return;
         }
 
         // Fallback: ensure hearts container exists in scene structure
-        _heartsContainer = GetNodeOrNull<HBoxContainer>("HeartsContainer");
+        _heartsContainer = NodeHelpers.GetNodeOrNull<HBoxContainer>(this, null, "HeartsContainer");
 
         if (_heartsContainer == null)
         {
@@ -131,11 +132,11 @@ public partial class MonsterLifeBar : Control
             // Check for regular Monster
             if (parent is Monster monster)
             {
-                return monster.GetNodeOrNull<MonsterLife>("MonsterLife");
+                return NodeHelpers.GetNodeOrNull<MonsterLife>(monster, null, "MonsterLife");
             }
 
             // Check for GhostMonster by looking for GhostMonsterLife node
-            var ghostLife = parent.GetNodeOrNull<MonsterLife>("GhostMonsterLife");
+            var ghostLife = NodeHelpers.GetNodeOrNull<MonsterLife>(parent, null, "GhostMonsterLife");
             if (ghostLife != null)
             {
                 Log.Debug($"Found GhostMonsterLife in parent: {parent.Name}", "MonsterLifeBarUI");
@@ -143,7 +144,7 @@ public partial class MonsterLifeBar : Control
             }
 
             // Check for regular MonsterLife as fallback
-            var regularLife = parent.GetNodeOrNull<MonsterLife>("MonsterLife");
+            var regularLife = NodeHelpers.GetNodeOrNull<MonsterLife>(parent, null, "MonsterLife");
             if (regularLife != null)
             {
                 return regularLife;
@@ -154,7 +155,7 @@ public partial class MonsterLifeBar : Control
         if (parent?.GetParent() is Monster monsterGrandparent)
         {
             _monster = monsterGrandparent;
-            return monsterGrandparent.GetNodeOrNull<MonsterLife>("MonsterLife");
+            return NodeHelpers.GetNodeOrNull<MonsterLife>(monsterGrandparent, null, "MonsterLife");
         }
 
         return null;
@@ -168,7 +169,7 @@ public partial class MonsterLifeBar : Control
         {
             if (monsterNode is Monster monster)
             {
-                var monsterLife = monster.GetNodeOrNull<MonsterLife>("MonsterLife");
+                var monsterLife = NodeHelpers.GetNodeOrNull<MonsterLife>(monster, null, "MonsterLife");
                 if (monsterLife != null)
                 {
                     _monster = monster;

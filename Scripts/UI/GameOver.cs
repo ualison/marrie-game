@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Utils;
 
 // Game over screen UI controller with smooth transitions and flexible messaging
 public partial class GameOver : Control
@@ -38,9 +39,9 @@ public partial class GameOver : Control
     private void DiscoverUIElements()
     {
         // Prefer editor-assigned NodePaths when available
-        if (GameOverLabelPath != null && GameOverLabelPath.ToString() != "")
-            _gameOverLabel = GetNodeOrNull<Label>(GameOverLabelPath);
-        _gameOverLabel ??= GetNodeOrNull<Label>("VBoxContainer/GameOverLabel") ?? FindUIElement<Label>("GameOverLabel");
+            if (GameOverLabelPath != null && GameOverLabelPath.ToString() != "")
+                _gameOverLabel = MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Label>(this, GameOverLabelPath, "VBoxContainer/GameOverLabel");
+            _gameOverLabel ??= MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Label>(this, null, "VBoxContainer/GameOverLabel") ?? FindUIElement<Label>("GameOverLabel");
 
         if (SubMessageLabelPath != null && SubMessageLabelPath.ToString() != "")
             _subMessageLabel = GetNodeOrNull<Label>(SubMessageLabelPath);
@@ -48,11 +49,11 @@ public partial class GameOver : Control
 
         if (RestartButtonPath != null && RestartButtonPath.ToString() != "")
             _restartButton = GetNodeOrNull<Button>(RestartButtonPath);
-        _restartButton ??= GetNodeOrNull<Button>("VBoxContainer/ButtonContainer/RestartButton") ?? FindUIElement<Button>("RestartButton");
+        _restartButton ??= MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Button>(this, null, "VBoxContainer/ButtonContainer/RestartButton") ?? FindUIElement<Button>("RestartButton");
 
         if (QuitButtonPath != null && QuitButtonPath.ToString() != "")
             _quitButton = GetNodeOrNull<Button>(QuitButtonPath);
-        _quitButton ??= GetNodeOrNull<Button>("VBoxContainer/ButtonContainer/QuitButton") ?? FindUIElement<Button>("QuitButton");
+        _quitButton ??= MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Button>(this, null, "VBoxContainer/ButtonContainer/QuitButton") ?? FindUIElement<Button>("QuitButton");
 
         LogDiscoveredElements();
     }

@@ -1,5 +1,6 @@
 using Godot;
 using MarrieGame.Core.Enums;
+using MarrieGame.Core.Utils;
 
 // Unified Monster class supporting both simple and follower behaviors
 public partial class Monster : CharacterBody2D, IPoolable
@@ -78,7 +79,7 @@ public partial class Monster : CharacterBody2D, IPoolable
         CallDeferred(nameof(EnsureRealitySubscription));
 
         // Configure the MonsterLifeBar for CurrentReality
-        var lifeBar = GetNodeOrNull<MonsterLifeBar>("MonsterLifeBar");
+        var lifeBar = NodeHelpers.GetNodeOrNull<MonsterLifeBar>(this, MonsterLifeBarPath, "MonsterLifeBar");
         if (lifeBar != null)
         {
             lifeBar.SetRequiredReality(Reality.CurrentReality);
@@ -203,13 +204,13 @@ public partial class Monster : CharacterBody2D, IPoolable
 
     private void FindSprite()
     {
-        // Prefer NodePath-configured nodes when provided
+        // Use centralized helper: try configured AnimatedSpritePath, then SpritePath, then common fallbacks
         if (AnimatedSpritePath != null && AnimatedSpritePath.ToString() != "")
         {
-            var animatedSprite = GetNodeOrNull<AnimatedSprite2D>(AnimatedSpritePath);
-            if (animatedSprite != null)
+            var animated = NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(this, AnimatedSpritePath, "");
+            if (animated != null)
             {
-                _spriteNode = animatedSprite;
+                _spriteNode = animated;
                 _sprite = null;
                 return;
             }
@@ -217,35 +218,33 @@ public partial class Monster : CharacterBody2D, IPoolable
 
         if (SpritePath != null && SpritePath.ToString() != "")
         {
-            _sprite = GetNodeOrNull<Sprite2D>(SpritePath);
-            _spriteNode = _sprite;
-            if (_spriteNode != null) return;
+            var sp = NodeHelpers.GetNodeOrNull<Sprite2D>(this, SpritePath, "");
+            if (sp != null)
+            {
+                _sprite = sp;
+                _spriteNode = _sprite;
+                return;
+            }
         }
 
-        // Fallback: Try AnimatedSprite2D first, then Sprite2D
-        var animatedSpriteFallback = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
-        if (animatedSpriteFallback != null)
+        // Final fallback: find any common sprite node in the children
+    var node = NodeHelpers.FindSpriteNode(this, AnimatedSpritePath != null && AnimatedSpritePath.ToString() != "" ? AnimatedSpritePath : SpritePath);
+        if (node != null)
         {
-            _spriteNode = animatedSpriteFallback;
-            _sprite = null;
-        }
-        else
-        {
-            _sprite = GetNodeOrNull<Sprite2D>("MonsterSprite");
-            _spriteNode = _sprite;
+            _spriteNode = node;
+            _sprite = node as Sprite2D;
+            return;
         }
 
-        if (_spriteNode == null)
-            Log.Error("Monster: No sprite component found!", "Monster");
+        Log.Error("Monster: No sprite component found!", "Monster");
     }
 
     private void FindMonsterLife()
     {
-        // Prefer configured path
-        if (MonsterLifePath != null && MonsterLifePath.ToString() != "")
-            _monsterLife = GetNodeOrNull<MonsterLife>(MonsterLifePath);
-
-        _monsterLife ??= GetNodeOrNull<MonsterLife>("MonsterLife");
+        // Try configured path first, then named child, then any child of the type
+    _monsterLife = NodeHelpers.GetNodeOrNull<MonsterLife>(this, MonsterLifePath, "MonsterLife");
+        if (_monsterLife == null)
+            _monsterLife = NodeHelpers.FindChildOfType<MonsterLife>(this);
 
         if (_monsterLife == null)
         {
@@ -259,23 +258,10 @@ public partial class Monster : CharacterBody2D, IPoolable
 
     private void FindMonsterLifeBar()
     {
-        // CRITICAL: Only use the Monster's own life bar, never search globally
-        // Prefer configured NodePath when available
-        if (MonsterLifeBarPath != null && MonsterLifeBarPath.ToString() != "")
-            _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>(MonsterLifeBarPath);
-
+        // Prefer configured NodePath, then look for a child of the type
+    _monsterLifeBar = NodeHelpers.GetNodeOrNull<MonsterLifeBar>(this, MonsterLifeBarPath, "MonsterLifeBar");
         if (_monsterLifeBar == null)
-        {
-            // Try direct child lookup with common names
-            foreach (Node child in GetChildren())
-            {
-                if (child is MonsterLifeBar lifeBar)
-                {
-                    _monsterLifeBar = lifeBar;
-                    break;
-                }
-            }
-        }
+            _monsterLifeBar = NodeHelpers.FindChildOfType<MonsterLifeBar>(this);
 
         if (_monsterLifeBar == null)
         {
@@ -297,9 +283,9 @@ public partial class Monster : CharacterBody2D, IPoolable
         if (!EnableFollowerBehavior) return;
 
         if (FootstepAudioPath != null && FootstepAudioPath.ToString() != "")
-            _footstepAudio = GetNodeOrNull<AudioStreamPlayer2D>(FootstepAudioPath);
+            _footstepAudio = NodeHelpers.GetNodeOrNull<AudioStreamPlayer2D>(this, FootstepAudioPath, "");
 
-        _footstepAudio ??= GetNodeOrNull<AudioStreamPlayer2D>("FootstepAudio");
+        _footstepAudio ??= NodeHelpers.GetNodeOrNull<AudioStreamPlayer2D>(this, null, "FootstepAudio");
         if (_footstepAudio == null)
         {
             _footstepAudio = new AudioStreamPlayer2D { Name = "FootstepAudio" };
@@ -310,9 +296,9 @@ public partial class Monster : CharacterBody2D, IPoolable
     private void SetupDamageArea()
     {
         if (DamageAreaPath != null && DamageAreaPath.ToString() != "")
-            _damageArea = GetNodeOrNull<Area2D>(DamageAreaPath);
+            _damageArea = NodeHelpers.GetNodeOrNull<Area2D>(this, DamageAreaPath, "");
 
-        _damageArea ??= GetNodeOrNull<Area2D>("DamageArea");
+        _damageArea ??= NodeHelpers.GetNodeOrNull<Area2D>(this, null, "DamageArea");
 
         if (_damageArea == null)
         {

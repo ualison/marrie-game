@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Utils;
 
 /// <summary>
 /// Rock item that can be collected by the player when static, or thrown as a projectile
@@ -93,12 +94,12 @@ public partial class Rock : Node2D, IPoolable
     private void InitializeComponents()
     {
         // Try to get nodes from scene file, but handle programmatic creation gracefully
-        _detectionArea = GetNodeOrNull<Area2D>("DetectionArea");
-        _rockSprite = GetNodeOrNull<Sprite2D>("RockSprite");
-        _promptLabel = GetNodeOrNull<Label>("PromptLabel");
+    _detectionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "DetectionArea");
+    _rockSprite = NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "RockSprite");
+    _promptLabel = NodeHelpers.GetNodeOrNull<Label>(this, null, "PromptLabel");
         
-        // Try to get the thrown collision area if it exists in the scene
-        _collisionArea = GetNodeOrNull<Area2D>("ThrownCollisionArea");
+    // Try to get the thrown collision area if it exists in the scene
+    _collisionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "ThrownCollisionArea");
         
         // If this is programmatic creation (no scene nodes), create sprite
         if (_rockSprite == null)

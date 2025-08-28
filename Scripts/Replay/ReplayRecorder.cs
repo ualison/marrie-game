@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Utils;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -140,25 +141,29 @@ public partial class ReplayRecorder : Node
 
     private AnimatedSprite2D FindSpriteInCharacter(Node2D character)
     {
-        var sprite = character.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D") ??
-                    character.GetNodeOrNull<AnimatedSprite2D>("MarrieSprite") ??
-                    character.GetNodeOrNull<AnimatedSprite2D>("GhostMarrieSprite") ??
-                    character.FindChild("AnimatedSprite2D", recursive: false) as AnimatedSprite2D ??
-                    character.FindChild("MarrieSprite", recursive: false) as AnimatedSprite2D;
-        
-        return sprite;
+    var node = NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(character, null, "AnimatedSprite2D")
+           ?? NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(character, null, "MarrieSprite")
+           ?? NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(character, null, "GhostMarrieSprite");
+
+    if (node != null) return node;
+
+    // Fallback: search direct children for a sprite-like node
+    var found = NodeHelpers.FindChildOfType<AnimatedSprite2D>(character);
+    return found;
     }
 
     private Node2D FindVisualInCharacter(Node2D character)
     {
-        var visual = character.GetNodeOrNull<Sprite2D>("Sprite2D") ??
-                    character.GetNodeOrNull<Sprite2D>("MonsterSprite") ??
-                    character.GetNodeOrNull<Sprite2D>("MarrieSprite") ??
-                    character.GetNodeOrNull<Sprite2D>("GhostMarrieSprite") ??
-                    character.FindChild("Sprite2D", recursive: false) as Node2D ??
-                    character.FindChild("MonsterSprite", recursive: false) as Node2D;
-        
-        return visual;
+    var node = NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "Sprite2D")
+           ?? NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "MonsterSprite")
+           ?? NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "MarrieSprite")
+           ?? NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "GhostMarrieSprite");
+
+    if (node != null) return node as Node2D;
+
+    // Fallback: find first Sprite2D child
+    var found = NodeHelpers.FindChildOfType<Sprite2D>(character);
+    return found as Node2D;
     }
     #endregion
 

@@ -2,6 +2,7 @@ using Godot;
 using System.Collections.Generic;
 using GodotCollections = Godot.Collections;
 using MarrieGame.Core.Enums;
+using MarrieGame.Core.Utils;
 
 // Ghost version of monster that replays recorded movements and interactions - Performance Optimized
 public partial class GhostMonster : CharacterBody2D, IPoolable
@@ -464,48 +465,25 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         // FIXED: Since the script is attached to CharacterBody2D, search directly in this node
         // The sprite should be a direct child of this CharacterBody2D
 
-        // Try to find AnimatedSprite2D first (for animated monsters)
-        _animatedSprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
-        if (_animatedSprite == null)
+        // Use centralized helper to discover a sprite node (animated or static)
+        var found = NodeHelpers.FindSpriteNode(this, null);
+        if (found is AnimatedSprite2D as2d)
         {
-            _animatedSprite = GetNodeOrNull<AnimatedSprite2D>("GhostMonsterSprite");
-        }
-        if (_animatedSprite == null)
-        {
-            _animatedSprite = FindDescendantOfType<AnimatedSprite2D>(this);
-        }
-
-        if (_animatedSprite != null)
-        {
+            _animatedSprite = as2d;
             _activeSprite = _animatedSprite;
             Log.Debug($"GhostMonster: Found AnimatedSprite2D: {_animatedSprite.Name}", "GhostMonster");
             return;
         }
 
-        // Try to find Sprite2D (this should match "GhostMonsterSprite" from the .tscn)
-        _sprite = GetNodeOrNull<Sprite2D>("GhostMonsterSprite");
-        if (_sprite == null)
+        if (found is Sprite2D s2d)
         {
-            _sprite = GetNodeOrNull<Sprite2D>("Sprite2D");
-        }
-        if (_sprite == null)
-        {
-            _sprite = GetNodeOrNull<Sprite2D>("MonsterSprite"); // fallback for other monster types
-        }
-        if (_sprite == null)
-        {
-            _sprite = FindDescendantOfType<Sprite2D>(this);
-        }
-
-        if (_sprite != null)
-        {
+            _sprite = s2d;
             _activeSprite = _sprite;
             Log.Debug($"GhostMonster: Found Sprite2D: {_sprite.Name}", "GhostMonster");
         }
         else
         {
-            Log.Warning("GhostMonster: No sprite found, creating fallback", "GhostMonster");
-            Log.Warning($"GhostMonster: Searched paths: GhostMonsterSprite, AnimatedSprite2D, Sprite2D, MonsterSprite, recursive search", "GhostMonster");
+            Log.Warning("GhostMonster: No sprite found via NodeHelpers, creating fallback", "GhostMonster");
             CreateFallbackVisual();
         }
     }
@@ -564,7 +542,7 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
     // Setup DamageArea for player collision detection (similar to Monster.cs)
     private void SetupDamageArea()
     {
-        _damageArea = GetNodeOrNull<Area2D>("DamageArea");
+        _damageArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "DamageArea");
         if (_damageArea == null)
         {
             CreateDamageArea();
@@ -613,15 +591,15 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         // FIXED: Since the script is attached to CharacterBody2D, search directly in this node
         // The life components should be direct children of this CharacterBody2D
 
-        // Look for the correct MonsterLife node
-        _monsterLife = GetNodeOrNull<MonsterLife>("GhostMonsterLife");
+        // Look for the correct MonsterLife node using helper utilities
+        _monsterLife = NodeHelpers.GetNodeOrNull<MonsterLife>(this, null, "GhostMonsterLife");
         if (_monsterLife == null)
         {
-            _monsterLife = GetNodeOrNull<MonsterLife>("MonsterLife");
+            _monsterLife = NodeHelpers.GetNodeOrNull<MonsterLife>(this, null, "MonsterLife");
         }
         if (_monsterLife == null)
         {
-            _monsterLife = FindDescendantOfType<MonsterLife>(this);
+            _monsterLife = NodeHelpers.FindChildOfType<MonsterLife>(this);
         }
 
         if (_monsterLife == null)
@@ -638,14 +616,14 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         }
 
         // Look for the correct MonsterLifeBar node
-        _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>("GhostMonsterLifeBar");
+        _monsterLifeBar = NodeHelpers.GetNodeOrNull<MonsterLifeBar>(this, null, "GhostMonsterLifeBar");
         if (_monsterLifeBar == null)
         {
-            _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>("MonsterLifeBar");
+            _monsterLifeBar = NodeHelpers.GetNodeOrNull<MonsterLifeBar>(this, null, "MonsterLifeBar");
         }
         if (_monsterLifeBar == null)
         {
-            _monsterLifeBar = FindDescendantOfType<MonsterLifeBar>(this);
+            _monsterLifeBar = NodeHelpers.FindChildOfType<MonsterLifeBar>(this);
         }
 
         if (_monsterLifeBar != null)
@@ -803,19 +781,7 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         try { DisableCollisions(); } catch { }
     }
 
-    // FIXED: Helper method for recursive node search - now properly implemented
-    private T FindDescendantOfType<T>(Node parent) where T : Node
-    {
-        foreach (Node child in parent.GetChildren())
-        {
-            if (child is T found)
-                return found;
-
-            var descendant = FindDescendantOfType<T>(child);
-            if (descendant != null) return descendant;
-        }
-        return null;
-    }
+    // NOTE: Recursive descendant search replaced by NodeHelpers.FindChildOfType and other helpers.
 
 
     // Allow external systems (like rocks) to apply rock damage to ghost
