@@ -258,25 +258,28 @@ public partial class ReplayRecorder : Node
     {
         var pos = _cachedPlayer.GlobalPosition;
         var rot = _cachedPlayer.GlobalRotation;
-        var anim = GetAnimationName(_playerSprite);
-        var flip = GetSpriteFlip(_playerSprite, _playerVisual);
-        var (visible, alpha) = GetVisibility(_playerVisual);
+    var animName = GetAnimationName(_playerSprite);
+    var animId = ReplayStringRegistry.GetOrRegisterAnimation(animName);
+    var flip = GetSpriteFlip(_playerSprite, _playerVisual);
+    var (visible, alpha) = GetVisibility(_playerVisual);
 
-        return new ReplayFrame(_elapsedTime, pos, rot, anim, flip, visible, alpha);
+    return new ReplayFrame(_elapsedTime, pos, rot, animId, flip, visible, alpha);
     }
 
     private ReplayFrame CreateMonsterFrame()
     {
         var pos = _cachedMonster.GlobalPosition;
         var rot = _cachedMonster.GlobalRotation;
-        var anim = GetAnimationName(_monsterSprite);
-        var flip = GetMonsterSpriteFlip(_monsterSprite, _monsterVisual);
-        var (visible, alpha) = GetVisibility(_monsterVisual);
-        
-        var state = _cachedMonster.EnableFollowerBehavior ? _cachedMonster.GetState().ToString() : "";
-        var fullyVisible = _cachedMonster.EnableFollowerBehavior ? _cachedMonster.IsFullyVisible() : true;
+    var animName = GetAnimationName(_monsterSprite);
+    var animId = ReplayStringRegistry.GetOrRegisterAnimation(animName);
+    var flip = GetMonsterSpriteFlip(_monsterSprite, _monsterVisual);
+    var (visible, alpha) = GetVisibility(_monsterVisual);
 
-        return new ReplayFrame(_elapsedTime, pos, rot, anim, flip, visible, alpha, state, fullyVisible);
+    var stateName = _cachedMonster.EnableFollowerBehavior ? _cachedMonster.GetState().ToString() : "";
+    var stateId = ReplayStringRegistry.GetOrRegisterMonsterState(stateName);
+    var fullyVisible = _cachedMonster.EnableFollowerBehavior ? _cachedMonster.IsFullyVisible() : true;
+
+    return new ReplayFrame(_elapsedTime, pos, rot, animId, flip, visible, alpha, stateId, fullyVisible);
     }
     #endregion
 

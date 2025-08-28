@@ -12,31 +12,32 @@ public readonly struct ReplayFrame
     #endregion
 
     #region Visual Data
-    public readonly string Animation;
+    // Store compact ids for animation and monster state to avoid per-frame string allocations
+    public readonly ushort AnimationId;
     public readonly bool SpriteFlip;
     public readonly bool IsVisible;
     public readonly float Alpha;
     #endregion
 
     #region Monster State Data
-    public readonly string MonsterState; // "InitialWait", "Following", "Hidden"
+    public readonly ushort MonsterStateId; // compact id for monster state
     public readonly bool IsFullyVisible; // Controls movement during transitions
     #endregion
 
     #region Constructor
-    public ReplayFrame(float timestamp, Vector2 position, float rotation = 0f, 
-                      string animation = "idle", bool spriteFlip = false, 
+    public ReplayFrame(float timestamp, Vector2 position, float rotation = 0f,
+                      ushort animationId = 0, bool spriteFlip = false,
                       bool isVisible = true, float alpha = 1.0f,
-                      string monsterState = "", bool isFullyVisible = true)
+                      ushort monsterStateId = 0, bool isFullyVisible = true)
     {
         Timestamp = timestamp;
         Position = position;
         Rotation = rotation;
-        Animation = animation ?? "idle";
+        AnimationId = animationId;
         SpriteFlip = spriteFlip;
         IsVisible = isVisible;
         Alpha = alpha;
-        MonsterState = monsterState ?? "";
+        MonsterStateId = monsterStateId;
         IsFullyVisible = isFullyVisible;
     }
     #endregion
@@ -44,13 +45,16 @@ public readonly struct ReplayFrame
     #region Utility Methods
     public override string ToString()
     {
-        var stateInfo = !string.IsNullOrEmpty(MonsterState) ? $" State:{MonsterState} FullyVisible:{IsFullyVisible}" : "";
-        return $"Frame[{Timestamp:F2}s] Pos:{Position} Rot:{Rotation:F1}° Anim:{Animation} Flip:{SpriteFlip} Visible:{IsVisible} Alpha:{Alpha:F2}{stateInfo}";
+    var animName = ReplayStringRegistry.GetAnimationName(AnimationId);
+    var stateName = ReplayStringRegistry.GetMonsterStateName(MonsterStateId);
+    var stateInfo = !string.IsNullOrEmpty(stateName) ? $" State:{stateName} FullyVisible:{IsFullyVisible}" : "";
+    return $"Frame[{Timestamp:F2}s] Pos:{Position} Rot:{Rotation:F1}° Anim:{animName} Flip:{SpriteFlip} Visible:{IsVisible} Alpha:{Alpha:F2}{stateInfo}";
     }
 
     public bool IsValid()
     {
-        return Timestamp >= 0 && !string.IsNullOrWhiteSpace(Animation) && Alpha is >= 0f and <= 1f;
+    // AnimationId can be zero for idle/no-animation
+    return Timestamp >= 0 && Alpha is >= 0f and <= 1f;
     }
     #endregion
 }

@@ -5,6 +5,8 @@ using Godot;
 public partial class EnemyManager : Node
 {
     private EventSubscriptionHelper _subscriptionHelper = new();
+    // Cached prefabs to avoid repeated GD.Load calls
+    private PackedScene _monsterPrefab;
     #region Singleton
     public static EnemyManager Instance { get; private set; }
     #endregion
@@ -29,7 +31,9 @@ public partial class EnemyManager : Node
             return;
         }
 
-        CallDeferred(nameof(DiscoverEnemies));
+    CallDeferred(nameof(DiscoverEnemies));
+    // Cache common prefabs
+    _monsterPrefab = GD.Load<PackedScene>("res://Prefabs/Monster.tscn");
         // Connect to global game events
         GameEventSystem.PlayerDied += OnPlayerDeath;
         _subscriptionHelper.AddUnsubscriber(() => GameEventSystem.PlayerDied -= OnPlayerDeath);
@@ -42,16 +46,16 @@ public partial class EnemyManager : Node
 
     private void DiscoverEnemies()
     {
-        // Find all existing enemies in scene
-        FindAllMonsters();
-        // Debug level - component discovery is routine
-        Log.Debug($"Found {_monsters.Count} monsters", "EnemyManager");
+    // Find all existing enemies in scene
+    FindAllMonsters();
+    // Debug level - component discovery is routine
+    if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.Debug)) Log.Debug($"Found {_monsters.Count} monsters", "EnemyManager");
     }
 
     private void FindAllMonsters()
     {
         // Find all Monster nodes
-        _monsters.Clear();
+    _monsters.Clear();
         var enemies = GetTree().GetNodesInGroup("enemies");
         foreach (Node enemy in enemies)
         {
@@ -71,26 +75,22 @@ public partial class EnemyManager : Node
     #region Follower Monster Control
     public void HideAllFollowers()
     {
-        // Hide all monsters
+        // Hide all monsters - prune invalid entries first to avoid wasted iterations
+        _monsters.RemoveAll(m => !IsInstanceValid(m));
         foreach (var monster in _monsters)
         {
-            if (IsInstanceValid(monster))
-            {
-                monster.ForceHide();
-            }
+            monster.ForceHide();
         }
         Log.System("All monsters hidden", "EnemyManager");
     }
 
     public void ShowAllFollowers()
     {
-        // Show all monsters
+        // Show all monsters - prune invalid entries first
+        _monsters.RemoveAll(m => !IsInstanceValid(m));
         foreach (var monster in _monsters)
         {
-            if (IsInstanceValid(monster))
-            {
-                monster.ForceShow();
-            }
+            monster.ForceShow();
         }
         Log.System("All monsters shown", "EnemyManager");
     }
@@ -98,10 +98,11 @@ public partial class EnemyManager : Node
     public int GetVisibleFollowerCount()
     {
         // Count how many monsters are currently visible
+        _monsters.RemoveAll(m => !IsInstanceValid(m));
         int count = 0;
         foreach (var monster in _monsters)
         {
-            if (IsInstanceValid(monster) && monster.IsCurrentlyVisible)
+            if (monster.IsCurrentlyVisible)
             {
                 count++;
             }
@@ -116,7 +117,7 @@ public partial class EnemyManager : Node
         // Spawn a new monster at position
         if (followerScene == null)
         {
-            followerScene = GD.Load<PackedScene>("res://Prefabs/Monster.tscn");
+            followerScene = _monsterPrefab;
         }
 
         if (followerScene == null)
@@ -125,17 +126,19 @@ public partial class EnemyManager : Node
             return null;
         }
 
-        var monster = followerScene.Instantiate() as Monster;
+        var key = followerScene.ResourcePath;
+        var node = PoolManager.Acquire(followerScene, key);
+        var monster = node as Monster;
         if (monster == null)
         {
-            Log.Error("Failed to instantiate Monster", "EnemyManager");
+            Log.Error("Failed to obtain Monster instance from pool or prefab", "EnemyManager");
             return null;
         }
 
         // Add to scene and track
         GetTree().CurrentScene.AddChild(monster);
         monster.GlobalPosition = position;
-        _monsters.Add(monster);
+        if (!_monsters.Contains(monster)) _monsters.Add(monster);
 
         Log.System($"Spawned Monster at {position}", "EnemyManager");
         return monster;

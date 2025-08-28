@@ -309,7 +309,15 @@ public partial class ReplayOrchestrator : Node
             if (_currentGhost.GetParent() != null)
             {
                 _currentGhost.GetParent().RemoveChild(_currentGhost);
-                _currentGhost.CallDeferred("queue_free");
+                if (_currentGhost is IPoolable)
+                {
+                    // Use PoolManager to release pooled ghost when possible
+                    PoolManager.Release(_currentGhost, _currentGhost.GetType().Name);
+                }
+                else
+                {
+                    _currentGhost.CallDeferred("queue_free");
+                }
             }
             else
             {
@@ -328,7 +336,14 @@ public partial class ReplayOrchestrator : Node
             if (_currentGhostMonster.GetParent() != null)
             {
                 _currentGhostMonster.GetParent().RemoveChild(_currentGhostMonster);
-                _currentGhostMonster.CallDeferred("queue_free");
+                if (_currentGhostMonster is IPoolable)
+                {
+                    PoolManager.Release(_currentGhostMonster, _currentGhostMonster.GetType().Name);
+                }
+                else
+                {
+                    _currentGhostMonster.CallDeferred("queue_free");
+                }
             }
             else
             {
@@ -350,7 +365,14 @@ public partial class ReplayOrchestrator : Node
                     if (ghost.GetParent() != null)
                     {
                         ghost.GetParent().RemoveChild(ghost);
-                        ghost.CallDeferred("queue_free");
+                        if (ghost is IPoolable)
+                        {
+                            PoolManager.Release(ghost, ghost.GetType().Name);
+                        }
+                        else
+                        {
+                            ghost.CallDeferred("queue_free");
+                        }
                     }
                     else
                     {
@@ -375,7 +397,14 @@ public partial class ReplayOrchestrator : Node
                     if (ghost.GetParent() != null)
                     {
                         ghost.GetParent().RemoveChild(ghost);
-                        ghost.CallDeferred("queue_free");
+                        if (ghost is IPoolable)
+                        {
+                            PoolManager.Release(ghost, ghost.GetType().Name);
+                        }
+                        else
+                        {
+                            ghost.CallDeferred("queue_free");
+                        }
                     }
                     else
                     {

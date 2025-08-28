@@ -2,7 +2,7 @@ using Godot;
 using MarrieGame.Core.Enums;
 
 // Unified Monster class supporting both simple and follower behaviors
-public partial class Monster : CharacterBody2D
+public partial class Monster : CharacterBody2D, IPoolable
 {
     #region Exported Properties
     [Export] public int DamageAmount { get; set; } = 1;
@@ -92,6 +92,31 @@ public partial class Monster : CharacterBody2D
 
     // Cache camera for life bar updates to avoid repeated GetViewport() calls
     _cachedCameraForLifeBar = GetViewport().GetCamera2D();
+    }
+
+    // Pooling support (basic)
+    public bool IsFromPool { get; set; } = false;
+
+    public void ResetForReuse()
+    {
+        // Reset runtime state that may be mutated during gameplay
+        _isTransitioning = false;
+        _isVisible = true;
+        _isFullyVisible = true;
+        _currentState = MonsterState.Visible;
+        Velocity = Vector2.Zero;
+        Show();
+        // Reset life
+        _monsterLife?.Reset();
+    }
+
+    public void OnReleasedToPool()
+    {
+        // Stop timers and tweens, disconnect signals to avoid leaks
+        try { _stateTimer?.Stop(); } catch { }
+        try { if (_damageArea != null) _damageArea.BodyEntered -= OnPlayerEntered; } catch { }
+        // Hide and remove from scene - PoolManager will handle hiding
+        Hide();
     }
 
     private bool _realityConnected = false;

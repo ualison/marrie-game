@@ -33,7 +33,11 @@ public partial class PlayerMana : Node, IManaSystem
     private Timer _regenDelayTimer;
     private Timer _regenTimer;
     private Player _player; // Reference to player for pause checking
+
+    // Default construction is required for Godot to instantiate this node from scenes.
+    // Initialization is done in _Ready().
     #endregion
+
 
     #region Initialization
     public override void _Ready()
@@ -90,7 +94,11 @@ public partial class PlayerMana : Node, IManaSystem
 
         // Emit depletion signal if mana exhausted
         if (IsEmpty)
+        {
             EmitSignal(SignalName.ManaDepleted);
+            // Notify global event bus as well
+            GameEventSystem.OnPlayerManaDepleted();
+        }
 
         // Start regen delay if auto-regeneration is enabled and player is not paused
         if (AutoRegenerate && !IsPlayerPaused())
@@ -108,7 +116,11 @@ public partial class PlayerMana : Node, IManaSystem
 
         // Emit restoration signal if mana was empty
         if (wasEmpty && CurrentMana > 0)
+        {
             EmitSignal(SignalName.ManaRestored);
+            // Notify global event bus as well
+            GameEventSystem.OnPlayerManaRestored();
+        }
 
         // Stop regeneration if at full mana
         if (IsFull)

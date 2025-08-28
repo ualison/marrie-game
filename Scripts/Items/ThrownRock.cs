@@ -3,7 +3,7 @@ using Godot;
 /// <summary>
 /// Represents a thrown rock projectile that follows a predetermined trajectory
 /// </summary>
-public partial class ThrownRock : Node2D
+public partial class ThrownRock : Node2D, IPoolable
 {
     #region Exported Properties
     [Export] public float TravelSpeed { get; set; } = 300.0f;
@@ -14,6 +14,9 @@ public partial class ThrownRock : Node2D
     private Sprite2D _sprite;
     private Area2D _collisionArea; // For collision detection with other objects
     #endregion
+
+    // Shared rock texture to reduce repeated resource loads
+    private static Texture2D _sharedRockTexture;
 
     #region Trajectory State
     private Vector2[] _trajectoryPoints;
@@ -55,8 +58,8 @@ public partial class ThrownRock : Node2D
     _collisionArea.AreaEntered += OnCollisionAreaEntered;
     _collisionArea.BodyEntered += OnCollisionBodyEntered;
         
-        AddChild(_collisionArea);
-        _collisionArea.AddChild(collisionShape);
+    AddChild(_collisionArea);
+    _collisionArea.AddChild(collisionShape);
         
         // Add to rocks group for easy identification
         AddToGroup("rocks");
@@ -70,8 +73,9 @@ public partial class ThrownRock : Node2D
     {
         if (RockTexture == null)
         {
-            // Load rock texture from resources
-            RockTexture = GD.Load<Texture2D>("res://Art/Rock.png");
+            if (_sharedRockTexture == null)
+                _sharedRockTexture = GD.Load<Texture2D>("res://Art/Rock.png");
+            RockTexture = _sharedRockTexture;
         }
         
         if (RockTexture != null && _sprite != null)
@@ -218,9 +222,36 @@ public partial class ThrownRock : Node2D
         // Simple visual feedback - could be expanded later
         var tween = CreateTween();
         tween.TweenProperty(_sprite, "modulate", new Color(1, 1, 1, 0), 0.3f);
-        tween.TweenCallback(Callable.From(() => QueueFree()));
+        tween.TweenCallback(Callable.From(() =>
+        {
+            if (IsFromPool)
+                PoolManager.Release(this);
+            else
+                QueueFree();
+        }));
     }
     #endregion
+
+    // Pooling support
+    public bool IsFromPool { get; set; } = false;
+
+    public void ResetForReuse()
+    {
+        // Reset runtime state
+        _isMoving = false;
+        _trajectoryPoints = null;
+        _currentPointIndex = 0;
+        _travelProgress = 0f;
+        Visible = true;
+        Show();
+    }
+
+    public void OnReleasedToPool()
+    {
+        // Called when returned to pool - cleanup signals if any
+        _isMoving = false;
+        try { if (_collisionArea != null) { _collisionArea.AreaEntered -= OnCollisionAreaEntered; _collisionArea.BodyEntered -= OnCollisionBodyEntered; } } catch { }
+    }
 
     #region Public API
     /// <summary>

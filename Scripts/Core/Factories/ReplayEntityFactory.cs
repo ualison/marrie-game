@@ -135,7 +135,8 @@ public static class ReplayEntityFactory
 
         if (scene != null)
         {
-            ghost = scene.Instantiate() as GhostPlayer;
+            var key = scene.ResourcePath;
+            ghost = PoolManager.Acquire(scene, key) as GhostPlayer;
         }
 
         // Fallback to programmatic creation
@@ -184,8 +185,9 @@ public static class ReplayEntityFactory
         {
             // When loading from scene, the structure is:
             // Root (Node2D) -> CharacterBody2D (with GhostMonster script)
-            var rootNode = scene.Instantiate();
-            var characterBody = rootNode.GetNodeOrNull<CharacterBody2D>("CharacterBody2D");
+            var key = scene.ResourcePath;
+            var rootNode = PoolManager.Acquire(scene, key);
+            var characterBody = rootNode?.GetNodeOrNull<CharacterBody2D>("CharacterBody2D");
 
             if (characterBody is GhostMonster ghostMonster)
             {
@@ -193,11 +195,17 @@ public static class ReplayEntityFactory
                 nodeToAdd = rootNode; // Add the root node to maintain hierarchy
                 Log.Debug("ReplayEntityFactory: GhostMonster loaded from scene with proper hierarchy", "ReplayEntityFactory");
             }
-            else
-            {
-                Log.Warning("ReplayEntityFactory: Scene loaded but CharacterBody2D is not a GhostMonster", "ReplayEntityFactory");
-                rootNode.QueueFree(); // Clean up failed instantiation
-            }
+                else
+                {
+                    Log.Warning("ReplayEntityFactory: Scene loaded but CharacterBody2D is not a GhostMonster", "ReplayEntityFactory");
+                    if (rootNode != null)
+                    {
+                        if (rootNode is IPoolable)
+                            PoolManager.Release(rootNode, scene.ResourcePath);
+                        else
+                            rootNode.QueueFree(); // Clean up failed instantiation
+                    }
+                }
         }
 
         // Fallback to programmatic creation

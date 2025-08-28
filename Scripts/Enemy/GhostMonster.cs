@@ -4,7 +4,7 @@ using GodotCollections = Godot.Collections;
 using MarrieGame.Core.Enums;
 
 // Ghost version of monster that replays recorded movements and interactions - Performance Optimized
-public partial class GhostMonster : CharacterBody2D
+public partial class GhostMonster : CharacterBody2D, IPoolable
 {
     #region Constants and Configuration
     private static readonly Color GHOST_TINT = new(0.6f, 0.3f, 0.9f, 0.7f); // Purple gem-like color
@@ -117,8 +117,22 @@ public partial class GhostMonster : CharacterBody2D
     {
         if (_monsterLifeBar == null)
         {
-            Log.Warning("GhostMonster: Cannot apply reality - life bar is null", "GhostMonster");
-            return;
+            Log.Debug("GhostMonster: Life bar is null when applying reality - attempting to (re)initialize life system", "GhostMonster");
+            // Try to (re)discover or create the life bar dynamically in case setup failed earlier
+            try
+            {
+                SetupLifeSystem();
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning($"GhostMonster: Exception while attempting SetupLifeSystem: {ex.Message}", "GhostMonster");
+            }
+
+            if (_monsterLifeBar == null)
+            {
+                Log.Warning("GhostMonster: Cannot apply reality - life bar is still null after reinitialization", "GhostMonster");
+                return;
+            }
         }
 
         Log.Debug($"GhostMonster: Applying reality {reality} to life bar", "GhostMonster");
@@ -277,21 +291,22 @@ public partial class GhostMonster : CharacterBody2D
         }
 
         // Only update animation if it changed and we have animation capability
-        if (_hasAnimationFrames && _lastAnimation != frame.Animation)
+        var animName = ReplayStringRegistry.GetAnimationName(frame.AnimationId);
+        if (_hasAnimationFrames && _lastAnimation != animName)
         {
-            if (!string.IsNullOrEmpty(frame.Animation))
+            if (!string.IsNullOrEmpty(animName))
             {
-                _animatedSprite?.Play(frame.Animation);
-                _lastAnimation = frame.Animation;
+                _animatedSprite?.Play(animName);
+                _lastAnimation = animName;
             }
         }
     }
 
     private void HandleStateBasedBehavior(ReplayFrame frame)
     {
-        // Extract state information from frame
-        string newMonsterState = frame.MonsterState;
-        bool newIsFullyVisible = frame.IsFullyVisible;
+    // Extract state information from frame (use compact ids)
+    string newMonsterState = ReplayStringRegistry.GetMonsterStateName(frame.MonsterStateId);
+    bool newIsFullyVisible = frame.IsFullyVisible;
         float finalAlpha = frame.Alpha * GHOST_TINT.A;
 
         // Update current alpha
@@ -413,9 +428,12 @@ public partial class GhostMonster : CharacterBody2D
         }
         tween.TweenCallback(Callable.From(() =>
         {
-            Log.Debug("Ghost monster faded out and destroyed", "GhostMonster");
+            Log.Debug("Ghost monster faded out and released/destroyed", "GhostMonster");
             CleanupLifeBar();
-            QueueFree();
+            if (IsFromPool)
+                PoolManager.Release(this);
+            else
+                QueueFree();
         }));
     }
 
@@ -708,6 +726,81 @@ public partial class GhostMonster : CharacterBody2D
         // Ensure cleanup when ghost is removed from scene
         CleanupLifeBar();
         base._ExitTree();
+    }
+
+    // Pooling support
+    public bool IsFromPool { get; set; } = false;
+
+    public void ResetForReuse()
+    {
+        // Stop any active replay and tweens
+        try { StopReplay(); } catch { }
+        _isReplaying = false;
+        _replayFrames = null;
+        _currentFrameIndex = 0;
+        _elapsedTime = 0f;
+
+        // Reset visual and state caches
+        _isCurrentlyFullyVisible = true;
+        _currentMonsterState = "";
+        _lastAlpha = -1f;
+        _lastFlipState = false;
+        _lastAnimation = "";
+        _currentFadeTween?.Kill();
+
+        // Reset positions
+        _currentPosition = Vector2.Zero;
+        _targetPosition = Vector2.Zero;
+
+        // Restore visibility and basic visual defaults
+        Show();
+        if (_activeSprite != null)
+        {
+            _activeSprite.Show();
+            _activeSprite.Modulate = GHOST_TINT;
+            _activeSprite.Scale = Vector2.One;
+        }
+
+        if (_animatedSprite != null)
+        {
+            try { _animatedSprite.Stop(); } catch { }
+        }
+
+        // Disable damage area while pooled
+        if (_damageArea != null)
+        {
+            _damageArea.Monitoring = false;
+            _damageArea.Monitorable = false;
+        }
+
+        // Reset lifebar reference but don't free scene-based bars here
+        // CleanupLifeBar will be called when released to pool
+    }
+
+    public void OnReleasedToPool()
+    {
+        // Disconnect runtime signals
+        try { if (_damageArea != null) _damageArea.BodyEntered -= OnPlayerEntered; } catch { }
+
+        // Unsubscribe from RealityManager if connected
+        try
+        {
+            if (_realityConnected && RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+            {
+                RealityManager.Instance.RealityChangedEvent -= OnRealityChanged;
+            }
+        }
+        catch { }
+        _realityConnected = false;
+
+        // Cleanup life bar (will QueueFree dynamic bars and hide scene bars)
+        CleanupLifeBar();
+
+        // Remove from groups to avoid stray callbacks while pooled
+        try { RemoveFromGroup("ghost_monster"); } catch { }
+
+        // Disable collisions to keep pooled node inert
+        try { DisableCollisions(); } catch { }
     }
 
     // FIXED: Helper method for recursive node search - now properly implemented

@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using MarrieGame.Core.Enums;
+using MarrieGame.Core.Models;
 
 /// <summary>
 /// Central event system for game-wide communication
@@ -9,14 +10,14 @@ using MarrieGame.Core.Enums;
 public static class GameEventSystem
 {
     // Player Events
-    public static event Action<MarrieGame.Core.Models.PlayerDeath> PlayerDied;
-    public static event Action<MarrieGame.Core.Models.PlayerHealth> PlayerHealthChanged;
-    public static event Action<int, int> PlayerManaChanged;
+    public static event Action<PlayerDeath> PlayerDied;
+    public static event Action<int,int> PlayerHealthChanged;
+    public static event Action<int,int> PlayerManaChanged;
     public static event Action PlayerManaRestored;
     public static event Action PlayerManaDepleted;
     
     // Monster Events
-    public static event Action<MarrieGame.Core.Models.MonsterHealth> MonsterHealthChanged;
+    public static event Action<int,int,int> MonsterHealthChanged;
     
     // Game State Events
     public static event Action<GameState> GameStateChanged;
@@ -27,15 +28,14 @@ public static class GameEventSystem
     public static event Action<Vector2> ReplayGemCreated;
     
     #region Player Event Triggers
-    public static void OnPlayerDied(MarrieGame.Core.Models.PlayerDeath payload)
+    public static void OnPlayerDied(PlayerDeath payload)
     {
         PlayerDied?.Invoke(payload);
     }
     
     public static void OnPlayerHealthChanged(int currentHealth, int maxHealth)
     {
-        var payload = new MarrieGame.Core.Models.PlayerHealth(currentHealth, maxHealth);
-        PlayerHealthChanged?.Invoke(payload);
+        PlayerHealthChanged?.Invoke(currentHealth, maxHealth);
     }
     
     public static void OnPlayerManaChanged(int currentMana, int maxMana)
@@ -57,8 +57,7 @@ public static class GameEventSystem
     #region Monster Event Triggers
     public static void OnMonsterHealthChanged(int currentHealth, int maxHealth, int purpleHearts)
     {
-        var payload = new MarrieGame.Core.Models.MonsterHealth(currentHealth, maxHealth, purpleHearts);
-        MonsterHealthChanged?.Invoke(payload);
+        MonsterHealthChanged?.Invoke(currentHealth, maxHealth, purpleHearts);
     }
     #endregion
     
@@ -90,8 +89,8 @@ public static class GameEventSystem
     public static void ClearAllSubscriptions()
     {
         PlayerDied = null;
-        PlayerHealthChanged = null;
-        PlayerManaChanged = null;
+    PlayerHealthChanged = null;
+    PlayerManaChanged = null;
         PlayerManaRestored = null;
         PlayerManaDepleted = null;
         MonsterHealthChanged = null;
