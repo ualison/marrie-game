@@ -97,7 +97,7 @@ public partial class EnemyManager : Node
         int count = 0;
         foreach (var monster in _monsters)
         {
-            if (IsInstanceValid(monster) && monster.IsVisible())
+            if (IsInstanceValid(monster) && monster.IsCurrentlyVisible)
             {
                 count++;
             }

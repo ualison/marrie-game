@@ -65,7 +65,7 @@ public partial class PlayerStateManager : Node
     private void DiscoverPlayerComponents()
     {
         _player = GetTree().GetFirstNodeInGroup("player") as Player;
-        _playerLife = _player?.GetLifeSystem();
+    _playerLife = _player?.LifeSystem;
         
         // Debug level - routine component discovery
         Log.Debug($"Player found: {_player != null}, Life system: {_playerLife != null}", "PlayerStateManager");

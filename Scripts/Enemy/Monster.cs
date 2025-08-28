@@ -423,7 +423,7 @@ public partial class Monster : CharacterBody2D
         if (!EnableFollowerBehavior) return;
         if (IsDisabledForReplay) return;
 
-        if (_player?.GetLifeSystem()?.IsDead != false) return;
+    if (_player?.LifeSystem?.IsDead != false) return;
 
         // Always apply gravity and physics when monster exists
         ApplyGravity(delta);
@@ -448,56 +448,7 @@ public partial class Monster : CharacterBody2D
         MoveAndSlide();
     }
 
-    private void ApplyGravity(double delta)
-    {
-        if (!IsOnFloor())
-            Velocity = new Vector2(Velocity.X, Velocity.Y + _gravity * (float)delta);
-    }
-
-    private void UpdateMovement()
-    {
-        if (_player == null) return;
-
-        float distanceToPlayer = GlobalPosition.DistanceTo(_player.GlobalPosition);
-
-        // If too close to player, don't move toward them
-        if (distanceToPlayer <= MinimumFollowDistance)
-        {
-            Velocity = new Vector2(0, Velocity.Y);
-            return;
-        }
-
-        // Normal following behavior - maintain FollowDistance behind player
-        Vector2 targetPos = _player.GlobalPosition - new Vector2(FollowDistance, 0);
-        float distanceToTarget = GlobalPosition.DistanceTo(targetPos);
-
-        if (distanceToTarget > 10.0f)
-        {
-            Vector2 direction = (targetPos - GlobalPosition).Normalized();
-            Velocity = new Vector2(direction.X * WalkSpeed, Velocity.Y);
-            UpdateSpriteDirection();
-        }
-        else
-        {
-            // Stop moving horizontally but keep current velocity for smoother stopping
-            Velocity = new Vector2(0, Velocity.Y);
-        }
-    }
-
-    private void UpdateSpriteDirection()
-    {
-        if (_spriteNode == null || _player == null) return;
-
-        bool shouldFaceLeft = _player.GlobalPosition.X > GlobalPosition.X;
-        var scale = _spriteNode.Scale;
-
-        // Only update scale if direction actually changed to avoid unnecessary updates
-        bool currentlyFacingLeft = scale.X < 0;
-        if (currentlyFacingLeft != shouldFaceLeft)
-        {
-            _spriteNode.Scale = new Vector2(shouldFaceLeft ? -Mathf.Abs(scale.X) : Mathf.Abs(scale.X), scale.Y);
-        }
-    }
+    // Movement methods moved to Monster.Movement.cs for readability
     #endregion
 
     #region State Management
@@ -724,100 +675,11 @@ public partial class Monster : CharacterBody2D
     }
     #endregion
 
-    #region Visual and Audio Effects
-    private void FadeIn()
-    {
-        if (_spriteNode == null) return;
-
-        _currentTween?.Kill();
-
-        _spriteNode.Visible = true;
-        _spriteNode.Modulate = new Color(1, 1, 1, 0);
-
-        _currentTween = CreateTween();
-        _currentTween.TweenProperty(_spriteNode, "modulate:a", 1.0f, 0.5f);
-        _currentTween.TweenCallback(Callable.From(() =>
-        {
-            // Now that fade-in finished, allow player interactions again
-            _isFullyVisible = true;
-            _isTransitioning = false; // No longer transitioning
-            SetCollisionMask(1u);
-            SetCollisionLayer(1u);
-
-            // Delay showing life bar slightly to ensure position is correct
-            GetTree().CreateTimer(0.1f).Timeout += () =>
-            {
-                if (_monsterLifeBar != null)
-                {
-                    // Update position right before showing the life bar
-                    DoUpdateLifeBarPositionForced(); // Force position update even when hidden
-                    _monsterLifeBar.Show();
-                }
-            };
-
-            Log.Debug("Monster fade in complete - fully visible", "Monster");
-        }));
-    }
-
-    private void FadeOut()
-    {
-        if (_spriteNode == null) return;
-
-        _currentTween?.Kill();
-
-        // Keep ground collision but disable player interactions when hidden
-        SetCollisionMask(1u); // Keep ground collision (bit 0)
-        SetCollisionLayer(2u); // Move to layer 2 to avoid player interactions
-        _isFullyVisible = false;
-
-        // Hide MonsterLifeBar when fading out
-        if (_monsterLifeBar != null)
-        {
-            _monsterLifeBar.Hide();
-        }
-
-        _currentTween = CreateTween();
-        _currentTween.TweenProperty(_spriteNode, "modulate:a", 0.0f, 0.5f);
-        _currentTween.TweenCallback(Callable.From(() =>
-        {
-            _spriteNode.Visible = false;
-            _isTransitioning = false; // No longer transitioning
-            // Life bar is already hidden, no need to update position when not visible
-            Log.Debug("Monster fade out complete - fully hidden", "Monster");
-        }));
-    }
-
-    public void PlayDamageEffect()
-    {
-        // Default damage effect - determine color based on current reality
-        Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
-        Color effectColor = currentReality == Reality.CurrentReality ? Colors.Red : Colors.Purple;
-        PlayDamageEffect(effectColor);
-    }
-
-    public void PlayDamageEffect(Color damageColor)
-    {
-        var targetSprite = _sprite ?? _spriteNode;
-        if (targetSprite == null) return;
-
-        var tween = CreateTween();
-        tween.TweenProperty(targetSprite, "modulate", damageColor, 0.2f);
-        tween.TweenProperty(targetSprite, "modulate", Colors.White, 0.3f);
-    }
-
-    private void PlayAudio(bool play)
-    {
-        if (_footstepAudio == null) return;
-
-        if (play && !_footstepAudio.Playing)
-            _footstepAudio.Play();
-        else if (!play)
-            _footstepAudio.Stop();
-    }
-    #endregion
+    // Visual and audio helper methods moved to Monster.Visuals.cs for readability
 
     #region Public API
-    public new bool IsVisible() => _isVisible;
+    // Use a descriptive property to avoid confusion with Node.Visible / Godot API
+    public bool IsCurrentlyVisible => _isVisible;
     public bool IsFullyVisible() => _isFullyVisible;
     public MonsterState GetState() => _currentState;
     public void ForceHide()
@@ -869,7 +731,10 @@ public partial class Monster : CharacterBody2D
         return result;
     }
 
+    // Backwards-compatible getter
     public MonsterLife GetLifeSystem() => _monsterLife;
+    // Idiomatic property access
+    public MonsterLife LifeSystem => _monsterLife;
 
     public Reality GetCurrentReality() => RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
 
@@ -1047,7 +912,7 @@ public partial class Monster : CharacterBody2D
             Log.Debug($"Monster {Name} collision with Player {body.Name} - IsGhost: {body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster")}", "Monster");
         }
 
-        if (!player.GetLifeSystem()?.IsDead == true)
+    if (!player.LifeSystem?.IsDead == true)
         {
             // Check if we can damage based on behavior mode
             if (EnableFollowerBehavior && !CanTakeDamage()) return;

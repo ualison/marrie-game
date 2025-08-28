@@ -605,7 +605,7 @@ public partial class GhostMonster : CharacterBody2D
         }
         bool isGhost = body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster");
         Log.Debug($"GhostMonster {Name} collision with Player {body.Name} - IsGhost: {isGhost}", "GhostMonster");
-        if (!player.GetLifeSystem()?.IsDead == true)
+    if (!player.LifeSystem?.IsDead == true)
         {
             Log.Debug($"GhostMonster {Name} attempting damage to player", "GhostMonster");
             if (player.TakeDamage(1)) // Default damage amount for ghost
@@ -840,7 +840,8 @@ public partial class GhostMonster : CharacterBody2D
         // Store reference to current damage tween
         _currentFadeTween = tween;
     }
-    // Compatibility API to match Monster's public interface
+    // Expose life system as property and keep compatibility method
+    public MonsterLife LifeSystem => _monsterLife;
     public MonsterLife GetLifeSystem() => _monsterLife;
 
     // Enhanced TakePhysicalDamage for consistency
