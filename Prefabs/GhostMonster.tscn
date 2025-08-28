@@ -5,8 +5,8 @@
 [ext_resource type="Script" uid="uid://2hx87sinu6t" path="res://Scripts/Enemy/MonsterLife.cs" id="3_monsterlife"]
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_6ib6h"]
-size = Vector2(322, 387)
+[sub_resource type="CircleShape2D" id="CircleShape2D_damage"]
+radius = 25.0
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
 size = Vector2(302, 376)
@@ -18,10 +18,11 @@ script = ExtResource("1_uqgqf")
 
 [node name="DamageArea" type="Area2D" parent="CharacterBody2D"]
 position = Vector2(0, -4)
+collision_layer = 16
+collision_mask = 129
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/DamageArea"]
-position = Vector2(11, -20.5)
-shape = SubResource("RectangleShape2D_6ib6h")
+shape = SubResource("CircleShape2D_damage")
 debug_color = Color(0.764087, 0.04706, 0.125471, 0.42)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]

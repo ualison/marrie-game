@@ -2,6 +2,7 @@ using Godot;
 using MarrieGame.Core.Enums;
 
 // Monster health display with red and purple hearts that follows the monster
+// Hearts display differently based on reality - showing which hearts are vulnerable to damage
 public partial class MonsterLifeBar : Control
 {
     #region Configuration
@@ -15,7 +16,7 @@ public partial class MonsterLifeBar : Control
     // Useful when a caller (like GhostMonster) instantiates the bar and wants to
     // explicitly connect it to a specific MonsterLife instance.
     [Export] public bool AutoDiscover { get; set; } = true;
-    
+
     // Reality-specific configuration
     [Export] public Reality RequiredReality { get; set; } = Reality.CurrentReality;
     #endregion
@@ -32,7 +33,7 @@ public partial class MonsterLifeBar : Control
         // Setup hearts container and find life system
         InitializeContainer();
         CallDeferred(nameof(FindLifeSystem));
-        
+
         // Connect to reality changes
         if (RealityManager.IsInstanceAvailable)
         {
@@ -44,7 +45,7 @@ public partial class MonsterLifeBar : Control
             CallDeferred(nameof(ConnectToRealityManager));
         }
     }
-    
+
     private void ConnectToRealityManager()
     {
         if (RealityManager.IsInstanceAvailable)
@@ -100,18 +101,18 @@ public partial class MonsterLifeBar : Control
     {
         // Strategy 1: Check parent node for MonsterLife or GhostMonsterLife
         var parent = GetParent();
-        
+
         if (parent != null)
         {
             // First, try to find the monster node directly
             _monster = parent as Node2D;
-            
+
             // Check for regular Monster
             if (parent is Monster monster)
             {
                 return monster.GetNodeOrNull<MonsterLife>("MonsterLife");
             }
-            
+
             // Check for GhostMonster by looking for GhostMonsterLife node
             var ghostLife = parent.GetNodeOrNull<MonsterLife>("GhostMonsterLife");
             if (ghostLife != null)
@@ -119,7 +120,7 @@ public partial class MonsterLifeBar : Control
                 Log.Debug($"Found GhostMonsterLife in parent: {parent.Name}", "MonsterLifeBarUI");
                 return ghostLife;
             }
-            
+
             // Check for regular MonsterLife as fallback
             var regularLife = parent.GetNodeOrNull<MonsterLife>("MonsterLife");
             if (regularLife != null)
@@ -127,14 +128,14 @@ public partial class MonsterLifeBar : Control
                 return regularLife;
             }
         }
-        
+
         // Strategy 2: Check parent's parent
         if (parent?.GetParent() is Monster monsterGrandparent)
         {
             _monster = monsterGrandparent;
             return monsterGrandparent.GetNodeOrNull<MonsterLife>("MonsterLife");
         }
-        
+
         return null;
     }
 
@@ -185,31 +186,37 @@ public partial class MonsterLifeBar : Control
     private void OnRealityChanged(Reality newReality)
     {
         Log.Debug($"Reality changed to {newReality}, required reality: {RequiredReality}", "MonsterLifeBarUI");
-        
+
         // Show/hide based on reality match
         bool shouldBeVisible = (newReality == RequiredReality);
         Visible = shouldBeVisible;
-        
+
         if (shouldBeVisible)
         {
             Log.Debug($"Showing life bar for {RequiredReality} reality", "MonsterLifeBarUI");
+
+            // Refresh heart display to show correct vulnerability based on new reality
+            if (_lifeSystem != null)
+            {
+                UpdateHearts(_lifeSystem.CurrentLife, _lifeSystem.MaxLife, _lifeSystem.PurpleHearts);
+            }
         }
         else
         {
             Log.Debug($"Hiding life bar (wrong reality)", "MonsterLifeBarUI");
         }
     }
-    
+
     private bool ShouldFollowMonster()
     {
         // Only follow if reality matches and following is enabled
         if (!FollowMonster) return false;
-        
+
         if (RealityManager.IsInstanceAvailable)
         {
             return RealityManager.Instance.CurrentReality == RequiredReality;
         }
-        
+
         // Fallback: if RealityManager isn't available, use default behavior
         return true;
     }
@@ -222,7 +229,7 @@ public partial class MonsterLifeBar : Control
         if (ShouldFollowMonster() && _monster != null && IsInstanceValid(_monster))
         {
             UpdatePosition();
-            
+
             // Don't automatically control visibility - let the Monster class handle it
             // The Monster class calls Show() and Hide() explicitly based on its state
         }
@@ -287,38 +294,64 @@ public partial class MonsterLifeBar : Control
 
     private void CreateTextureHearts(int currentLife, int maxLife, int purpleHearts)
     {
-        // Create hearts using texture images for polished visual appearance
-        // Purple hearts replace the last N hearts in the display, not add to them
-        int redHearts = maxLife - purpleHearts;
-        
+        Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+
+        // Use MonsterLife's corrected property calculations
+        int currentRedHearts = _lifeSystem?.CurrentRedHearts ?? 0;
+        int currentPurpleHearts = _lifeSystem?.CurrentPurpleHearts ?? 0;
+        int maxRedHearts = maxLife - purpleHearts;
+
         if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.Debug))
         {
-            Log.Debug($"Monster Hearts - Current: {currentLife}, Max: {maxLife}, Purple: {purpleHearts}", "MonsterLifeBarUI");
-            Log.Debug($"Calculated - Red slots: {redHearts}, Purple slots: {purpleHearts}", "MonsterLifeBarUI");
+            Log.Debug($"Monster Hearts - Current: {currentLife}, Max: {maxLife}, Purple: {purpleHearts}, Reality: {currentReality}", "MonsterLifeBarUI");
+            Log.Debug($"Calculated - Red hearts: {currentRedHearts}/{maxRedHearts}, Purple hearts: {currentPurpleHearts}/{purpleHearts}", "MonsterLifeBarUI");
         }
-        
-        // Create purple hearts first (leftmost positions 0 to purpleHearts-1)
-        for (int i = 0; i < purpleHearts; i++)
+
+        // ALWAYS show all heart slots (both red and purple), but vary visual emphasis by reality
+
+        // Create red hearts (show all max red heart slots)
+        for (int i = 0; i < maxRedHearts; i++)
         {
-            bool isFull = currentLife > i; // Purple hearts are filled first (highest priority)
-            var heart = CreateTextureHeart(isFull, false); // false for purple
+            bool isFull = i < currentRedHearts;
+            bool isVulnerable = (currentReality == Reality.CurrentReality); // Red hearts vulnerable in CurrentReality
+            var heart = CreateTextureHeart(isFull, true, isVulnerable);
             _heartsContainer.AddChild(heart);
         }
-        
-        // Create red hearts after purple hearts (positions purpleHearts to maxLife-1)
-        for (int i = 0; i < redHearts; i++)
+
+        // Create purple hearts (show all max purple heart slots) 
+        for (int i = 0; i < purpleHearts; i++)
         {
-            bool isFull = currentLife > (purpleHearts + i); // Red hearts are filled after purple hearts
-            var heart = CreateTextureHeart(isFull, true); // true for red
+            bool isFull = i < currentPurpleHearts;
+            bool isVulnerable = (currentReality == Reality.PastReality); // Purple hearts vulnerable in PastReality
+            var heart = CreateTextureHeart(isFull, false, isVulnerable);
             _heartsContainer.AddChild(heart);
         }
     }
 
-    private TextureRect CreateTextureHeart(bool isFull, bool isRed)
+    private void CreateRedTextureHearts(int maxCount, int currentCount, bool vulnerable)
     {
-        // Create individual texture heart
+        for (int i = 0; i < maxCount; i++)
+        {
+            bool isFull = i < currentCount;
+            var heart = CreateTextureHeart(isFull, true, vulnerable);
+            _heartsContainer.AddChild(heart);
+        }
+    }
+
+    private void CreatePurpleTextureHearts(int maxCount, int currentCount, bool vulnerable)
+    {
+        for (int i = 0; i < maxCount; i++)
+        {
+            bool isFull = i < currentCount;
+            var heart = CreateTextureHeart(isFull, false, vulnerable);
+            _heartsContainer.AddChild(heart);
+        }
+    }
+
+    private TextureRect CreateTextureHeart(bool isFull, bool isRed, bool vulnerable)
+    {
         Texture2D texture;
-        
+
         if (isRed)
             texture = isFull ? FullRedHeartTexture : EmptyRedHeartTexture;
         else
@@ -329,54 +362,91 @@ public partial class MonsterLifeBar : Control
             Texture = texture,
             ExpandMode = TextureRect.ExpandModeEnum.FitWidthProportional,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            CustomMinimumSize = new Vector2(32, 32) // Slightly smaller than player hearts
+            CustomMinimumSize = new Vector2(32, 32)
         };
+
+        // Visual emphasis: vulnerable hearts shown clearly, protected hearts dimmed
+        if (vulnerable)
+        {
+            // Full brightness for hearts that can be damaged in this reality
+            heart.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+        }
+        else
+        {
+            // Dimmed for hearts that are protected in this reality
+            heart.Modulate = new Color(0.6f, 0.6f, 0.6f, 0.7f);
+        }
 
         return heart;
     }
-
     private void CreateTextHearts(int currentLife, int maxLife, int purpleHearts)
     {
-        // Fallback display using Unicode heart characters
-        // Purple hearts replace the last N hearts in the display, not add to them
-        int redHearts = maxLife - purpleHearts;
-        
-        // Create purple hearts first (leftmost positions 0 to purpleHearts-1)
-        for (int i = 0; i < purpleHearts; i++)
+        Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+
+        int currentRedHearts = _lifeSystem?.CurrentRedHearts ?? 0;
+        int currentPurpleHearts = _lifeSystem?.CurrentPurpleHearts ?? 0;
+        int maxRedHearts = maxLife - purpleHearts;
+
+        // Create red hearts
+        for (int i = 0; i < maxRedHearts; i++)
         {
-            bool isFull = currentLife > i; // Purple hearts are filled first (highest priority)
-            var heartLabel = CreateTextHeart(isFull, false); // false for purple
+            bool isFull = i < currentRedHearts;
+            bool isVulnerable = (currentReality == Reality.CurrentReality);
+            var heartLabel = CreateTextHeart(isFull, true, isVulnerable);
             _heartsContainer.AddChild(heartLabel);
         }
-        
-        // Create red hearts after purple hearts (positions purpleHearts to maxLife-1)
-        for (int i = 0; i < redHearts; i++)
+
+        // Create purple hearts  
+        for (int i = 0; i < purpleHearts; i++)
         {
-            bool isFull = currentLife > (purpleHearts + i); // Red hearts are filled after purple hearts
-            var heartLabel = CreateTextHeart(isFull, true); // true for red
+            bool isFull = i < currentPurpleHearts;
+            bool isVulnerable = (currentReality == Reality.PastReality);
+            var heartLabel = CreateTextHeart(isFull, false, isVulnerable);
             _heartsContainer.AddChild(heartLabel);
         }
     }
 
-    private Label CreateTextHeart(bool isFull, bool isRed)
+    private void CreateRedTextHearts(int maxCount, int currentCount, bool vulnerable)
     {
-        // Create individual text heart with appropriate styling
+        for (int i = 0; i < maxCount; i++)
+        {
+            bool isFull = i < currentCount;
+            var heartLabel = CreateTextHeart(isFull, true, vulnerable);
+            _heartsContainer.AddChild(heartLabel);
+        }
+    }
+
+    private void CreatePurpleTextHearts(int maxCount, int currentCount, bool vulnerable)
+    {
+        for (int i = 0; i < maxCount; i++)
+        {
+            bool isFull = i < currentCount;
+            var heartLabel = CreateTextHeart(isFull, false, vulnerable);
+            _heartsContainer.AddChild(heartLabel);
+        }
+    }
+
+    private Label CreateTextHeart(bool isFull, bool isRed, bool vulnerable)
+    {
         var heartLabel = new Label();
 
         if (isFull)
         {
-            // Filled heart
             heartLabel.Text = "♥";
-            heartLabel.AddThemeColorOverride("font_color", isRed ? Colors.Red : Colors.Purple);
+            Color baseColor = isRed ? Colors.Red : Colors.Purple;
+            // Vulnerable hearts at full intensity, protected hearts dimmed
+            Color finalColor = vulnerable ? baseColor : baseColor * 0.6f;
+            heartLabel.AddThemeColorOverride("font_color", finalColor);
         }
         else
         {
-            // Empty heart
             heartLabel.Text = "♡";
-            heartLabel.AddThemeColorOverride("font_color", isRed ? Colors.DarkRed : Colors.DarkMagenta);
+            Color baseColor = isRed ? Colors.DarkRed : Colors.DarkMagenta;
+            Color finalColor = vulnerable ? baseColor : baseColor * 0.6f;
+            heartLabel.AddThemeColorOverride("font_color", finalColor);
         }
 
-        heartLabel.AddThemeFontSizeOverride("font_size", 20); // Slightly smaller than player
+        heartLabel.AddThemeFontSizeOverride("font_size", 20);
         return heartLabel;
     }
     #endregion
@@ -440,18 +510,18 @@ public partial class MonsterLifeBar : Control
     {
         OffsetFromMonster = offset;
     }
-    
+
     public void SetRequiredReality(Reality reality)
     {
         RequiredReality = reality;
-        
+
         // Update visibility immediately if RealityManager is available
         if (RealityManager.IsInstanceAvailable)
         {
             OnRealityChanged(RealityManager.Instance.CurrentReality);
         }
     }
-    
+
     public void SetMonsterReference(Node2D monster)
     {
         _monster = monster;
@@ -466,7 +536,7 @@ public partial class MonsterLifeBar : Control
         if (RealityManager.IsInstanceAvailable)
         {
             RealityManager.Instance.RealityChanged -= OnRealityChanged;
-        }   
+        }
         // Clean up life system connection
         DisconnectFromCurrentLifeSystem();
     }

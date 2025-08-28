@@ -890,64 +890,42 @@ public partial class Monster : CharacterBody2D
 
     public bool TakeRockDamage(int damage = 1)
     {
-        // Rock damage based on current reality
         Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
         Log.Debug($"TakeRockDamage called - CanTakeDamage: {CanTakeDamage()}, MonsterLife: {_monsterLife != null}, CurrentReality: {currentReality}", "Monster");
 
-        if (!CanTakeDamage() || _monsterLife == null)
-        {
-            Log.UI($"Rock damage blocked - CanTakeDamage: {CanTakeDamage()}, MonsterLife exists: {_monsterLife != null}", "Monster");
-            return false;
-        }
+        if (!CanTakeDamage() || _monsterLife == null) return false;
 
         bool damaged = false;
 
         switch (currentReality)
         {
             case Reality.CurrentReality:
-                // In current reality, rocks damage red hearts only
-                Log.Debug($"Attempting physical damage - CurrentRedHearts: {_monsterLife.CurrentRedHearts}", "Monster");
-                damaged = _monsterLife.TakePhysicalDamage(damage);
+                // Rocks only damage red hearts in current reality
+                damaged = _monsterLife.TakeRockDamageInCurrentReality(damage);
                 if (damaged)
                 {
-                    // Info level - combat feedback is important for balance testing
-                    Log.Info($"Rock hit monster in Current Reality - damaged red hearts", "Monster");
+                    PlayDamageEffect(Colors.Red);
+                    Log.Info($"Rock hit Monster in Current Reality - damaged red hearts", "Monster");
                 }
                 else
                 {
-                    // Warning level - indicates potential balance issue
-                    Log.Warning($"Rock hit monster in Current Reality but no red hearts to damage", "Monster");
+                    Log.Warning($"Rock hit Monster in Current Reality but no red hearts to damage", "Monster");
                 }
                 break;
 
             case Reality.PastReality:
-                // In past reality, rocks damage purple hearts only
-                damaged = _monsterLife.TakePurpleHeartDamage(damage);
+                // Rocks only damage purple hearts in past reality
+                damaged = _monsterLife.TakeRockDamageInPastReality(damage);
                 if (damaged)
                 {
-                    // Info level - important purple gem reality feedback
-                    Log.Info($"Rock hit monster in Purple Gem Reality - damaged purple hearts", "Monster");
-
-                    // Check if all purple hearts are lost (monster should die)
-                    if (_monsterLife.CurrentPurpleHearts <= 0)
-                    {
-                        Log.UI($"Monster died - all purple hearts lost in Purple Gem Reality", "Monster");
-                        // The MonsterLife system will handle the death signal
-                    }
+                    PlayDamageEffect(Colors.Purple);
+                    Log.Info($"Rock hit Monster in Past Reality - damaged purple hearts", "Monster");
                 }
                 else
                 {
-                    Log.UI($"Rock hit monster in Purple Gem Reality but no purple hearts to damage", "Monster");
+                    Log.Warning($"Rock hit Monster in Past Reality but no purple hearts to damage", "Monster");
                 }
                 break;
-        }
-
-        if (damaged)
-        {
-            // Use appropriate color based on which reality and what type of damage was dealt
-            Color damageColor = currentReality == Reality.CurrentReality ? Colors.Red : Colors.Purple;
-            PlayDamageEffect(damageColor);
-            Log.Debug($"Monster took {damage} rock damage in {currentReality} reality", "Monster");
         }
 
         return damaged;

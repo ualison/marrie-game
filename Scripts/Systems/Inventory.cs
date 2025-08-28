@@ -11,7 +11,7 @@ public partial class Inventory : Node
     #endregion
 
     #region State
-    private int _rockCount = 0;
+    private int _rockCount = 10;
     #endregion
 
     #region Signals

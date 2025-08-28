@@ -20,15 +20,15 @@ public partial class MonsterLife : Node, IHealthSystem
     public int CurrentLife { get; private set; }
     public bool IsInvulnerable { get; private set; }
     public bool IsDead => CurrentLife <= 0;
-    
+
     // IHealthSystem implementation
     public int CurrentHealth => CurrentLife;
     public int MaxHealth => MaxLife;
-    
-    // Heart type properties
+
+    // FIXED: Heart type properties with corrected calculations
     public int RedHearts => Mathf.Max(0, MaxLife - PurpleHearts);
-    public int CurrentRedHearts => Mathf.Max(0, CurrentLife - PurpleHearts);
-    public int CurrentPurpleHearts => Mathf.Min(CurrentLife, PurpleHearts);
+    public int CurrentRedHearts => Mathf.Min(CurrentLife, MaxLife - PurpleHearts);
+    public int CurrentPurpleHearts => Mathf.Max(0, CurrentLife - (MaxLife - PurpleHearts));
     #endregion
 
     #region Components
@@ -81,17 +81,17 @@ public partial class MonsterLife : Node, IHealthSystem
     {
         // Physical damage can only affect red hearts
         Log.Debug($"TakePhysicalDamage called - IsDead: {IsDead}, IsInvulnerable: {IsInvulnerable}, CurrentRedHearts: {CurrentRedHearts}", "MonsterLife");
-        
+
         if (IsDead || IsInvulnerable) return false;
-        
+
         // Calculate how much red heart damage can be applied
         int maxPhysicalDamage = CurrentRedHearts;
         int actualDamage = Mathf.Min(damage, maxPhysicalDamage);
-        
+
         Log.Debug($"Physical damage calculation - MaxPhysicalDamage: {maxPhysicalDamage}, ActualDamage: {actualDamage}", "MonsterLife");
-        
+
         if (actualDamage <= 0) return false; // No red hearts to damage
-        
+
         return TakeDamage(actualDamage);
     }
 
@@ -104,15 +104,64 @@ public partial class MonsterLife : Node, IHealthSystem
     public bool TakePurpleHeartDamage(int damage = 1)
     {
         // Purple heart damage can only affect purple hearts
+        Log.Debug($"TakePurpleHeartDamage called - IsDead: {IsDead}, IsInvulnerable: {IsInvulnerable}, CurrentPurpleHearts: {CurrentPurpleHearts}", "MonsterLife");
+
         if (IsDead || IsInvulnerable) return false;
-        
+
         // Calculate how much purple heart damage can be applied
         int maxPurpleDamage = CurrentPurpleHearts;
         int actualDamage = Mathf.Min(damage, maxPurpleDamage);
-        
+
+        Log.Debug($"Purple heart damage calculation - MaxPurpleDamage: {maxPurpleDamage}, ActualDamage: {actualDamage}", "MonsterLife");
+
         if (actualDamage <= 0) return false; // No purple hearts to damage
-        
+
         return TakeDamage(actualDamage);
+    }
+
+    // Reality-specific rock damage methods for simple damage rules
+    public bool TakeRockDamageInCurrentReality(int damage = 1)
+    {
+        Log.Debug($"TakeRockDamageInCurrentReality called - CurrentRedHearts: {CurrentRedHearts}", "MonsterLife");
+
+        if (IsDead || IsInvulnerable) return false;
+
+        // In CurrentReality, rocks ONLY damage red hearts, ignore purple hearts completely
+        int availableRedHearts = CurrentRedHearts;
+        if (availableRedHearts <= 0) return false; // No red hearts to damage, rock does nothing
+
+        int actualDamage = Mathf.Min(damage, availableRedHearts);
+
+        // Standard damage that will affect red hearts first
+        CurrentLife = Mathf.Max(0, CurrentLife - actualDamage);
+
+        StartInvulnerability();
+        NotifyLifeChanged();
+
+        if (IsDead) EmitSignal(SignalName.MonsterDied);
+        return true;
+    }
+
+    public bool TakeRockDamageInPastReality(int damage = 1)
+    {
+        Log.Debug($"TakeRockDamageInPastReality called - CurrentPurpleHearts: {CurrentPurpleHearts}", "MonsterLife");
+
+        if (IsDead || IsInvulnerable) return false;
+
+        // In PastReality, rocks ONLY damage purple hearts, ignore red hearts completely
+        int availablePurpleHearts = CurrentPurpleHearts;
+        if (availablePurpleHearts <= 0) return false; // No purple hearts to damage
+
+        int actualDamage = Mathf.Min(damage, availablePurpleHearts);
+
+        // Force damage to ONLY purple hearts by reducing CurrentLife directly
+        CurrentLife = Mathf.Max(0, CurrentLife - actualDamage);
+
+        StartInvulnerability();
+        NotifyLifeChanged();
+
+        if (IsDead) EmitSignal(SignalName.MonsterDied);
+        return true;
     }
 
     public void Heal(int amount = 1)
@@ -172,7 +221,7 @@ public partial class MonsterLife : Node, IHealthSystem
     {
         // Notify subscribers of health changes
         EmitSignal(SignalName.LifeChanged, CurrentLife, MaxLife, PurpleHearts);
-        
+
         // Also notify through event bus
         GameEventSystem.OnMonsterHealthChanged(CurrentLife, MaxLife, PurpleHearts);
     }

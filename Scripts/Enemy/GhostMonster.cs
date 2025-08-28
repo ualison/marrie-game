@@ -27,6 +27,7 @@ public partial class GhostMonster : CharacterBody2D
     // Monster life for the ghost so UI and damage work like real Monster
     private MonsterLife _monsterLife;
     private MonsterLifeBar _monsterLifeBar;
+    private Area2D _damageArea;
     #endregion
 
     #region Performance Cache
@@ -71,6 +72,9 @@ public partial class GhostMonster : CharacterBody2D
 
         // Setup a MonsterLife and LifeBar so ghost displays health like a real monster
         SetupLifeSystem();
+
+        // Setup damage area for player collision detection
+        SetupDamageArea();
 
         // Connect to reality changes so life bar visibility and following behavior update
         // CRITICAL FIX: Connect to reality changes BEFORE checking current reality
@@ -543,7 +547,7 @@ public partial class GhostMonster : CharacterBody2D
 
     private void DisableCollisions()
     {
-        SetCollisionLayerValue(1, false);
+        SetCollisionLayerValue(1, true);
         SetCollisionMaskValue(1, false);
 
         var damageArea = GetNodeOrNull<Area2D>("DamageArea");
@@ -563,6 +567,50 @@ public partial class GhostMonster : CharacterBody2D
                 area.Monitorable = false;
                 area.SetCollisionLayerValue(1, false);
                 area.SetCollisionMaskValue(1, false);
+            }
+        }
+    }
+
+    // Setup DamageArea for player collision detection (similar to Monster.cs)
+    private void SetupDamageArea()
+    {
+        _damageArea = GetNodeOrNull<Area2D>("DamageArea");
+        if (_damageArea == null)
+        {
+            CreateDamageArea();
+        }
+        _damageArea.BodyEntered += OnPlayerEntered;
+    }
+
+    private void CreateDamageArea()
+    {
+        _damageArea = new Area2D { Name = "DamageArea" };
+        AddChild(_damageArea);
+
+        // Set collision layers/masks to only detect players (layer 1)
+        _damageArea.CollisionLayer = 0; // Don't collide with anything as a layer
+        _damageArea.CollisionMask = 1; // Only detect objects on layer 1 (players)
+
+        var shape = new CollisionShape2D();
+        shape.Shape = new CircleShape2D { Radius = 25.0f };
+        _damageArea.AddChild(shape);
+    }
+
+    private void OnPlayerEntered(Node2D body)
+    {
+        // Only process player collisions - ignore ground and other objects
+        if (body is not Player player)
+        {
+            return;
+        }
+        bool isGhost = body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster");
+        Log.Debug($"GhostMonster {Name} collision with Player {body.Name} - IsGhost: {isGhost}", "GhostMonster");
+        if (!player.GetLifeSystem()?.IsDead == true)
+        {
+            Log.Debug($"GhostMonster {Name} attempting damage to player", "GhostMonster");
+            if (player.TakeDamage(1)) // Default damage amount for ghost
+            {
+                PlayDamageEffect(Colors.Purple);
             }
         }
     }
@@ -704,50 +752,140 @@ public partial class GhostMonster : CharacterBody2D
         return null;
     }
 
+
     // Allow external systems (like rocks) to apply rock damage to ghost
+    // Replace the existing TakeRockDamage method with this implementation
     public bool TakeRockDamage(int damage = 1)
     {
-        // Only purple heart damage should be consumed when in PastReality
-        var currentReality = RealityManager.Instance?.CurrentReality ?? MarrieGame.Core.Enums.Reality.CurrentReality;
-        if (currentReality == MarrieGame.Core.Enums.Reality.PastReality)
+        Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+
+        if (_monsterLife == null) return false;
+
+        bool damaged = false;
+
+        switch (currentReality)
         {
-            bool damaged = _monsterLife?.TakePurpleHeartDamage(damage) ?? false;
-            if (damaged) PlayDamageEffect(Colors.Purple);
-            return damaged;
+            case Reality.CurrentReality:
+                damaged = _monsterLife.TakeRockDamageInCurrentReality(damage);
+                if (damaged)
+                {
+                    PlayDamageEffect(Colors.Red);
+                    Log.Info($"Rock hit GhostMonster in Current Reality - damaged red hearts", "GhostMonster");
+                }
+                else
+                {
+                    Log.Warning($"Rock hit GhostMonster in Current Reality but no red hearts to damage", "GhostMonster");
+                }
+                break;
+
+            case Reality.PastReality:
+                damaged = _monsterLife.TakeRockDamageInPastReality(damage);
+                if (damaged)
+                {
+                    PlayDamageEffect(Colors.Purple);
+                    Log.Info($"Rock hit GhostMonster in Past Reality - damaged purple hearts", "GhostMonster");
+
+                    /* Check for ghost death when all purple hearts lost
+                   if (_monsterLife.CurrentPurpleHearts <= 0)
+                    {
+                        Log.UI($"GhostMonster died - all purple hearts lost in Past Reality", "GhostMonster");
+                        OnGhostDeath();
+                    } */
+                }
+                else
+                {
+                    Log.Warning($"Rock hit GhostMonster in Past Reality but no purple hearts to damage", "GhostMonster");
+                }
+                break;
         }
 
-        // In current reality, treat like physical damage (red hearts)
-        bool damagedCurrent = _monsterLife?.TakePhysicalDamage(damage) ?? false;
-        if (damagedCurrent) PlayDamageEffect(Colors.Red);
-        return damagedCurrent;
+        return damaged;
+    }
+    // Add this new method to handle ghost-specific death behavior
+    private void OnGhostDeath()
+    {
+        // Stop any ongoing replay
+        StopReplay();
+
+        // Trigger fade out and destruction
+        FadeOutAndDestroy();
+
+        // Notify any systems that need to know about ghost death
+        Log.UI("GhostMonster has been destroyed by rock damage", "GhostMonster");
     }
 
+
+
+    // Also update the existing PlayDamageEffect method to ensure it works properly
     public void PlayDamageEffect(Color damageColor)
     {
-        if (_activeSprite != null)
-        {
-            var tween = CreateTween();
-            tween.TweenProperty(_activeSprite, "modulate", damageColor, 0.15f);
-            tween.TweenProperty(_activeSprite, "modulate", GHOST_TINT, 0.25f);
-        }
-    }
+        if (_activeSprite == null) return;
 
+        // Kill any existing damage effect tween (simple approach - kill current tween if it exists)
+        _currentFadeTween?.Kill();
+
+        // Create new damage effect
+        var tween = CreateTween();
+        tween.SetParallel(true); // Allow multiple property tweens
+
+        // Flash to damage color then back to ghost tint
+        tween.TweenProperty(_activeSprite, "modulate", damageColor, 0.15f);
+        tween.TweenProperty(_activeSprite, "modulate", GHOST_TINT, 0.25f).SetDelay(0.15f);
+
+        // Add slight scale effect for impact feedback
+        var originalScale = _activeSprite.Scale;
+        tween.TweenProperty(_activeSprite, "scale", originalScale * 1.1f, 0.1f);
+        tween.TweenProperty(_activeSprite, "scale", originalScale, 0.2f).SetDelay(0.1f);
+
+        // Store reference to current damage tween
+        _currentFadeTween = tween;
+    }
     // Compatibility API to match Monster's public interface
     public MonsterLife GetLifeSystem() => _monsterLife;
 
+    // Enhanced TakePhysicalDamage for consistency
     public bool TakePhysicalDamage(int damage = 1)
     {
         if (_monsterLife == null) return false;
+
+        Log.Debug($"GhostMonster TakePhysicalDamage - CurrentRedHearts: {_monsterLife.CurrentRedHearts}", "GhostMonster");
         bool damaged = _monsterLife.TakePhysicalDamage(damage);
-        if (damaged) PlayDamageEffect(Colors.Red);
+
+        if (damaged)
+        {
+            PlayDamageEffect(Colors.Red);
+            Log.Debug($"GhostMonster took {damage} physical damage", "GhostMonster");
+
+            // Check for death
+            if (_monsterLife.IsDead)
+            {
+                OnGhostDeath();
+            }
+        }
+
         return damaged;
     }
 
+    // Enhanced TakeMagicalDamage for consistency
     public bool TakeMagicalDamage(int damage = 1)
     {
         if (_monsterLife == null) return false;
+
+        Log.Debug($"GhostMonster TakeMagicalDamage - CurrentLife: {_monsterLife.CurrentLife}", "GhostMonster");
         bool damaged = _monsterLife.TakeMagicalDamage(damage);
-        if (damaged) PlayDamageEffect(Colors.Purple);
+
+        if (damaged)
+        {
+            PlayDamageEffect(Colors.Purple);
+            Log.Debug($"GhostMonster took {damage} magical damage", "GhostMonster");
+
+            // Check for death
+            if (_monsterLife.IsDead)
+            {
+                OnGhostDeath();
+            }
+        }
+
         return damaged;
     }
     #endregion

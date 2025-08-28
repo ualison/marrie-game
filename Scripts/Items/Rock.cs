@@ -143,8 +143,8 @@ public partial class Rock : Node2D
         
         // Ensure proper layer setup for thrown rocks
         _collisionArea.CollisionLayer = 8;  // Rock is on layer 8
-        _collisionArea.CollisionMask = 1 | 4;   // Rock detects bodies/monsters on layer 1 and apples on layer 4
-        
+        _collisionArea.CollisionMask = 1 | 4 | 16;   // Rock detects bodies/monsters on layer 1 and apples on layer 4
+
         // Connect to area entered signal so rock disappears when hitting apple or monster
         _collisionArea.AreaEntered += OnRockHitArea;
         _collisionArea.BodyEntered += OnRockHitBody;

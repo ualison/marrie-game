@@ -50,7 +50,7 @@ StartingMana = 1
 
 [node name="Inventory" type="Node" parent="CharacterBody2D"]
 script = ExtResource("5_inventory")
-MaxRocks = 5
+MaxRocks = 10
 
 [node name="RockThrower" type="Node2D" parent="CharacterBody2D"]
 position = Vector2(68, -124)
