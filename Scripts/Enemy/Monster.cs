@@ -906,6 +906,12 @@ public partial class Monster : CharacterBody2D
         Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
         Log.Debug($"TakeRockDamage called - CanTakeDamage: {CanTakeDamage()}, MonsterLife: {_monsterLife != null}, CurrentReality: {currentReality}", "Monster");
 
+        // For debugging first-hit issues, log pre-state of life and invulnerability
+        if (_monsterLife != null)
+        {
+            Log.System($"[Debug] PreDamage - CurrentLife: {_monsterLife.CurrentLife}, Red:{_monsterLife.CurrentRedHearts}, Purple:{_monsterLife.CurrentPurpleHearts}, IsInvulnerable: {_monsterLife.IsInvulnerable}", "Monster");
+        }
+
         if (!CanTakeDamage() || _monsterLife == null) return false;
 
         bool damaged = false;
@@ -922,7 +928,7 @@ public partial class Monster : CharacterBody2D
                 }
                 else
                 {
-                    Log.Warning($"Rock hit Monster in Current Reality but no red hearts to damage", "Monster");
+                    Log.Warning($"Rock hit Monster in Current Reality but no red hearts to damage - Red:{_monsterLife.CurrentRedHearts}, Purple:{_monsterLife.CurrentPurpleHearts}, IsInvulnerable:{_monsterLife.IsInvulnerable}", "Monster");
                 }
                 break;
 
@@ -936,9 +942,15 @@ public partial class Monster : CharacterBody2D
                 }
                 else
                 {
-                    Log.Warning($"Rock hit Monster in Past Reality but no purple hearts to damage", "Monster");
+                    Log.Warning($"Rock hit Monster in Past Reality but no purple hearts to damage - Red:{_monsterLife.CurrentRedHearts}, Purple:{_monsterLife.CurrentPurpleHearts}, IsInvulnerable:{_monsterLife.IsInvulnerable}", "Monster");
                 }
                 break;
+        }
+
+        // Log post-damage state for debugging
+        if (_monsterLife != null)
+        {
+            Log.System($"[Debug] PostDamage - CurrentLife: {_monsterLife.CurrentLife}, Red:{_monsterLife.CurrentRedHearts}, Purple:{_monsterLife.CurrentPurpleHearts}, IsInvulnerable: {_monsterLife.IsInvulnerable}, Damaged: {damaged}", "Monster");
         }
 
         return damaged;

@@ -272,7 +272,18 @@ public partial class MonsterLifeBar : Control
     private void OnLifeChanged(int currentLife, int maxLife, int purpleHearts)
     {
         // Respond to health changes from MonsterLife
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+            Log.System($"[Debug] MonsterLifeBar.OnLifeChanged called - Current: {currentLife}, Max: {maxLife}, Purple: {purpleHearts}", "MonsterLifeBarUI");
+
         UpdateHearts(currentLife, maxLife, purpleHearts);
+
+        // Force a redraw to ensure visual update (helpful under some engine redraw timing cases)
+        if (_heartsContainer != null)
+        {
+            if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.Debug))
+                Log.Debug($"MonsterLifeBar: Hearts container child count after update: {_heartsContainer.GetChildCount()}", "MonsterLifeBarUI");
+            _heartsContainer.QueueRedraw();
+        }
     }
 
     private void UpdateHearts(int currentLife, int maxLife, int purpleHearts)
