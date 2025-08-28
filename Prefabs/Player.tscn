@@ -14,14 +14,17 @@ size = Vector2(133, 271)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
 size = Vector2(120, 278)
 
-[node name="Root" type="Node2D"]
+[node name="Root2" type="Node2D"]
 
 [node name="CharacterBody2D" type="CharacterBody2D" parent="." groups=["player"]]
 position = Vector2(0, 4)
 collision_layer = 2
+collision_mask = 17
 script = ExtResource("2_kyqiw")
 
 [node name="HurtBox" type="Area2D" parent="CharacterBody2D"]
+collision_layer = 2
+collision_mask = 16
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/HurtBox"]
 position = Vector2(0.5, -1.5)

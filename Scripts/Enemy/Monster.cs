@@ -44,6 +44,9 @@ public partial class Monster : CharacterBody2D
     private Node2D _spriteNode;
     private Area2D _damageArea;
     private Tween _currentTween;
+    private Camera2D _cachedCameraForLifeBar;
+    private Vector2 _lastLifeBarMonsterPos = new Vector2(float.NaN, float.NaN);
+    private Vector2 _lastLifeBarCameraPos = new Vector2(float.NaN, float.NaN);
     #endregion
 
     #region Initialization
@@ -79,6 +82,9 @@ public partial class Monster : CharacterBody2D
         {
             Log.Warning("MonsterLifeBar not found in Monster scene", "Monster");
         }
+
+    // Cache camera for life bar updates to avoid repeated GetViewport() calls
+    _cachedCameraForLifeBar = GetViewport().GetCamera2D();
     }
 
     private bool _realityConnected = false;
@@ -692,22 +698,29 @@ public partial class Monster : CharacterBody2D
         if (_monsterLifeBar == null || !_monsterLifeBar.FollowMonster) return;
 
         // Direct position calculation using the same logic as MonsterLifeBar.cs
-        var camera = GetViewport().GetCamera2D();
-        Vector2 targetPosition;
+        var camera = _cachedCameraForLifeBar ?? GetViewport().GetCamera2D();
+        Vector2 monsterPos = GlobalPosition;
+        Vector2 cameraPos = camera != null ? camera.GlobalPosition : new Vector2(float.NaN, float.NaN);
 
+        // Skip update if nothing moved
+        bool monsterMoved = float.IsNaN(_lastLifeBarMonsterPos.X) || monsterPos != _lastLifeBarMonsterPos;
+        bool cameraMoved = float.IsNaN(_lastLifeBarCameraPos.X) || cameraPos != _lastLifeBarCameraPos;
+        if (!monsterMoved && !cameraMoved) return;
+
+        Vector2 targetPosition;
         if (camera != null)
         {
-            // Match MonsterLifeBar positioning exactly
-            Vector2 screenPos = camera.GetScreenCenterPosition() + (GlobalPosition - camera.GlobalPosition) * camera.Zoom;
+            Vector2 screenPos = camera.GetScreenCenterPosition() + (monsterPos - camera.GlobalPosition) * camera.Zoom;
             targetPosition = screenPos + _monsterLifeBar.OffsetFromMonster;
         }
         else
         {
-            // Fallback positioning
-            targetPosition = GlobalPosition + _monsterLifeBar.OffsetFromMonster;
+            targetPosition = monsterPos + _monsterLifeBar.OffsetFromMonster;
         }
 
         _monsterLifeBar.GlobalPosition = targetPosition;
+        _lastLifeBarMonsterPos = monsterPos;
+        _lastLifeBarCameraPos = cameraPos;
     }
     #endregion
 
@@ -1017,7 +1030,10 @@ public partial class Monster : CharacterBody2D
             return; // Don't log non-player collisions to reduce spam
         }
 
-        Log.Debug($"Monster {Name} collision with Player {body.Name} - IsGhost: {body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster")}", "Monster");
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.Debug))
+        {
+            Log.Debug($"Monster {Name} collision with Player {body.Name} - IsGhost: {body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster")}", "Monster");
+        }
 
         if (!player.GetLifeSystem()?.IsDead == true)
         {

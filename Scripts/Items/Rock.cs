@@ -123,10 +123,13 @@ public partial class Rock : Node2D
             _rockSprite.Scale = new Vector2(0.05f, 0.05f);
         }
         
-        // Add to rocks group for collision detection
-        AddToGroup("rocks");
-        
-        EnableInputProcessing();
+    // Add to rocks group for collision detection
+    AddToGroup("rocks");
+
+    // Ensure movement runs in the physics step so Area2D overlaps are detected reliably
+    SetPhysicsProcess(true);
+
+    EnableInputProcessing();
         
         Log.System($"Rock setup in thrown mode - CollisionArea: {_collisionArea != null}", "Rock");
     }
@@ -146,8 +149,10 @@ public partial class Rock : Node2D
         _collisionArea.CollisionMask = 1 | 4 | 16;   // Rock detects bodies/monsters on layer 1 and apples on layer 4
 
         // Connect to area entered signal so rock disappears when hitting apple or monster
-        _collisionArea.AreaEntered += OnRockHitArea;
-        _collisionArea.BodyEntered += OnRockHitBody;
+    _collisionArea.Monitoring = true;
+    _collisionArea.Monitorable = true;
+    _collisionArea.AreaEntered += OnRockHitArea;
+    _collisionArea.BodyEntered += OnRockHitBody;
         
         Log.System($"Rock collision area set up - Layer: {_collisionArea.CollisionLayer}, Mask: {_collisionArea.CollisionMask}", "Rock");
     }
@@ -155,14 +160,36 @@ public partial class Rock : Node2D
     private void OnRockHitArea(Area2D area)
     {
         // Rock hit something with an Area2D (like an apple or monster's damage area)
-        Log.System($"Rock's area hit another area: {area.Name} on layer {area.CollisionLayer}, mask {area.CollisionMask}", "Rock");
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+            Log.System($"Rock's area hit another area: {area.Name} on layer {area.CollisionLayer}, mask {area.CollisionMask}", "Rock");
         
         string areaName = area.Name.ToString();
         
-        // Check if this is an apple's rock detection area
-        if (area.CollisionLayer == 4)
+        // Check if this is an apple's rock detection area (use bitmask)
+        if ((area.CollisionLayer & 4) != 0)
         {
-            Log.System("Rock confirmed hit apple detection area", "Rock");
+            // Try to find the Apple parent node and trigger fall if possible
+            Node current = area;
+            Apple apple = null;
+            while (current != null && apple == null)
+            {
+                apple = current as Apple;
+                current = current.GetParent();
+            }
+
+            if (apple != null)
+            {
+                if (apple.CanFallFromRockHit())
+                {
+                    Log.System($"Rock triggered apple fall for: {apple.Name}", "Rock");
+                    apple.MakeAppleFall();
+                }
+                else
+                {
+                    Log.System($"Rock hit apple but it cannot fall now: {apple.Name}", "Rock");
+                }
+            }
+
             // Stop movement and disappear when hitting apple area
             _isMoving = false;
             CreateImpactEffect();
@@ -186,7 +213,8 @@ public partial class Rock : Node2D
 
             if (ghost != null)
             {
-                Log.System($"Found parent ghost monster: {ghost.Name} - dealing rock damage", "Rock");
+                if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+                    Log.System($"Found parent ghost monster: {ghost.Name} - dealing rock damage", "Rock");
                 bool damaged = ghost.TakeRockDamage(1);
                 if (damaged)
                 {
@@ -201,7 +229,8 @@ public partial class Rock : Node2D
             }
             else if (monster != null)
             {
-                Log.System($"Found parent monster: {monster.Name} - dealing rock damage", "Rock");
+                if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+                    Log.System($"Found parent monster: {monster.Name} - dealing rock damage", "Rock");
                 bool damaged = monster.TakeRockDamage(1);
                 if (damaged)
                 {
@@ -216,12 +245,14 @@ public partial class Rock : Node2D
             }
             else
             {
-                Log.System($"No parent monster found for area: {area.Name} - continuing trajectory", "Rock");
+                if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+                    Log.System($"No parent monster found for area: {area.Name} - continuing trajectory", "Rock");
             }
         }
         else
         {
-            Log.System($"Rock hit unknown area: {area.Name} - stopping", "Rock");
+            if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+                Log.System($"Rock hit unknown area: {area.Name} - stopping", "Rock");
             // Stop movement and disappear for other unknown areas
             _isMoving = false;
             CreateImpactEffect();
@@ -231,12 +262,14 @@ public partial class Rock : Node2D
     private void OnRockHitBody(Node2D body)
     {
         // Rock hit a CharacterBody2D (like a monster)
-        Log.System($"Rock Area2D hit body: {body.Name} ({body.GetType().Name}) at position {GlobalPosition}", "Rock");
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+            Log.System($"Rock Area2D hit body: {body.Name} ({body.GetType().Name}) at position {GlobalPosition}", "Rock");
         
         // Check if this is a ghost monster first, then a real Monster
         if (body is GhostMonster ghost)
         {
-            Log.System("Rock hit ghost monster via Area2D - dealing rock damage based on reality", "Rock");
+            if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+                Log.System("Rock hit ghost monster via Area2D - dealing rock damage based on reality", "Rock");
             bool damaged = ghost.TakeRockDamage(1);
             if (damaged)
             {
@@ -249,7 +282,8 @@ public partial class Rock : Node2D
         }
         else if (body is Monster monster)
         {
-            Log.System("Rock hit monster via Area2D - dealing rock damage based on reality", "Rock");
+            if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+                Log.System("Rock hit monster via Area2D - dealing rock damage based on reality", "Rock");
             bool damaged = monster.TakeRockDamage(1);
             if (damaged)
             {
@@ -294,7 +328,12 @@ public partial class Rock : Node2D
         {
             HandleRockCollection();
         }
-        else if (_currentMode == RockMode.Thrown && _isMoving && _trajectoryPoints != null && _trajectoryPoints.Length > 1)
+        // Thrown-mode movement runs in _PhysicsProcess
+    }
+
+    public override void _PhysicsProcess(double delta)
+    {
+        if (_currentMode == RockMode.Thrown && _isMoving && _trajectoryPoints != null && _trajectoryPoints.Length > 1)
         {
             MoveAlongTrajectory((float)delta);
         }
@@ -355,14 +394,7 @@ public partial class Rock : Node2D
             if (_currentPointIndex < _trajectoryPoints.Length)
             {
                 Vector2 newPosition = _trajectoryPoints[_currentPointIndex];
-                
-                // Check for collision at the new position
-                if (CheckCollisionAtPosition(newPosition))
-                {
-                    OnRockHitSomething(newPosition);
-                    return;
-                }
-                
+                // Rely on Area2D signals for collision detection; simply move the rock
                 GlobalPosition = newPosition;
             }
         }
@@ -370,14 +402,7 @@ public partial class Rock : Node2D
         {
             // Interpolate between current and next point
             Vector2 interpolatedPosition = currentPoint.Lerp(nextPoint, _travelProgress);
-            
-            // Check for collision at interpolated position
-            if (CheckCollisionAtPosition(interpolatedPosition))
-            {
-                OnRockHitSomething(interpolatedPosition);
-                return;
-            }
-            
+            // Move without per-point physics checks; Area2D will notify if we hit something
             GlobalPosition = interpolatedPosition;
         }
         
@@ -391,47 +416,12 @@ public partial class Rock : Node2D
 
     private void OnRockHitSomething(Vector2 hitPosition)
     {
-        _isMoving = false;
-        GlobalPosition = hitPosition;
-        
-        Log.System("Rock hit ground during flight", "Rock");
-        
-        // Create impact effect and remove rock
-        CreateImpactEffect();
-    }
-
-    private bool CheckCollisionAtPosition(Vector2 worldPoint)
-    {
-        // Use PhysicsServer2D to check for ground/static objects but exclude monsters
-        var spaceState = GetWorld2D().DirectSpaceState;
-        
-        // Check for ground/static objects (layer 1) but exclude monsters
-        var query = new PhysicsPointQueryParameters2D();
-        query.Position = worldPoint;
-        query.CollisionMask = 1; // Check layer 1 (ground and monsters)
-        query.Exclude = new Godot.Collections.Array<Rid>();
-        
-        var result = spaceState.IntersectPoint(query);
-        
-        // If we found collisions, check if any are NOT monsters
-        foreach (var collision in result)
-        {
-            var collider = collision["collider"].AsGodotObject();
-            
-            // If the collider is not a monster, it's ground/static - collision detected
-            if (collider is not Monster)
-            {
-                Log.System($"Rock trajectory collision with ground/static object: {collider?.GetType().Name ?? "unknown"}", "Rock");
-                return true;
-            }
-            else
-            {
-                Log.System($"Rock trajectory passed through monster: {((Monster)collider).Name} - letting Area2D handle interaction", "Rock");
-            }
-        }
-        
-        // No ground/static collisions found (only monsters if any)
-        return false;
+    // Deprecated: collisions are handled by Area2D signals (OnRockHitArea/OnRockHitBody).
+    // Kept for compatibility in case external callers invoke it.
+    _isMoving = false;
+    GlobalPosition = hitPosition;
+    Log.System("Rock hit during flight (handled programmatically)", "Rock");
+    CreateImpactEffect();
     }
 
     private void OnTrajectoryComplete()

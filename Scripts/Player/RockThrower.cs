@@ -186,7 +186,8 @@ public partial class RockThrower : Node2D
 
     // Physics simulation step
     float timeStep = 0.05f; // smaller = smoother curve
-    int maxSteps = 200;
+    // Reduced maxSteps to lower CPU when drawing trajectory; throttle or increase if higher fidelity needed
+    int maxSteps = 60;
 
     Vector2 currentPos = start;
 

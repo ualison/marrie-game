@@ -75,7 +75,12 @@ public partial class Apple : Node2D
     {
         // Connect rock hit detection - the Area2D is already set up in the scene
         if (_rockDetectionArea != null)
+        {
+            // Ensure the detection area is monitoring so AreaEntered fires reliably
+            _rockDetectionArea.Monitoring = true;
+            _rockDetectionArea.Monitorable = true;
             _rockDetectionArea.AreaEntered += OnProjectileImpact;
+        }
         
         // Connect to ground collision detection via dedicated ground detection area
         if (_groundDetectionArea != null)
@@ -351,7 +356,8 @@ public partial class Apple : Node2D
     private void OnProjectileImpact(Area2D area)
     {
         // Generic projectile impact detection - any Area2D on layer 8 is considered a projectile
-        if (area.CollisionLayer == 8)
+    // Use bitmask check in case multiple layers are set on the entering area
+    if ((area.CollisionLayer & 8) != 0)
         {
             // Apple should fall ONLY when hit in GrayKnockable state
             if (_currentState == AppleState.GrayKnockable && !_isFalling)

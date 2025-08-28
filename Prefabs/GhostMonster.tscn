@@ -19,7 +19,6 @@ script = ExtResource("1_uqgqf")
 [node name="DamageArea" type="Area2D" parent="CharacterBody2D"]
 position = Vector2(0, -4)
 collision_layer = 16
-collision_mask = 129
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/DamageArea"]
 shape = SubResource("CircleShape2D_damage")

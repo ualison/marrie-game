@@ -25,6 +25,9 @@ public partial class MonsterLifeBar : Control
     private HBoxContainer _heartsContainer;
     private MonsterLife _lifeSystem;
     private Node2D _monster;
+    private Camera2D _cachedCamera;
+    private Vector2 _lastMonsterPos = new Vector2(float.NaN, float.NaN);
+    private Vector2 _lastCameraPos = new Vector2(float.NaN, float.NaN);
     #endregion
 
     #region Initialization
@@ -33,6 +36,9 @@ public partial class MonsterLifeBar : Control
         // Setup hearts container and find life system
         InitializeContainer();
         CallDeferred(nameof(FindLifeSystem));
+
+    // Cache the camera if available to avoid repeated GetViewport().GetCamera2D() calls
+    _cachedCamera = GetViewport().GetCamera2D();
 
         // Connect to reality changes
         if (RealityManager.IsInstanceAvailable)
@@ -226,22 +232,31 @@ public partial class MonsterLifeBar : Control
     public override void _Process(double delta)
     {
         // Follow the monster if enabled, monster exists, and reality is correct
-        if (ShouldFollowMonster() && _monster != null && IsInstanceValid(_monster))
+        if (!ShouldFollowMonster() || _monster == null || !IsInstanceValid(_monster))
+            return;
+
+        // Only update when the monster or camera has actually moved to avoid unnecessary math/work
+        Vector2 monsterPos = _monster.GlobalPosition;
+        Vector2 cameraPos = _cachedCamera != null ? _cachedCamera.GlobalPosition : new Vector2(float.NaN, float.NaN);
+
+        bool monsterMoved = float.IsNaN(_lastMonsterPos.X) || monsterPos != _lastMonsterPos;
+        bool cameraMoved = float.IsNaN(_lastCameraPos.X) || cameraPos != _lastCameraPos;
+
+        if (monsterMoved || cameraMoved)
         {
             UpdatePosition();
-
-            // Don't automatically control visibility - let the Monster class handle it
-            // The Monster class calls Show() and Hide() explicitly based on its state
+            _lastMonsterPos = monsterPos;
+            _lastCameraPos = cameraPos;
         }
     }
 
     private void UpdatePosition()
     {
-        // Position the UI above the monster
-        var camera = GetViewport().GetCamera2D();
+        // Position the UI above the monster. Use cached camera when available to reduce per-frame lookups.
+        var camera = _cachedCamera ?? GetViewport().GetCamera2D();
         if (camera != null)
         {
-            // Convert monster's world position to screen position
+            // Convert monster's world position to screen position (camera conversion kept minimal)
             Vector2 screenPos = camera.GetScreenCenterPosition() + (_monster.GlobalPosition - camera.GlobalPosition) * camera.Zoom;
             GlobalPosition = screenPos + OffsetFromMonster;
         }

@@ -36,7 +36,8 @@ shape = SubResource("RectangleShape2D_t25bi")
 
 [node name="ThrownCollisionArea" type="Area2D" parent="."]
 collision_layer = 8
-collision_mask = 4
+# Thrown rocks detect ground (1), apples (4) and monsters (16)
+collision_mask = 21
 
 [node name="ThrownCollisionShape" type="CollisionShape2D" parent="ThrownCollisionArea"]
 shape = SubResource("CircleShape2D_collision")

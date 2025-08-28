@@ -48,16 +48,22 @@ public partial class ThrownRock : Node2D
         collisionShape.Shape = shape;
         
         // Set collision layers - rock should be on layer 8 to be detected by apples
-        _collisionArea.CollisionLayer = 8; // Rock collision layer (matches Apple's RockDetectionArea mask)
-        _collisionArea.CollisionMask = 0;  // Don't need to detect other objects
+    _collisionArea.CollisionLayer = 8; // Rock collision layer (matches Apple's RockDetectionArea mask)
+    _collisionArea.CollisionMask = 1 | 4 | 16;  // Detect ground (1), apples (4), monsters (16) as appropriate
+    _collisionArea.Monitoring = true;
+    _collisionArea.Monitorable = true;
+    _collisionArea.AreaEntered += OnCollisionAreaEntered;
+    _collisionArea.BodyEntered += OnCollisionBodyEntered;
         
         AddChild(_collisionArea);
         _collisionArea.AddChild(collisionShape);
         
         // Add to rocks group for easy identification
         AddToGroup("rocks");
-        
-        Log.System("ThrownRock collision area set up on layer 8", "ThrownRock");
+    // Ensure movement runs in physics step so physics monitoring/integration works correctly
+    SetPhysicsProcess(true);
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+            Log.System("ThrownRock collision area set up on layer 8", "ThrownRock");
     }
 
     private void LoadRockTexture()
@@ -76,8 +82,9 @@ public partial class ThrownRock : Node2D
     #endregion
 
     #region Movement
-    public override void _Process(double delta)
+    public override void _PhysicsProcess(double delta)
     {
+        // Run movement during the physics step so Area2D overlap events are detected reliably
         if (_isMoving && _trajectoryPoints != null && _trajectoryPoints.Length > 1)
         {
             MoveAlongTrajectory((float)delta);
@@ -111,13 +118,7 @@ public partial class ThrownRock : Node2D
             {
                 Vector2 newPosition = _trajectoryPoints[_currentPointIndex];
                 
-                // Check for collision at the new position
-                if (CheckCollisionAtPosition(newPosition))
-                {
-                    OnRockHitSomething(newPosition);
-                    return;
-                }
-                
+                // Rely on Area2D signals for collision detection; simply move the rock
                 GlobalPosition = newPosition;
             }
         }
@@ -126,13 +127,7 @@ public partial class ThrownRock : Node2D
             // Interpolate between current and next point
             Vector2 interpolatedPosition = currentPoint.Lerp(nextPoint, _travelProgress);
             
-            // Check for collision at interpolated position
-            if (CheckCollisionAtPosition(interpolatedPosition))
-            {
-                OnRockHitSomething(interpolatedPosition);
-                return;
-            }
-            
+            // Move without per-point physics checks; Area2D will notify if we hit something
             GlobalPosition = interpolatedPosition;
         }
         
@@ -148,28 +143,65 @@ public partial class ThrownRock : Node2D
     {
         _isMoving = false;
         GlobalPosition = hitPosition;
-        
-        Log.System("ThrownRock hit something during flight", "ThrownRock");
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+            Log.System("ThrownRock hit something during flight", "ThrownRock");
         
         // Create impact effect and remove rock
         CreateImpactEffect();
     }
 
-    private bool CheckCollisionAtPosition(Vector2 worldPoint)
+    private void OnCollisionAreaEntered(Area2D area)
     {
-        // Use PhysicsServer2D to check for collisions at this point
-        var spaceState = GetWorld2D().DirectSpaceState;
-        
-        // Create a small collision query at this point
-        var query = new PhysicsPointQueryParameters2D();
-        query.Position = worldPoint;
-        query.CollisionMask = 1; // Check collision layer 1 (typically ground/static objects)
-        query.Exclude = new Godot.Collections.Array<Rid>(); // Don't exclude anything
-        
-        // Perform the collision check
-        var result = spaceState.IntersectPoint(query);
-        
-        return result.Count > 0;
+        // Delegate handling to the same logic used elsewhere (or treat generically)
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+            Log.System($"ThrownRock collided with area: {area.Name}", "ThrownRock");
+
+        // If this area corresponds to an Apple or has the apple layer, try to trigger fall
+        if ((area.CollisionLayer & 4) != 0)
+        {
+            Node current = area;
+            Apple apple = null;
+            while (current != null && apple == null)
+            {
+                apple = current as Apple;
+                current = current.GetParent();
+            }
+
+            if (apple != null)
+            {
+                if (apple.CanFallFromRockHit())
+                {
+                    Log.System($"ThrownRock triggered apple fall for: {apple.Name}", "ThrownRock");
+                    apple.MakeAppleFall();
+                }
+                else
+                {
+                    Log.System($"ThrownRock hit apple but it cannot fall now: {apple.Name}", "ThrownRock");
+                }
+            }
+        }
+
+        // Stop movement and create impact
+        _isMoving = false;
+        CreateImpactEffect();
+    }
+
+    private void OnCollisionBodyEntered(Node2D body)
+    {
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+            Log.System($"ThrownRock collided with body: {body.Name} ({body.GetType().Name})", "ThrownRock");
+
+        if (body is GhostMonster ghost)
+        {
+            ghost.TakeRockDamage(1);
+        }
+        else if (body is Monster monster)
+        {
+            monster.TakeRockDamage(1);
+        }
+
+        _isMoving = false;
+        CreateImpactEffect();
     }
 
     private void OnTrajectoryComplete()
