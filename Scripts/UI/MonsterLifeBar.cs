@@ -307,24 +307,26 @@ public partial class MonsterLifeBar : Control
             Log.Debug($"Calculated - Red hearts: {currentRedHearts}/{maxRedHearts}, Purple hearts: {currentPurpleHearts}/{purpleHearts}", "MonsterLifeBarUI");
         }
 
-        // ALWAYS show all heart slots (both red and purple), but vary visual emphasis by reality
-
-        // Create red hearts (show all max red heart slots)
-        for (int i = 0; i < maxRedHearts; i++)
+        // REALITY-SPECIFIC DISPLAY: Show only the relevant heart type
+        if (currentReality == Reality.CurrentReality)
         {
-            bool isFull = i < currentRedHearts;
-            bool isVulnerable = (currentReality == Reality.CurrentReality); // Red hearts vulnerable in CurrentReality
-            var heart = CreateTextureHeart(isFull, true, isVulnerable);
-            _heartsContainer.AddChild(heart);
+            // Current Reality: Show ONLY red hearts (vulnerable hearts)
+            for (int i = 0; i < maxRedHearts; i++)
+            {
+                bool isFull = i < currentRedHearts;
+                var heart = CreateTextureHeart(isFull, true, true); // Red, vulnerable
+                _heartsContainer.AddChild(heart);
+            }
         }
-
-        // Create purple hearts (show all max purple heart slots) 
-        for (int i = 0; i < purpleHearts; i++)
+        else // PastReality
         {
-            bool isFull = i < currentPurpleHearts;
-            bool isVulnerable = (currentReality == Reality.PastReality); // Purple hearts vulnerable in PastReality
-            var heart = CreateTextureHeart(isFull, false, isVulnerable);
-            _heartsContainer.AddChild(heart);
+            // Past Reality: Show ONLY purple hearts (vulnerable hearts)
+            for (int i = 0; i < purpleHearts; i++)
+            {
+                bool isFull = i < currentPurpleHearts;
+                var heart = CreateTextureHeart(isFull, false, true); // Purple, vulnerable
+                _heartsContainer.AddChild(heart);
+            }
         }
     }
 
@@ -365,17 +367,8 @@ public partial class MonsterLifeBar : Control
             CustomMinimumSize = new Vector2(32, 32)
         };
 
-        // Visual emphasis: vulnerable hearts shown clearly, protected hearts dimmed
-        if (vulnerable)
-        {
-            // Full brightness for hearts that can be damaged in this reality
-            heart.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
-        }
-        else
-        {
-            // Dimmed for hearts that are protected in this reality
-            heart.Modulate = new Color(0.6f, 0.6f, 0.6f, 0.7f);
-        }
+        // Since we only show relevant hearts, always display at full brightness
+        heart.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 
         return heart;
     }
@@ -387,24 +380,29 @@ public partial class MonsterLifeBar : Control
         int currentPurpleHearts = _lifeSystem?.CurrentPurpleHearts ?? 0;
         int maxRedHearts = maxLife - purpleHearts;
 
-        // Create red hearts
-        for (int i = 0; i < maxRedHearts; i++)
+        // REALITY-SPECIFIC DISPLAY: Show only the relevant heart type
+        if (currentReality == Reality.CurrentReality)
         {
-            bool isFull = i < currentRedHearts;
-            bool isVulnerable = (currentReality == Reality.CurrentReality);
-            var heartLabel = CreateTextHeart(isFull, true, isVulnerable);
-            _heartsContainer.AddChild(heartLabel);
+            // Current Reality: Show ONLY red hearts
+            for (int i = 0; i < maxRedHearts; i++)
+            {
+                bool isFull = i < currentRedHearts;
+                var heartLabel = CreateTextHeart(isFull, true, true); // Red, vulnerable
+                _heartsContainer.AddChild(heartLabel);
+            }
         }
-
-        // Create purple hearts  
-        for (int i = 0; i < purpleHearts; i++)
+        else // PastReality
         {
-            bool isFull = i < currentPurpleHearts;
-            bool isVulnerable = (currentReality == Reality.PastReality);
-            var heartLabel = CreateTextHeart(isFull, false, isVulnerable);
-            _heartsContainer.AddChild(heartLabel);
+            // Past Reality: Show ONLY purple hearts
+            for (int i = 0; i < purpleHearts; i++)
+            {
+                bool isFull = i < currentPurpleHearts;
+                var heartLabel = CreateTextHeart(isFull, false, true); // Purple, vulnerable
+                _heartsContainer.AddChild(heartLabel);
+            }
         }
     }
+
 
     private void CreateRedTextHearts(int maxCount, int currentCount, bool vulnerable)
     {
@@ -434,16 +432,13 @@ public partial class MonsterLifeBar : Control
         {
             heartLabel.Text = "♥";
             Color baseColor = isRed ? Colors.Red : Colors.Purple;
-            // Vulnerable hearts at full intensity, protected hearts dimmed
-            Color finalColor = vulnerable ? baseColor : baseColor * 0.6f;
-            heartLabel.AddThemeColorOverride("font_color", finalColor);
+            heartLabel.AddThemeColorOverride("font_color", baseColor);
         }
         else
         {
             heartLabel.Text = "♡";
             Color baseColor = isRed ? Colors.DarkRed : Colors.DarkMagenta;
-            Color finalColor = vulnerable ? baseColor : baseColor * 0.6f;
-            heartLabel.AddThemeColorOverride("font_color", finalColor);
+            heartLabel.AddThemeColorOverride("font_color", baseColor);
         }
 
         heartLabel.AddThemeFontSizeOverride("font_size", 20);
