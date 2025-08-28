@@ -24,7 +24,7 @@ public partial class ManaBar : Control
     private void InitializeContainer()
     {
         // Ensure mana container exists in scene structure
-        _manaContainer = GetNode<HBoxContainer>("ManaContainer");
+        _manaContainer = GetNodeOrNull<HBoxContainer>("ManaContainer");
 
         if (_manaContainer == null)
         {
@@ -41,7 +41,8 @@ public partial class ManaBar : Control
         if (_manaSystem != null)
         {
             ConnectToManaSystem();
-            Log.UI("Connected to PlayerMana!", "ManaBarUI");
+            // Debug level - successful connection is routine
+            Log.Debug("Connected to PlayerMana!", "ManaBarUI");
         }
         else
         {
@@ -151,7 +152,7 @@ public partial class ManaBar : Control
             Texture = index < currentMana ? FullManaTexture : EmptyManaTexture,
             ExpandMode = TextureRect.ExpandModeEnum.FitWidthProportional,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            CustomMinimumSize = new Vector2(32, 32)
+            CustomMinimumSize = new Vector2(40, 40)
         };
 
         return mana;

@@ -17,17 +17,12 @@ namespace Core.Enums
     /// </summary>
     public enum AppleState
     {
-        /// <summary>
-        /// Red color - Life phase (collectible when on ground, restores health)
-        /// </summary>
+        // Red color - Life phase (collectible when on ground, restores health)
         RedLife,
         
-        /// <summary>
-        /// Gray color - Knockable phase (tree only, can be hit by rocks to fall)
-        /// </summary>
+        // Gray color - Knockable phase (tree only, can be hit by rocks to fall)
         GrayKnockable,
         
-        /// <summary>
         /// Purple color - Mana phase (collectible when on ground, restores mana)
         /// </summary>
         PurpleMana,

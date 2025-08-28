@@ -14,6 +14,9 @@ public static class GameEventSystem
     public static event Action PlayerManaRestored;
     public static event Action PlayerManaDepleted;
     
+    // Monster Events
+    public static event Action<int, int, int> MonsterHealthChanged;
+    
     // Game State Events
     public static event Action<string> GameStateChanged;
     public static event Action GameRestart;
@@ -49,6 +52,13 @@ public static class GameEventSystem
     }
     #endregion
     
+    #region Monster Event Triggers
+    public static void OnMonsterHealthChanged(int currentHealth, int maxHealth, int purpleHearts)
+    {
+        MonsterHealthChanged?.Invoke(currentHealth, maxHealth, purpleHearts);
+    }
+    #endregion
+    
     #region Game State Event Triggers
     public static void OnGameStateChanged(string newState)
     {
@@ -81,6 +91,7 @@ public static class GameEventSystem
         PlayerManaChanged = null;
         PlayerManaRestored = null;
         PlayerManaDepleted = null;
+        MonsterHealthChanged = null;
         GameStateChanged = null;
         GameRestart = null;
         GameRestarted = null;

@@ -45,7 +45,8 @@ public partial class AudioManager : AudioStreamPlayer2D
             PlayBackgroundMusic();
         }
 
-        Log.Audio("AudioManager initialized", "AudioManager");
+        // Debug level - system initialization is routine
+        Log.Debug("AudioManager initialized", "AudioManager");
     }
 
     private void SetupAudioConfiguration()
@@ -94,7 +95,8 @@ public partial class AudioManager : AudioStreamPlayer2D
             Stop(); // Ensure we start from beginning
             Play();
             _isMusicPaused = false;
-            Log.Audio("Background music started", "AudioManager");
+            // Debug level - routine audio operations
+            Log.Debug("Background music started", "AudioManager");
         }
         else
         {
@@ -204,12 +206,15 @@ public partial class AudioManager : AudioStreamPlayer2D
     {
         // Only log audio status in debug builds
         #if DEBUG
-        Log.Debug("=== AudioManager Status ===", "AudioManager");
-        Log.Debug($"Playing: {Playing}", "AudioManager");
-        Log.Debug($"Paused: {_isMusicPaused}", "AudioManager");
-        Log.Debug($"Volume: {VolumeDb} dB", "AudioManager");
-        Log.Debug($"Current Music: {BackgroundMusic?.ResourcePath ?? "None"}", "AudioManager");
-        Log.Debug($"Stream: {Stream?.ResourcePath ?? "None"}", "AudioManager");
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.Debug))
+        {
+            Log.Debug("=== AudioManager Status ===", "AudioManager");
+            Log.Debug($"Playing: {Playing}", "AudioManager");
+            Log.Debug($"Paused: {_isMusicPaused}", "AudioManager");
+            Log.Debug($"Volume: {VolumeDb} dB", "AudioManager");
+            Log.Debug($"Current Music: {BackgroundMusic?.ResourcePath ?? "None"}", "AudioManager");
+            Log.Debug($"Stream: {Stream?.ResourcePath ?? "None"}", "AudioManager");
+        }
         #endif
     }
     #endregion

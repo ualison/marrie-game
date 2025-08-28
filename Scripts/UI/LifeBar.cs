@@ -24,7 +24,7 @@ public partial class LifeBar : Control
     private void InitializeContainer()
     {
         // Ensure hearts container exists in scene structure
-        _heartsContainer = GetNode<HBoxContainer>("HeartsContainer");
+        _heartsContainer = GetNodeOrNull<HBoxContainer>("HeartsContainer");
 
         if (_heartsContainer == null)
         {
@@ -41,7 +41,8 @@ public partial class LifeBar : Control
         if (_lifeSystem != null)
         {
             ConnectToLifeSystem();
-            Log.UI("Connected to PlayerLife!", "LifeBarUI");
+            // Debug level - successful connection is routine
+            Log.Debug("Connected to PlayerLife!", "LifeBarUI");
         }
         else
         {
@@ -151,7 +152,7 @@ public partial class LifeBar : Control
             Texture = index < currentLife ? FullHeartTexture : EmptyHeartTexture,
             ExpandMode = TextureRect.ExpandModeEnum.FitWidthProportional,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            CustomMinimumSize = new Vector2(32, 32)
+            CustomMinimumSize = new Vector2(40, 40)
         };
 
         return heart;

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dubgbfarwhdd5"
-path="res://.godot/imported/MarrieV3.png-0e752555069293e080aaf451bfbba850.ctex"
+uid="uid://dgt1qlw7a46lr"
+path="res://.godot/imported/TextBoxMessage.png-6ce37f0183d84682e7d43fb554e73e31.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Art/MarrieV3.png"
-dest_files=["res://.godot/imported/MarrieV3.png-0e752555069293e080aaf451bfbba850.ctex"]
+source_file="res://Art/TextBoxMessage.png"
+dest_files=["res://.godot/imported/TextBoxMessage.png-6ce37f0183d84682e7d43fb554e73e31.ctex"]
 
 [params]
 

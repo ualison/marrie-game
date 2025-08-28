@@ -1,0 +1,20 @@
+[gd_scene load_steps=3 format=3 uid="uid://844rfld3y4ee"]
+
+[ext_resource type="Script" path="res://Scripts/UI/RockCount.cs" id="1_vnikc"]
+[ext_resource type="Texture2D" uid="uid://8tum5coe2u2v" path="res://Art/Rock.png" id="2_t5ape"]
+
+[node name="RockCount" type="HBoxContainer"]
+custom_minimum_size = Vector2(0, 45)
+
+[node name="RockIcon" type="TextureRect" parent="."]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+texture = ExtResource("2_t5ape")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RockLabel" type="Label" parent="."]
+layout_mode = 2
+text = "0"
+vertical_alignment = 1
+script = ExtResource("1_vnikc")

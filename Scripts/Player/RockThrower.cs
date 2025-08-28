@@ -36,7 +36,9 @@ public partial class RockThrower : Node2D
     {
         SetupTrajectoryLine();
         FindComponents();
-        Log.System("RockThrower ready", "RockThrower");
+        // Only log critical issues that prevent functionality
+        if (_inventory == null)
+            Log.Error("RockThrower cannot function without inventory", "RockThrower");
     }
 
     private void SetupTrajectoryLine()
@@ -133,7 +135,7 @@ public partial class RockThrower : Node2D
         if (!_isDrawingTrajectory) return;
 
         Vector2 currentWorldPos = GetGlobalMousePosition();
-        Vector2 direction = (currentWorldPos - GlobalPosition); // Direction from RockThrower to mouse
+        Vector2 direction = currentWorldPos - GlobalPosition; // Direction from RockThrower to mouse
         
         // Ensure minimum distance for meaningful trajectory
         if (direction.Length() < 50.0f)
@@ -184,7 +186,8 @@ public partial class RockThrower : Node2D
 
     // Physics simulation step
     float timeStep = 0.05f; // smaller = smoother curve
-    int maxSteps = 200;
+    // Reduced maxSteps to lower CPU when drawing trajectory; throttle or increase if higher fidelity needed
+    int maxSteps = 60;
 
     Vector2 currentPos = start;
 
@@ -253,7 +256,15 @@ public partial class RockThrower : Node2D
     {
         if (_inventory == null || !_inventory.HasRocks(1))
         {
-            Log.UI("No rocks available to throw", "RockThrower");
+            Log.Debug("No rocks available to throw", "RockThrower");
+            return;
+        }
+
+        // Check trajectory validity before removing rock or creating projectile
+        if (_currentGlobalTrajectory == null || _currentGlobalTrajectory.Length == 0)
+        {
+            Log.Warning("Cannot throw rock: no valid trajectory.", "RockThrower");
+            CancelTrajectory();
             return;
         }
 
@@ -266,8 +277,8 @@ public partial class RockThrower : Node2D
 
         // Create and launch projectile
         CreateRockProjectile();
-        
-        Log.UI($"Rock thrown! Remaining rocks: {_inventory.GetRockCount()}", "RockThrower");
+
+        Log.Debug($"Rock thrown! Remaining rocks: {_inventory.GetRockCount()}", "RockThrower");
     }
 
     private void CreateRockProjectile()
@@ -290,6 +301,7 @@ public partial class RockThrower : Node2D
         {
             rock.SetTrajectory(_currentGlobalTrajectory);
             Log.System($"Rock projectile created with {_currentGlobalTrajectory.Length} trajectory points and velocity {RockVelocity}", "RockThrower");
+            _currentGlobalTrajectory = null; // Clear trajectory after successful use
         }
         else
         {
@@ -303,7 +315,7 @@ public partial class RockThrower : Node2D
         _isDrawingTrajectory = false;
         _trajectoryLine.Hide();
         _trajectoryLine.ClearPoints();
-        _currentGlobalTrajectory = null; // Clear stored trajectory
+        // Don't clear trajectory here - let CreateRockProjectile clear it after use
     }
 
     private void CancelTrajectory()

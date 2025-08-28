@@ -1,9 +1,8 @@
 using Godot;
+using MarrieGame.Core.Logging; // Why: bring LogCategory into scope to avoid verbose fully-qualified names
 
-/// <summary>
 /// Handles scene loading, reloading, and lifecycle management
 /// Single Responsibility: Scene Management
-/// </summary>
 public partial class SceneLifecycleManager : Node
 {
     public static SceneLifecycleManager Instance { get; private set; }
@@ -48,7 +47,8 @@ public partial class SceneLifecycleManager : Node
     {
         if (node == GetTree().CurrentScene)
         {
-            Log.System($"Scene reloaded: {node.Name}", "SceneLifecycleManager");
+            if (Log.IsCategoryEnabled(LogCategory.Debug))
+                Log.Debug($"Scene reloaded: {node.Name}", "SceneLifecycleManager");
             
             // Wait for scene to be fully ready
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -62,15 +62,22 @@ public partial class SceneLifecycleManager : Node
     
     private void HandleSceneReload()
     {
-        Log.System($"Scene reloaded: {GetTree().CurrentScene?.Name}", "SceneLifecycleManager");
+        if (Log.IsCategoryEnabled(LogCategory.Debug))
+            Log.Debug($"Scene reloaded: {GetTree().CurrentScene?.Name}", "SceneLifecycleManager");
+
+        // Notify readiness regardless of logging configuration
         CallDeferred(nameof(NotifySceneReady));
     }
-    
     private void NotifySceneReady()
     {
-        Log.System("Firing SceneReady event", "SceneLifecycleManager");
+        // Always fire the event; logging is only observational
+        if (Log.IsCategoryEnabled(LogCategory.Debug))
+            Log.Debug("Firing SceneReady event", "SceneLifecycleManager");
+
         SceneReady?.Invoke();
-        Log.System("SceneReady event fired", "SceneLifecycleManager");
+
+        if (Log.IsCategoryEnabled(LogCategory.Debug))
+            Log.Debug("SceneReady event fired", "SceneLifecycleManager");
     }
     
     public override void _ExitTree()

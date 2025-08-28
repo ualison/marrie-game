@@ -18,7 +18,7 @@ public readonly struct ReplayFrame
     public readonly float Alpha;
     #endregion
 
-    #region Monster State Data (for Monster with follower behavior)
+    #region Monster State Data
     public readonly string MonsterState; // "InitialWait", "Following", "Hidden"
     public readonly bool IsFullyVisible; // Controls movement during transitions
     #endregion

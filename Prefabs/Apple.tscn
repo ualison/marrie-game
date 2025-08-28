@@ -47,6 +47,7 @@ text = "Press E"
 
 [node name="RockDetectionArea" type="Area2D" parent="RigidBody2D"]
 collision_layer = 4
+# Rock detection area should detect rocks on layer 8
 collision_mask = 8
 
 [node name="RockDetectionCollision" type="CollisionShape2D" parent="RigidBody2D/RockDetectionArea"]
@@ -61,6 +62,8 @@ shape = SubResource("CircleShape2D_apple")
 
 [node name="GroundDetectionArea" type="Area2D" parent="RigidBody2D"]
 collision_layer = 0
+# Ground detection should detect ground (layer 1)
+collision_mask = 1
 
 [node name="GroundDetectionShape" type="CollisionShape2D" parent="RigidBody2D/GroundDetectionArea"]
 position = Vector2(0, 16)

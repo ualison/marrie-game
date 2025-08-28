@@ -39,7 +39,9 @@ public partial class Player : CharacterBody2D, IPausable, IResettable
         AddToGroup("player");
         InitializePhysics();
         InitializeComponents();
-        Log.System($"Player initialized - Health system: {(_playerLife != null ? "✓" : "✗")}", "Player");
+        // Only log critical initialization failures
+        if (_playerLife == null)
+            Log.Error("Player health system failed to initialize", "Player");
     }
 
     private void InitializePhysics()
@@ -359,14 +361,14 @@ private void ProcessDamageFromEnemy(Node2D enemy)
 
     private void OnPlayerDied()
     {
-        // Handle player death - stop movement and apply visual effects
-        Log.Gameplay("Player died!", "Player");
-        Velocity = Vector2.Zero;
+    // Critical game event - always log player death
+    Log.Warning("Player died!", "Player");
+    Velocity = Vector2.Zero;
 
-        ApplyDeathVisuals();
-        
-        // Notify death through event system instead of direct GameManager call
-        GameEventSystem.OnPlayerDied(GlobalPosition, _playerLife?.CurrentHealth ?? 0);
+    ApplyDeathVisuals();
+
+    // Notify PlayerStateManager instead of firing global event directly
+    PlayerStateManager.Instance?.HandlePlayerDeath(GlobalPosition);
     }
 
     private void ApplyDeathVisuals()
@@ -395,8 +397,10 @@ private void ProcessDamageFromEnemy(Node2D enemy)
 
         // Reset sprite direction to initial state
         ResetSpriteDirection();
-
-        Log.Gameplay("Player reset complete with direction reset", "Player");
+        
+        // Only log if reset fails
+        if (_sprite == null && StartFacingRight != _facingRight)
+            Log.Warning("Player direction reset failed - sprite not found", "Player");
     }
 
 private void ResetSpriteDirection()
@@ -409,24 +413,23 @@ private void ResetSpriteDirection()
         var scale = _sprite.Scale;
         _sprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
     }
-    else
-    {
-        Log.Warning("Player sprite not found for direction reset", "Player");
-    }
+    // Warning moved to Reset() method to avoid duplicate logging
 }
 
     public void PausePlayer()
     {
         // Pause player movement for replay mode
         _isPaused = true;
-        Log.Replay("Player paused for replay", "Player");
+        // Debug level - only needed during replay development
+        Log.Debug("Player paused for replay", "Player");
     }
 
     public void ResumePlayer()
     {
         // Resume player movement after replay
         _isPaused = false;
-        Log.Replay("Player resumed after replay", "Player");
+        // Debug level - only needed during replay development
+        Log.Debug("Player resumed after replay", "Player");
     }
 
     public bool IsPaused() => _isPaused; // Check if player is paused

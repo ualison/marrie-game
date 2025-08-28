@@ -15,13 +15,16 @@ public partial class ReplayRecorder : Node
     #region Configuration
     [Export] public float RecordInterval { get; set; } = 0.1f;
     [Export] public bool EnableFrameOptimization { get; set; } = true;
-    [Export] public bool EnableDebugLogging { get; set; } = false; // PERFORMANCE: Conditional debug logging
+    [Export] public bool EnableDebugLogging { get; set; } = false; // Conditional debug logging for performance
     #endregion
 
     #region State
     public bool IsRecording { get; private set; }
     public bool IsPausedForReplay { get; private set; }
-    public bool HasRecordedData => _playerFrames.Count > 0 || _monsterFrames.Count > 0;
+    // Include the small prebuffer in the recorded-data check to avoid losing fast deaths
+    private const int PREBUFFER_CAPACITY = 64;
+    private readonly Queue<ReplayFrame> _playerPreBuffer = new();
+    public bool HasRecordedData => _playerFrames.Count > 0 || _monsterFrames.Count > 0 || _playerPreBuffer.Count > 0;
     #endregion
 
     #region Data Storage
@@ -51,11 +54,10 @@ public partial class ReplayRecorder : Node
     #region Lifecycle
     public override void _Ready()
     {
-        Instance = this;
-        ProcessMode = ProcessModeEnum.Always;
+    Instance = this;
+    ProcessMode = ProcessModeEnum.Always;
         AddToGroup("replay_recorder");
         
-        // Simple initialization - no complex retry system
         CallDeferred(nameof(Initialize));
     }
 
@@ -87,17 +89,16 @@ public partial class ReplayRecorder : Node
         if (_cachedPlayer != null)
         {
             StartRecording();
-            Log.Replay("ReplayRecorder initialized and started", "ReplayRecorder");
+            Log.Debug("ReplayRecorder initialized and started", "ReplayRecorder");
         }
         else
         {
-            // Single retry after 0.1 seconds
             GetTree().CreateTimer(0.1f).Timeout += () => {
                 RefreshCharacterCache();
                 if (_cachedPlayer != null)
                 {
                     StartRecording();
-                    Log.Replay("ReplayRecorder started after retry", "ReplayRecorder");
+                    Log.Debug("ReplayRecorder started after retry", "ReplayRecorder");
                 }
                 else
                 {
@@ -109,19 +110,16 @@ public partial class ReplayRecorder : Node
 
     public void RefreshCharacterCache()
     {
-        // Simple character discovery
         _cachedPlayer = GetTree().GetFirstNodeInGroup("player") as Player;
         
         var enemies = GetTree().GetNodesInGroup("enemies").OfType<Monster>();
         _cachedMonster = enemies.FirstOrDefault(m => m.EnableFollowerBehavior) ?? enemies.FirstOrDefault();
 
-        // Cache sprite references for performance
         if (_cachedPlayer != null)
         {
             _playerSprite = FindSpriteInCharacter(_cachedPlayer);
             _playerVisual = _playerSprite ?? FindVisualInCharacter(_cachedPlayer);
             
-            // Only warn if no visual component found at all
             if (_playerSprite == null && _playerVisual == null)
             {
                 Log.Warning($"No visual component (AnimatedSprite2D or Sprite2D) found for player {_cachedPlayer.Name}", "ReplayRecorder");
@@ -133,7 +131,6 @@ public partial class ReplayRecorder : Node
             _monsterSprite = FindSpriteInCharacter(_cachedMonster);
             _monsterVisual = _monsterSprite ?? FindVisualInCharacter(_cachedMonster);
             
-            // Only warn if no visual component found at all
             if (_monsterSprite == null && _monsterVisual == null)
             {
                 Log.Warning($"No visual component (AnimatedSprite2D or Sprite2D) found for monster {_cachedMonster.Name}", "ReplayRecorder");
@@ -143,20 +140,17 @@ public partial class ReplayRecorder : Node
 
     private AnimatedSprite2D FindSpriteInCharacter(Node2D character)
     {
-        // Enhanced sprite discovery with more search patterns
         var sprite = character.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D") ??
                     character.GetNodeOrNull<AnimatedSprite2D>("MarrieSprite") ??
                     character.GetNodeOrNull<AnimatedSprite2D>("GhostMarrieSprite") ??
                     character.FindChild("AnimatedSprite2D", recursive: false) as AnimatedSprite2D ??
                     character.FindChild("MarrieSprite", recursive: false) as AnimatedSprite2D;
         
-        // Don't warn here - we'll check for fallback visuals in FindVisualInCharacter
         return sprite;
     }
 
     private Node2D FindVisualInCharacter(Node2D character)
     {
-        // Enhanced visual discovery as fallback
         var visual = character.GetNodeOrNull<Sprite2D>("Sprite2D") ??
                     character.GetNodeOrNull<Sprite2D>("MonsterSprite") ??
                     character.GetNodeOrNull<Sprite2D>("MarrieSprite") ??
@@ -164,7 +158,6 @@ public partial class ReplayRecorder : Node
                     character.FindChild("Sprite2D", recursive: false) as Node2D ??
                     character.FindChild("MonsterSprite", recursive: false) as Node2D;
         
-        // Warning handled at higher level in RefreshCharacterCache
         return visual;
     }
     #endregion
@@ -177,7 +170,6 @@ public partial class ReplayRecorder : Node
         _recordTimer = 0f;
         _elapsedTime = 0f;
         
-        // Initialize optimization tracking
         if (_cachedPlayer != null) _lastPlayerPos = _cachedPlayer.GlobalPosition;
         if (_cachedMonster != null) _lastMonsterPos = _cachedMonster.GlobalPosition;
         _skipCounter = 0;
@@ -186,7 +178,16 @@ public partial class ReplayRecorder : Node
     public void StopRecording()
     {
         IsRecording = false;
-        Log.Replay($"Recording stopped - Player: {_playerFrames.Count}, Monster: {_monsterFrames.Count} frames", "ReplayRecorder");
+        // If we have no primary frames but the prebuffer holds data (very short session), promote it
+        if (_playerFrames.Count == 0 && _playerPreBuffer.Count > 0)
+        {
+            while (_playerPreBuffer.Count > 0)
+            {
+                _playerFrames.Add(_playerPreBuffer.Dequeue());
+            }
+        }
+
+        Log.Debug($"Recording stopped - Player: {_playerFrames.Count}, Monster: {_monsterFrames.Count} frames", "ReplayRecorder");
     }
 
     public void ClearRecording()
@@ -212,7 +213,6 @@ public partial class ReplayRecorder : Node
     #region Frame Recording (Optimized)
     private void RecordFrame()
     {
-        // Skip frame if optimization enabled and no significant movement
         if (EnableFrameOptimization && ShouldSkipFrame())
         {
             _skipCounter++;
@@ -221,15 +221,18 @@ public partial class ReplayRecorder : Node
 
         _skipCounter = 0;
 
-        // Record player frame
         if (_cachedPlayer != null)
         {
             var frame = CreatePlayerFrame();
+            // Keep a short rolling prebuffer to preserve the last frames in case recording stops quickly
+            _playerPreBuffer.Enqueue(frame);
+            while (_playerPreBuffer.Count > PREBUFFER_CAPACITY)
+                _playerPreBuffer.Dequeue();
+
             _playerFrames.Add(frame);
             _lastPlayerPos = _cachedPlayer.GlobalPosition;
         }
 
-        // Record monster frame
         if (_cachedMonster != null)
         {
             var frame = CreateMonsterFrame();
@@ -240,7 +243,6 @@ public partial class ReplayRecorder : Node
 
     private bool ShouldSkipFrame()
     {
-        // Force recording every MAX_SKIP_FRAMES to ensure we don't lose important frames
         if (_skipCounter >= MAX_SKIP_FRAMES) return false;
 
         bool playerMoved = _cachedPlayer == null || 
@@ -271,7 +273,6 @@ public partial class ReplayRecorder : Node
         var flip = GetMonsterSpriteFlip(_monsterSprite, _monsterVisual);
         var (visible, alpha) = GetVisibility(_monsterVisual);
         
-        // Monster state data
         var state = _cachedMonster.EnableFollowerBehavior ? _cachedMonster.GetState().ToString() : "";
         var fullyVisible = _cachedMonster.EnableFollowerBehavior ? _cachedMonster.IsFullyVisible() : true;
 
@@ -291,13 +292,11 @@ public partial class ReplayRecorder : Node
         {
             try
             {
-                // ENHANCED: Check both FlipH property and Scale.X for flipping
-                // Some characters use FlipH, others use negative Scale.X
+                // Check both FlipH property and Scale.X for flipping
                 bool flipH = animSprite.FlipH;
                 bool scaleFlip = animSprite.Scale.X < 0;
                 bool isFlipped = flipH || scaleFlip;
                 
-                // Debug: Log flip detection whenever we record a frame (not just changes)
                 if (EnableDebugLogging)
                 {
                     Log.Debug($"Player flip detected: FlipH={flipH}, ScaleFlip={scaleFlip}, Final={isFlipped}, Scale.X={animSprite.Scale.X:F3}", "ReplayRecorder");
@@ -339,7 +338,6 @@ public partial class ReplayRecorder : Node
                 bool scaleFlip = animSprite.Scale.X < 0;
                 bool isFlipped = flipH || scaleFlip;
                 
-                // Debug: Log monster flip detection whenever we record a frame
                 if (EnableDebugLogging)
                 {
                     Log.Debug($"Monster flip detected: FlipH={flipH}, ScaleFlip={scaleFlip}, Final={isFlipped}, Scale.X={animSprite.Scale.X:F3}", "ReplayRecorder");
@@ -359,7 +357,6 @@ public partial class ReplayRecorder : Node
             {
                 bool scaleFlip = visual.Scale.X < 0;
                 
-                // Debug logging for non-animated sprites
                 if (EnableDebugLogging)
                 {
                     Log.Debug($"Monster visual flip detected: ScaleFlip={scaleFlip}, Scale.X={visual.Scale.X:F3}", "ReplayRecorder");

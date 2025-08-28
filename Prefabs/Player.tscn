@@ -1,6 +1,6 @@
 [gd_scene load_steps=10 format=3 uid="uid://ckwbdf3jm340m"]
 
-[ext_resource type="Texture2D" uid="uid://dubgbfarwhdd5" path="res://Art/MarrieV3.png" id="2_b43ah"]
+[ext_resource type="Texture2D" uid="uid://dubgbfarwhdd5" path="res://Art/Marrie.png" id="2_b43ah"]
 [ext_resource type="Script" uid="uid://dtbbh4gt6l7cr" path="res://Scripts/Player/Player.cs" id="2_kyqiw"]
 [ext_resource type="Script" uid="uid://bfetyy0iofqcj" path="res://Scripts/Player/PlayerLife.cs" id="3_gntrk"]
 [ext_resource type="Script" uid="uid://gp6wfjapkopj" path="res://Scripts/Player/PlayerMana.cs" id="4_mana"]
@@ -14,14 +14,17 @@ size = Vector2(133, 271)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
 size = Vector2(120, 278)
 
-[node name="Root" type="Node2D"]
+[node name="Root2" type="Node2D"]
 
 [node name="CharacterBody2D" type="CharacterBody2D" parent="." groups=["player"]]
 position = Vector2(0, 4)
 collision_layer = 2
+collision_mask = 17
 script = ExtResource("2_kyqiw")
 
 [node name="HurtBox" type="Area2D" parent="CharacterBody2D"]
+collision_layer = 2
+collision_mask = 16
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/HurtBox"]
 position = Vector2(0.5, -1.5)
@@ -40,16 +43,17 @@ texture = ExtResource("2_b43ah")
 [node name="PlayerLife" type="Node2D" parent="CharacterBody2D"]
 position = Vector2(0, -4)
 script = ExtResource("3_gntrk")
-MaxLife = 2
+MaxLife = 4
+StartingLife = 2
 
 [node name="PlayerMana" type="Node" parent="CharacterBody2D"]
 script = ExtResource("4_mana")
 MaxMana = 4
-StartingMana = 0
+StartingMana = 1
 
 [node name="Inventory" type="Node" parent="CharacterBody2D"]
 script = ExtResource("5_inventory")
-MaxRocks = 5
+MaxRocks = 10
 
 [node name="RockThrower" type="Node2D" parent="CharacterBody2D"]
 position = Vector2(68, -124)

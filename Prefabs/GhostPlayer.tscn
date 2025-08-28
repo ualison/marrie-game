@@ -1,7 +1,7 @@
 [gd_scene load_steps=4 format=3 uid="uid://b1tol8dfceoum"]
 
 [ext_resource type="Script" uid="uid://dakyi6pluqdcf" path="res://Scripts/Player/GhostPlayer.cs" id="1_l3qnp"]
-[ext_resource type="Texture2D" uid="uid://drl2pcibc5s14" path="res://Art/MarrieGhostV3.png" id="2_ivqar"]
+[ext_resource type="Texture2D" uid="uid://dubgbfarwhdd5" path="res://Art/Marrie.png" id="2_ivqar"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
 size = Vector2(122, 278)

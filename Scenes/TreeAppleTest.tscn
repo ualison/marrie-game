@@ -1,18 +1,17 @@
-[gd_scene load_steps=14 format=3 uid="uid://54o6xy0qaoae"]
+[gd_scene load_steps=13 format=3 uid="uid://54o6xy0qaoae"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
-[ext_resource type="PackedScene" uid="uid://jlrj0meior1r" path="res://Prefabs/UI/LifeHearts.tscn" id="7_gfl13"]
 [ext_resource type="PackedScene" uid="uid://dbt3v1ee4f7fr" path="res://Prefabs/AppleTree.tscn" id="8_2e0hl"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
-[ext_resource type="PackedScene" uid="uid://bcy7l2h8xj4wd" path="res://Prefabs/UI/ManaBar.tscn" id="8_manabar"]
 [ext_resource type="AudioStream" uid="uid://c5xm6p8ayswcj" path="res://Sounds/Background3.wav" id="11_1pt5x"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
 [ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="12_r6l07"]
 [ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="13_bcr4f"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
+[ext_resource type="PackedScene" uid="uid://dxvamghbt08mr" path="res://Prefabs/UI/ScreenElements.tscn" id="16_screen"]
 
 [node name="TreeAppleTestScene" type="Node2D"]
 
@@ -34,26 +33,8 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="LifeHearts" parent="UserInterface/HUD" instance=ExtResource("7_gfl13")]
+[node name="ScreenElements" parent="UserInterface/HUD" instance=ExtResource("16_screen")]
 layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.511285
-anchor_top = 0.487654
-anchor_right = 0.511285
-anchor_bottom = 0.487654
-offset_left = -564.0
-offset_top = -316.0
-metadata/_edit_use_anchors_ = true
-
-[node name="ManaBar" parent="UserInterface/HUD" instance=ExtResource("8_manabar")]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.511285
-anchor_top = 0.37963
-anchor_right = 0.511285
-anchor_bottom = 0.37963
-offset_left = -564.0
-metadata/_edit_use_anchors_ = true
 
 [node name="Overlays" type="Control" parent="UserInterface"]
 layout_mode = 3

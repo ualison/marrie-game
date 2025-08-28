@@ -1,19 +1,48 @@
-[gd_scene load_steps=4 format=3 uid="uid://bqj7y8lk5uq60"]
+[gd_scene load_steps=7 format=3 uid="uid://bqj7y8lk5uq60"]
 
 [ext_resource type="Script" uid="uid://d0e7xcevrndxm" path="res://Scripts/Enemy/GhostMonster.cs" id="1_uqgqf"]
-[ext_resource type="Texture2D" uid="uid://bj7aeaudq2rbt" path="res://Art/Monsterv3Ghost.png" id="2_efpf5"]
+[ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monster.png" id="2_uqgqf"]
+[ext_resource type="Script" uid="uid://2hx87sinu6t" path="res://Scripts/Enemy/MonsterLife.cs" id="3_monsterlife"]
+[ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_damage"]
+radius = 25.0
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
 size = Vector2(302, 376)
 
-[node name="GhostMonster" type="CharacterBody2D"]
+[node name="Root" type="Node2D"]
+
+[node name="CharacterBody2D" type="CharacterBody2D" parent="."]
 script = ExtResource("1_uqgqf")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="DamageArea" type="Area2D" parent="CharacterBody2D"]
+position = Vector2(0, -4)
+collision_layer = 16
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/DamageArea"]
+shape = SubResource("CircleShape2D_damage")
+debug_color = Color(0.764087, 0.04706, 0.125471, 0.42)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]
 position = Vector2(10, -20)
 shape = SubResource("RectangleShape2D_kyqiw")
 
-[node name="GhostMonsterSprite" type="Sprite2D" parent="."]
+[node name="GhostMonsterSprite" type="Sprite2D" parent="CharacterBody2D"]
 position = Vector2(12.5, 9.00002)
 scale = Vector2(0.31543, 0.317708)
-texture = ExtResource("2_efpf5")
+texture = ExtResource("2_uqgqf")
+
+[node name="GhostMonsterLifeBar" parent="CharacterBody2D" instance=ExtResource("4_lifebar")]
+offset_left = -53.0
+offset_top = -236.0
+offset_right = 47.0
+offset_bottom = -186.0
+OffsetFromMonster = Vector2(-80, -240)
+RequiredReality = 1
+
+[node name="GhostMonsterLife" type="Node2D" parent="CharacterBody2D"]
+position = Vector2(-2, -221)
+script = ExtResource("3_monsterlife")
+MaxLife = 3
+StartingLife = 3

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://brg0tm2b1puno"
-path="res://.godot/imported/Monsterv3.png-ebf83ac812728195a14ff67c21f3f49d.ctex"
+uid="uid://ddnvqsgg8ga0t"
+path="res://.godot/imported/MarrieIcon.png-77b1fdc6845e7f83c53a6f48afebd742.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Art/Monsterv3.png"
-dest_files=["res://.godot/imported/Monsterv3.png-ebf83ac812728195a14ff67c21f3f49d.ctex"]
+source_file="res://Art/MarrieIcon.png"
+dest_files=["res://.godot/imported/MarrieIcon.png-77b1fdc6845e7f83c53a6f48afebd742.ctex"]
 
 [params]
 

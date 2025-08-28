@@ -44,18 +44,14 @@ public partial class PlayerStateManager : Node
     
     private void TryImmediateInitialization()
     {
-        Log.System("Attempting immediate initialization", "PlayerStateManager");
+        // Only log failures - success is routine
         DiscoverPlayerComponents();
         ConnectPlayerSystems();
         CachePlayerSpawn();
         
-        if (_player != null && _playerLife != null)
+        if (_player == null || _playerLife == null)
         {
-            Log.System("Immediate initialization successful", "PlayerStateManager");
-        }
-        else
-        {
-            Log.System("Immediate initialization failed, waiting for SceneReady", "PlayerStateManager");
+            Log.Warning($"PlayerStateManager initialization incomplete - Player: {_player != null}, Life: {_playerLife != null}", "PlayerStateManager");
         }
     }
     
@@ -71,7 +67,8 @@ public partial class PlayerStateManager : Node
         _player = GetTree().GetFirstNodeInGroup("player") as Player;
         _playerLife = _player?.GetLifeSystem();
         
-        Log.System($"Player found: {_player != null}, Life system: {_playerLife != null}", "PlayerStateManager");
+        // Debug level - routine component discovery
+        Log.Debug($"Player found: {_player != null}, Life system: {_playerLife != null}", "PlayerStateManager");
         
         #if DEBUG
         if (_player != null)
@@ -99,7 +96,8 @@ public partial class PlayerStateManager : Node
 #endif
             }
             _playerLife.PlayerDied += OnPlayerHealthDepleted;
-            Log.System("Connected to PlayerLife.PlayerDied signal", "PlayerStateManager");
+            // Debug level - successful signal connection is routine
+            Log.Debug("Connected to PlayerLife.PlayerDied signal", "PlayerStateManager");
         }
         else
         {
@@ -120,7 +118,8 @@ public partial class PlayerStateManager : Node
     {
         if (IsPlayerDead) return;
         
-        Log.Gameplay("Player health depleted", "PlayerStateManager");
+        // Important game event - track player deaths for debugging
+        Log.Debug("Player health depleted", "PlayerStateManager");
         
         Vector2 deathPosition = _player?.GlobalPosition ?? Vector2.Zero;
         HandlePlayerDeath(deathPosition);
@@ -146,14 +145,23 @@ public partial class PlayerStateManager : Node
             return;
         }
         
-        Log.Gameplay($"Player died at {deathPosition}", "PlayerStateManager");
+        // Critical game event - always log player deaths for analysis
+        Log.Warning($"Player died at {deathPosition}", "PlayerStateManager");
         
         IsPlayerDead = true;
         
-        // Notify other systems
-        Log.System("Firing PlayerDied event", "PlayerStateManager");
-        PlayerDied?.Invoke(deathPosition, _playerLife?.CurrentHealth ?? 0);
-        GameEventSystem.OnPlayerDied(deathPosition, _playerLife?.CurrentHealth ?? 0);
+    // Notify other systems
+    // Pause recording first to reduce race window where recorder might still be writing frames
+    if (ReplayRecorder.Instance != null)
+    {
+        ReplayRecorder.Instance.PauseRecording();
+#if DEBUG
+        Log.Debug("Paused ReplayRecorder before firing PlayerDied", "PlayerStateManager");
+#endif
+    }
+    Log.System("Firing PlayerDied event", "PlayerStateManager");
+    PlayerDied?.Invoke(deathPosition, _playerLife?.CurrentHealth ?? 0);
+    GameEventSystem.OnPlayerDied(deathPosition, _playerLife?.CurrentHealth ?? 0);
     }
     
     public void RespawnPlayer()

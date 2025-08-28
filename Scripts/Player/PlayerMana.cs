@@ -32,6 +32,7 @@ public partial class PlayerMana : Node, IManaSystem
     #region Components
     private Timer _regenDelayTimer;
     private Timer _regenTimer;
+    private Player _player; // Reference to player for pause checking
     #endregion
 
     #region Initialization
@@ -40,7 +41,18 @@ public partial class PlayerMana : Node, IManaSystem
         // Initialize mana to starting amount and setup systems
         CurrentMana = Mathf.Clamp(StartingMana, 0, MaxMana);
         SetupRegenTimers();
+        FindPlayer();
         NotifyManaChanged();
+    }
+
+    private void FindPlayer()
+    {
+        // Find the player reference for pause checking
+        _player = GetParent() as Player;
+        if (_player == null)
+        {
+            Log.Warning("PlayerMana could not find Player parent", "PlayerMana");
+        }
     }
 
     private void SetupRegenTimers()
@@ -80,8 +92,8 @@ public partial class PlayerMana : Node, IManaSystem
         if (IsEmpty)
             EmitSignal(SignalName.ManaDepleted);
 
-        // Start regen delay if auto-regeneration is enabled
-        if (AutoRegenerate)
+        // Start regen delay if auto-regeneration is enabled and player is not paused
+        if (AutoRegenerate && !IsPlayerPaused())
             _regenDelayTimer.Start();
 
         return true;
@@ -137,8 +149,8 @@ public partial class PlayerMana : Node, IManaSystem
     #region Regeneration System
     private void StartRegeneration()
     {
-        // Begin mana regeneration if not at full capacity
-        if (!IsFull && AutoRegenerate)
+        // Begin mana regeneration if not at full capacity and player is not paused
+        if (!IsFull && AutoRegenerate && !IsPlayerPaused())
         {
             IsRegenerating = true;
             _regenTimer.Start();
@@ -155,12 +167,26 @@ public partial class PlayerMana : Node, IManaSystem
 
     private void RegenerateMana()
     {
+        // Only regenerate if player is not paused (not in replay mode)
+        if (IsPlayerPaused())
+        {
+            // Pause regeneration during replay
+            StopRegeneration();
+            return;
+        }
+
         // Regenerate one point of mana
         RestoreMana(1);
         
         // Stop if at full capacity
         if (IsFull)
             StopRegeneration();
+    }
+
+    private bool IsPlayerPaused()
+    {
+        // Check if player is paused (during replay mode)
+        return _player?.IsPaused() ?? false;
     }
 
     public void SetAutoRegenerate(bool enabled)

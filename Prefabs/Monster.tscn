@@ -1,7 +1,9 @@
-[gd_scene load_steps=5 format=3 uid="uid://djryvxjy0bkfe"]
+[gd_scene load_steps=7 format=3 uid="uid://djryvxjy0bkfe"]
 
 [ext_resource type="Script" uid="uid://c0o15dmumujxy" path="res://Scripts/Enemy/Monster.cs" id="1_x8qak"]
-[ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monsterv3.png" id="2_x8qak"]
+[ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monster.png" id="2_x8qak"]
+[ext_resource type="Script" uid="uid://2hx87sinu6t" path="res://Scripts/Enemy/MonsterLife.cs" id="3_monsterlife"]
+[ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wqfq0"]
 size = Vector2(284, 369)
@@ -9,22 +11,26 @@ size = Vector2(284, 369)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
 size = Vector2(262, 365)
 
-[node name="Root" type="Node2D"]
+[node name="Root2" type="Node2D"]
 
 [node name="CharacterBody2D" type="CharacterBody2D" parent="."]
 position = Vector2(0, 4)
+collision_layer = 16
 script = ExtResource("1_x8qak")
 EnableFollowerBehavior = true
-MinSpawnDistance = 100.0
+FollowDistance = 200.0
+MinSpawnDistance = 150.0
+MinimumFollowDistance = 150.0
 WalkSpeed = 35.0
-InitialWaitTime = 5.0
-MinVisibleTime = 5.0
+InitialWaitTime = 3.0
+MinVisibleTime = 3.0
 MaxVisibleTime = 5.0
 MinHiddenTime = 3.0
 MaxHiddenTime = 5.0
 
 [node name="DamageArea" type="Area2D" parent="CharacterBody2D"]
 position = Vector2(0, -4)
+collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/DamageArea"]
 position = Vector2(4, 1.5)
@@ -39,3 +45,16 @@ shape = SubResource("RectangleShape2D_kyqiw")
 position = Vector2(5.99999, 27.625)
 scale = Vector2(0.302734, 0.309408)
 texture = ExtResource("2_x8qak")
+
+[node name="MonsterLifeBar" parent="CharacterBody2D" instance=ExtResource("4_lifebar")]
+offset_left = -53.0
+offset_top = -236.0
+offset_right = 47.0
+offset_bottom = -186.0
+OffsetFromMonster = Vector2(-80, -220)
+
+[node name="MonsterLife" type="Node2D" parent="CharacterBody2D"]
+position = Vector2(0, -195)
+script = ExtResource("3_monsterlife")
+MaxLife = 3
+StartingLife = 3
