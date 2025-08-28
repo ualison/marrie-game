@@ -14,6 +14,11 @@ public partial class GameOver : Control
     #endregion
 
     #region UI Components
+    [Export] public NodePath GameOverLabelPath;
+    [Export] public NodePath SubMessageLabelPath;
+    [Export] public NodePath RestartButtonPath;
+    [Export] public NodePath QuitButtonPath;
+
     private Label _gameOverLabel;
     private Label _subMessageLabel;
     private Button _restartButton;
@@ -32,18 +37,22 @@ public partial class GameOver : Control
 
     private void DiscoverUIElements()
     {
-        // Find UI components with optimized search and fallback
-        _gameOverLabel = GetNodeOrNull<Label>("VBoxContainer/GameOverLabel")
-            ?? FindUIElement<Label>("GameOverLabel");
+        // Prefer editor-assigned NodePaths when available
+        if (GameOverLabelPath != null && GameOverLabelPath.ToString() != "")
+            _gameOverLabel = GetNodeOrNull<Label>(GameOverLabelPath);
+        _gameOverLabel ??= GetNodeOrNull<Label>("VBoxContainer/GameOverLabel") ?? FindUIElement<Label>("GameOverLabel");
 
-        _subMessageLabel = GetNodeOrNull<Label>("VBoxContainer/SubMessageLabel")
-            ?? FindUIElement<Label>("SubMessageLabel");
+        if (SubMessageLabelPath != null && SubMessageLabelPath.ToString() != "")
+            _subMessageLabel = GetNodeOrNull<Label>(SubMessageLabelPath);
+        _subMessageLabel ??= GetNodeOrNull<Label>("VBoxContainer/SubMessageLabel") ?? FindUIElement<Label>("SubMessageLabel");
 
-        _restartButton = GetNodeOrNull<Button>("VBoxContainer/ButtonContainer/RestartButton")
-            ?? FindUIElement<Button>("RestartButton");
+        if (RestartButtonPath != null && RestartButtonPath.ToString() != "")
+            _restartButton = GetNodeOrNull<Button>(RestartButtonPath);
+        _restartButton ??= GetNodeOrNull<Button>("VBoxContainer/ButtonContainer/RestartButton") ?? FindUIElement<Button>("RestartButton");
 
-        _quitButton = GetNodeOrNull<Button>("VBoxContainer/ButtonContainer/QuitButton")
-            ?? FindUIElement<Button>("QuitButton");
+        if (QuitButtonPath != null && QuitButtonPath.ToString() != "")
+            _quitButton = GetNodeOrNull<Button>(QuitButtonPath);
+        _quitButton ??= GetNodeOrNull<Button>("VBoxContainer/ButtonContainer/QuitButton") ?? FindUIElement<Button>("QuitButton");
 
         LogDiscoveredElements();
     }

@@ -94,8 +94,8 @@ public partial class GhostMonster : CharacterBody2D
 
         if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
         {
-            // Connect using Godot signals to receive the raw emitted value
-            RealityManager.Instance.Connect("RealityChanged", new Callable(this, nameof(OnRealityChangedSignal)));
+            // Subscribe to typed C# event for direct enum delivery
+            RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
             _realityConnected = true;
             Log.Debug("GhostMonster: Successfully connected to RealityManager signals", "GhostMonster");
         }
@@ -105,35 +105,7 @@ public partial class GhostMonster : CharacterBody2D
         }
     }
 
-    // Wrapper for the Godot signal which emits an int; convert it to the Reality enum and forward
-    private void OnRealityChangedSignal(object rawValue)
-    {
-        try
-        {
-            int intVal = -1;
-
-            // Godot may send signal args as an object array or Godot.Collections.Array
-            if (rawValue is object[] objArr && objArr.Length > 0)
-            {
-                intVal = System.Convert.ToInt32(objArr[0]);
-            }
-            else if (rawValue is GodotCollections.Array gdArr && gdArr.Count > 0)
-            {
-                intVal = System.Convert.ToInt32(gdArr[0]);
-            }
-            else
-            {
-                intVal = System.Convert.ToInt32(rawValue);
-            }
-
-            var reality = (MarrieGame.Core.Enums.Reality)intVal;
-            OnRealityChanged(reality);
-        }
-        catch (System.Exception ex)
-        {
-            Log.Warning($"GhostMonster: Received RealityChanged signal with unexpected value - {ex.Message}", "GhostMonster");
-        }
-    }
+    // OnRealityChanged(Reality) will be invoked directly via RealityChangedEvent (typed C# event)
 
     private void OnRealityChanged(Reality newReality)
     {

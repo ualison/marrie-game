@@ -8,6 +8,7 @@ using System.Linq;
 /// </summary>
 public partial class ReplaySystemManager : Node
 {
+    private EventSubscriptionHelper _subscriptionHelper = new();
     #region Singleton
     public static ReplaySystemManager Instance { get; private set; }
     #endregion
@@ -33,7 +34,10 @@ public partial class ReplaySystemManager : Node
             
             // Connect to events
             PlayerStateManager.PlayerDied += OnPlayerDied;
+            _subscriptionHelper.AddUnsubscriber(() => PlayerStateManager.PlayerDied -= OnPlayerDied);
+
             GameEventSystem.GameRestart += OnGameRestart;
+            _subscriptionHelper.AddUnsubscriber(() => GameEventSystem.GameRestart -= OnGameRestart);
             
             // Initialize
             CallDeferred(nameof(Initialize));
@@ -50,8 +54,8 @@ public partial class ReplaySystemManager : Node
         if (Instance == this)
         {
             Instance = null;
-            PlayerStateManager.PlayerDied -= OnPlayerDied;
-            GameEventSystem.GameRestart -= OnGameRestart;
+            // Centralized cleanup
+            _subscriptionHelper.UnsubscribeAll();
         }
     }
     #endregion
@@ -89,7 +93,7 @@ public partial class ReplaySystemManager : Node
     #endregion
 
     #region Event Handlers
-    private void OnPlayerDied(Vector2 deathPosition, int health)
+    private void OnPlayerDied(MarrieGame.Core.Models.PlayerDeath death)
     {
         // Check if we have current recording data
         bool hasCurrentRecording = _recorder?.HasRecordedData ?? false;
@@ -101,11 +105,11 @@ public partial class ReplaySystemManager : Node
         }
 
         // Always stop current recording and save death record
-        _recorder.StopRecording();
-        SaveDeathRecord(deathPosition);
-        
-        // Important event - player deaths should be tracked for debugging
-        Log.Info($"Player death recorded at {deathPosition} (Total deaths: {_deathRecords.Count})", "ReplaySystemManager");
+    _recorder.StopRecording();
+    SaveDeathRecord(death.Position);
+
+    // Important event - player deaths should be tracked for debugging
+    Log.Info($"Player death recorded at {death.Position} (Total deaths: {_deathRecords.Count})", "ReplaySystemManager");
     }
 
     private void OnGameRestart()

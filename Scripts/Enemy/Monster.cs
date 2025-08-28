@@ -35,6 +35,13 @@ public partial class Monster : CharacterBody2D
     #endregion
 
     #region Components
+    [Export] public NodePath AnimatedSpritePath;
+    [Export] public NodePath SpritePath;
+    [Export] public NodePath MonsterLifePath;
+    [Export] public NodePath MonsterLifeBarPath;
+    [Export] public NodePath FootstepAudioPath;
+    [Export] public NodePath DamageAreaPath;
+
     private Player _player;
     private MonsterLife _monsterLife;
     private MonsterLifeBar _monsterLifeBar;
@@ -95,7 +102,7 @@ public partial class Monster : CharacterBody2D
 
         if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
         {
-            RealityManager.Instance.Connect("RealityChanged", new Callable(this, nameof(OnRealityChangedSignal)));
+            RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
             _realityConnected = true;
             // Immediately apply current reality state to life bar
             ApplyRealityToLifeBar(RealityManager.Instance.CurrentReality);
@@ -107,33 +114,7 @@ public partial class Monster : CharacterBody2D
         }
     }
 
-    private void OnRealityChangedSignal(object rawValue)
-    {
-        try
-        {
-            int intVal = -1;
-
-            if (rawValue is object[] objArr && objArr.Length > 0)
-            {
-                intVal = System.Convert.ToInt32(objArr[0]);
-            }
-            else if (rawValue is Godot.Collections.Array gdArr && gdArr.Count > 0)
-            {
-                intVal = System.Convert.ToInt32(gdArr[0]);
-            }
-            else
-            {
-                intVal = System.Convert.ToInt32(rawValue);
-            }
-
-            var reality = (Reality)intVal;
-            OnRealityChanged(reality);
-        }
-        catch (System.Exception ex)
-        {
-            Log.Warning($"Monster: Received RealityChanged signal with unexpected value - {ex.Message}", "Monster");
-        }
-    }
+    // Note: OnRealityChanged(Reality) will be invoked directly via RealityChangedEvent (typed C# event)
 
     private void OnRealityChanged(Reality newReality)
     {
@@ -197,12 +178,31 @@ public partial class Monster : CharacterBody2D
 
     private void FindSprite()
     {
-        // Try AnimatedSprite2D first, then Sprite2D
-        var animatedSprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
-        if (animatedSprite != null)
+        // Prefer NodePath-configured nodes when provided
+        if (AnimatedSpritePath != null && AnimatedSpritePath.ToString() != "")
         {
-            _spriteNode = animatedSprite;
-            _sprite = null; // Clear sprite reference when using animated sprite
+            var animatedSprite = GetNodeOrNull<AnimatedSprite2D>(AnimatedSpritePath);
+            if (animatedSprite != null)
+            {
+                _spriteNode = animatedSprite;
+                _sprite = null;
+                return;
+            }
+        }
+
+        if (SpritePath != null && SpritePath.ToString() != "")
+        {
+            _sprite = GetNodeOrNull<Sprite2D>(SpritePath);
+            _spriteNode = _sprite;
+            if (_spriteNode != null) return;
+        }
+
+        // Fallback: Try AnimatedSprite2D first, then Sprite2D
+        var animatedSpriteFallback = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
+        if (animatedSpriteFallback != null)
+        {
+            _spriteNode = animatedSpriteFallback;
+            _sprite = null;
         }
         else
         {
@@ -211,15 +211,16 @@ public partial class Monster : CharacterBody2D
         }
 
         if (_spriteNode == null)
-        {
             Log.Error("Monster: No sprite component found!", "Monster");
-        }
     }
 
     private void FindMonsterLife()
     {
-        // Find MonsterLife component
-        _monsterLife = GetNodeOrNull<MonsterLife>("MonsterLife");
+        // Prefer configured path
+        if (MonsterLifePath != null && MonsterLifePath.ToString() != "")
+            _monsterLife = GetNodeOrNull<MonsterLife>(MonsterLifePath);
+
+        _monsterLife ??= GetNodeOrNull<MonsterLife>("MonsterLife");
 
         if (_monsterLife == null)
         {
@@ -227,7 +228,6 @@ public partial class Monster : CharacterBody2D
         }
         else
         {
-            // Debug level - component discovery success is routine
             Log.Debug("Monster: MonsterLife component found and connected", "Monster");
         }
     }
@@ -235,8 +235,9 @@ public partial class Monster : CharacterBody2D
     private void FindMonsterLifeBar()
     {
         // CRITICAL: Only use the Monster's own life bar, never search globally
-        // This prevents conflicts with GhostMonster life bars
-        _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>("MonsterLifeBar");
+        // Prefer configured NodePath when available
+        if (MonsterLifeBarPath != null && MonsterLifeBarPath.ToString() != "")
+            _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>(MonsterLifeBarPath);
 
         if (_monsterLifeBar == null)
         {
@@ -270,7 +271,10 @@ public partial class Monster : CharacterBody2D
     {
         if (!EnableFollowerBehavior) return;
 
-        _footstepAudio = GetNodeOrNull<AudioStreamPlayer2D>("FootstepAudio");
+        if (FootstepAudioPath != null && FootstepAudioPath.ToString() != "")
+            _footstepAudio = GetNodeOrNull<AudioStreamPlayer2D>(FootstepAudioPath);
+
+        _footstepAudio ??= GetNodeOrNull<AudioStreamPlayer2D>("FootstepAudio");
         if (_footstepAudio == null)
         {
             _footstepAudio = new AudioStreamPlayer2D { Name = "FootstepAudio" };
@@ -280,7 +284,10 @@ public partial class Monster : CharacterBody2D
 
     private void SetupDamageArea()
     {
-        _damageArea = GetNodeOrNull<Area2D>("DamageArea");
+        if (DamageAreaPath != null && DamageAreaPath.ToString() != "")
+            _damageArea = GetNodeOrNull<Area2D>(DamageAreaPath);
+
+        _damageArea ??= GetNodeOrNull<Area2D>("DamageArea");
 
         if (_damageArea == null)
         {

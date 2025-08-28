@@ -4,6 +4,7 @@ using Godot;
 // Manages all enemy behavior and spawning separate from GameManager
 public partial class EnemyManager : Node
 {
+    private EventSubscriptionHelper _subscriptionHelper = new();
     #region Singleton
     public static EnemyManager Instance { get; private set; }
     #endregion
@@ -31,7 +32,10 @@ public partial class EnemyManager : Node
         CallDeferred(nameof(DiscoverEnemies));
         // Connect to global game events
         GameEventSystem.PlayerDied += OnPlayerDeath;
-        GameEventSystem.GameRestart += OnGameRestart;
+        _subscriptionHelper.AddUnsubscriber(() => GameEventSystem.PlayerDied -= OnPlayerDeath);
+
+    GameEventSystem.GameRestart += OnGameRestart;
+    _subscriptionHelper.AddUnsubscriber(() => GameEventSystem.GameRestart -= OnGameRestart);
         // Debug level - system initialization is routine
         Log.Debug("EnemyManager initialized", "EnemyManager");
     }
@@ -139,13 +143,13 @@ public partial class EnemyManager : Node
     #endregion
 
     #region Game Events
-    public void OnPlayerDeath(Vector2 position, int remainingHealth)
+    public void OnPlayerDeath(MarrieGame.Core.Models.PlayerDeath death)
     {
-    if (_isPlayerDead) return;
-    _isPlayerDead = true;
-    // Handle player death - could pause all enemies or trigger special behavior
-    HideAllFollowers();
-    Log.System($"Player died at {position} (health: {remainingHealth}), hiding all followers", "EnemyManager");
+        if (_isPlayerDead) return;
+        _isPlayerDead = true;
+        // Handle player death - could pause all enemies or trigger special behavior
+        HideAllFollowers();
+        Log.System($"Player died at {death.Position} (health: {death.RemainingHealth}), hiding all followers", "EnemyManager");
     }
 
     public void OnGameRestart()
@@ -186,9 +190,8 @@ public partial class EnemyManager : Node
     {
         if (Instance == this)
         {
-            // Unsubscribe from global game events
-            GameEventSystem.PlayerDied -= OnPlayerDeath;
-            GameEventSystem.GameRestart -= OnGameRestart;
+            // Centralized unsubscribe
+            _subscriptionHelper.UnsubscribeAll();
             Instance = null;
         }
     }

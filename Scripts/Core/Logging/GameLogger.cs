@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace MarrieGame.Core.Logging
 {
@@ -17,8 +18,8 @@ namespace MarrieGame.Core.Logging
     // Why: reduce noisy logs in production while keeping important categories active
     private readonly Dictionary<LogCategory, bool> _categoryFilters = new();
         
-        // Performance tracking
-        private readonly Dictionary<string, DateTime> _performanceTimers = new();
+    // Performance tracking (use high-resolution Stopwatch)
+    private readonly Dictionary<string, Stopwatch> _performanceTimers = new();
         
         public override void _Ready()
         {
@@ -155,14 +156,15 @@ namespace MarrieGame.Core.Logging
         #region Performance Tracking
         public void StartPerformanceTimer(string timerName)
         {
-            _performanceTimers[timerName] = DateTime.Now;
+            _performanceTimers[timerName] = Stopwatch.StartNew();
         }
         
         public void EndPerformanceTimer(string timerName, string operation = "")
         {
-            if (_performanceTimers.TryGetValue(timerName, out DateTime startTime))
+            if (_performanceTimers.TryGetValue(timerName, out Stopwatch sw))
             {
-                var elapsed = (DateTime.Now - startTime).TotalMilliseconds;
+                sw.Stop();
+                var elapsed = sw.Elapsed.TotalMilliseconds;
                 var message = string.IsNullOrEmpty(operation) ? timerName : $"{operation} ({timerName})";
                 LogPerformance(message, elapsed);
                 _performanceTimers.Remove(timerName);

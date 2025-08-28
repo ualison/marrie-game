@@ -11,6 +11,11 @@ public partial class Player : CharacterBody2D, IPausable, IResettable
     [Export] public float Speed = 120.0f;
     [Export] public float JumpHeight = 100.0f;
     [Export] public bool StartFacingRight = true; // Configurable initial direction
+
+    // Editor-assigned node paths to avoid fragile string lookups at runtime
+    [Export] public NodePath SpritePath;
+    [Export] public NodePath HurtBoxPath;
+    [Export] public NodePath PlayerLifePath;
     #endregion
 
     #region Movement State
@@ -85,7 +90,15 @@ public partial class Player : CharacterBody2D, IPausable, IResettable
     #region Component Setup
     private void FindSpriteComponent()
     {
-        // Find sprite component with optimized search order
+        // Prefer an editor-assigned NodePath when available (less brittle)
+        if (SpritePath != null && SpritePath.ToString() != "")
+        {
+            _sprite = GetNodeOrNull<Node2D>(SpritePath);
+            if (_sprite != null)
+                return;
+        }
+
+        // Fallback: find sprite component with optimized search order
         _sprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D")
             ?? GetNodeOrNull<Sprite2D>("Sprite2D")
             ?? GetNodeOrNull<Node2D>("MarrieSprite")
@@ -106,7 +119,13 @@ public partial class Player : CharacterBody2D, IPausable, IResettable
     private void SetupLifeSystem()
     {
         // Find or create PlayerLife component
-        _playerLife = GetNodeOrNull<PlayerLife>("PlayerLife") ?? FindPlayerLifeInChildren();
+        // Prefer an editor-assigned NodePath when provided
+        if (PlayerLifePath != null && PlayerLifePath.ToString() != "")
+        {
+            _playerLife = GetNodeOrNull<PlayerLife>(PlayerLifePath);
+        }
+
+        _playerLife ??= GetNodeOrNull<PlayerLife>("PlayerLife") ?? FindPlayerLifeInChildren();
 
         if (_playerLife == null)
         {
@@ -146,7 +165,13 @@ public partial class Player : CharacterBody2D, IPausable, IResettable
 
     private void SetupHurtBox()
     {
-        _hurtBox = GetNodeOrNull<Area2D>("HurtBox");
+        // Prefer editor-assigned HurtBox path when available
+        if (HurtBoxPath != null && HurtBoxPath.ToString() != "")
+        {
+            _hurtBox = GetNodeOrNull<Area2D>(HurtBoxPath);
+        }
+
+        _hurtBox ??= GetNodeOrNull<Area2D>("HurtBox");
         if (_hurtBox != null)
         {
             // Remove the old enter-based detection:

@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using MarrieGame.Core.Enums;
 
 /// <summary>
 /// Central event system for game-wide communication
@@ -8,17 +9,17 @@ using System;
 public static class GameEventSystem
 {
     // Player Events
-    public static event Action<Vector2, int> PlayerDied;
-    public static event Action<int, int> PlayerHealthChanged;
+    public static event Action<MarrieGame.Core.Models.PlayerDeath> PlayerDied;
+    public static event Action<MarrieGame.Core.Models.PlayerHealth> PlayerHealthChanged;
     public static event Action<int, int> PlayerManaChanged;
     public static event Action PlayerManaRestored;
     public static event Action PlayerManaDepleted;
     
     // Monster Events
-    public static event Action<int, int, int> MonsterHealthChanged;
+    public static event Action<MarrieGame.Core.Models.MonsterHealth> MonsterHealthChanged;
     
     // Game State Events
-    public static event Action<string> GameStateChanged;
+    public static event Action<GameState> GameStateChanged;
     public static event Action GameRestart;
     public static event Action GameRestarted;
     
@@ -26,14 +27,15 @@ public static class GameEventSystem
     public static event Action<Vector2> ReplayGemCreated;
     
     #region Player Event Triggers
-    public static void OnPlayerDied(Vector2 position, int remainingHealth)
+    public static void OnPlayerDied(MarrieGame.Core.Models.PlayerDeath payload)
     {
-        PlayerDied?.Invoke(position, remainingHealth);
+        PlayerDied?.Invoke(payload);
     }
     
     public static void OnPlayerHealthChanged(int currentHealth, int maxHealth)
     {
-        PlayerHealthChanged?.Invoke(currentHealth, maxHealth);
+        var payload = new MarrieGame.Core.Models.PlayerHealth(currentHealth, maxHealth);
+        PlayerHealthChanged?.Invoke(payload);
     }
     
     public static void OnPlayerManaChanged(int currentMana, int maxMana)
@@ -55,12 +57,13 @@ public static class GameEventSystem
     #region Monster Event Triggers
     public static void OnMonsterHealthChanged(int currentHealth, int maxHealth, int purpleHearts)
     {
-        MonsterHealthChanged?.Invoke(currentHealth, maxHealth, purpleHearts);
+        var payload = new MarrieGame.Core.Models.MonsterHealth(currentHealth, maxHealth, purpleHearts);
+        MonsterHealthChanged?.Invoke(payload);
     }
     #endregion
     
     #region Game State Event Triggers
-    public static void OnGameStateChanged(string newState)
+    public static void OnGameStateChanged(GameState newState)
     {
         GameStateChanged?.Invoke(newState);
     }

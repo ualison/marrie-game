@@ -22,9 +22,15 @@ public partial class MonsterLifeBar : Control
     #endregion
 
     #region Components
+    // Editor-exposed NodePaths to reduce fragile string lookups
+    [Export] public NodePath HeartsContainerPath;
+    [Export] public NodePath MonsterLifePath;
+    [Export] public NodePath MonsterNodePath;
+
     private HBoxContainer _heartsContainer;
     private MonsterLife _lifeSystem;
     private Node2D _monster;
+    private EventSubscriptionHelper _subscriptionHelper = new();
     private Camera2D _cachedCamera;
     private Vector2 _lastMonsterPos = new Vector2(float.NaN, float.NaN);
     private Vector2 _lastCameraPos = new Vector2(float.NaN, float.NaN);
@@ -43,7 +49,8 @@ public partial class MonsterLifeBar : Control
         // Connect to reality changes
         if (RealityManager.IsInstanceAvailable)
         {
-            RealityManager.Instance.RealityChanged += OnRealityChanged;
+                RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
+                _subscriptionHelper.AddUnsubscriber(() => RealityManager.Instance.RealityChangedEvent -= OnRealityChanged);
         }
         else
         {
@@ -56,13 +63,21 @@ public partial class MonsterLifeBar : Control
     {
         if (RealityManager.IsInstanceAvailable)
         {
-            RealityManager.Instance.RealityChanged += OnRealityChanged;
+                RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
+                _subscriptionHelper.AddUnsubscriber(() => RealityManager.Instance.RealityChangedEvent -= OnRealityChanged);
         }
     }
 
     private void InitializeContainer()
     {
-        // Ensure hearts container exists in scene structure
+        // Prefer an editor-assigned NodePath when present
+        if (HeartsContainerPath != null && HeartsContainerPath.ToString() != "")
+        {
+            _heartsContainer = GetNodeOrNull<HBoxContainer>(HeartsContainerPath);
+            if (_heartsContainer != null) return;
+        }
+
+        // Fallback: ensure hearts container exists in scene structure
         _heartsContainer = GetNodeOrNull<HBoxContainer>("HeartsContainer");
 
         if (_heartsContainer == null)
@@ -553,13 +568,11 @@ public partial class MonsterLifeBar : Control
     #region Cleanup
     public override void _ExitTree()
     {
-        // Clean up reality manager connection
-        if (RealityManager.IsInstanceAvailable)
-        {
-            RealityManager.Instance.RealityChanged -= OnRealityChanged;
-        }
-        // Clean up life system connection
-        DisconnectFromCurrentLifeSystem();
+    // Centralized cleanup of subscriptions registered via helper
+    _subscriptionHelper.UnsubscribeAll();
+
+    // Clean up life system connection
+    DisconnectFromCurrentLifeSystem();
     }
     #endregion
 }

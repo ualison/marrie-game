@@ -107,10 +107,12 @@ public partial class GameManager : Node
 
     private void VerifyRealityManagerInitialization()
     {
-        Log.System($"Verifying RealityManager initialization - IsInstanceAvailable: {RealityManager.IsInstanceAvailable}", "GameManager");
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+            Log.System($"Verifying RealityManager initialization - IsInstanceAvailable: {RealityManager.IsInstanceAvailable}", "GameManager");
         if (RealityManager.IsInstanceAvailable)
         {
-            Log.System($"RealityManager successfully initialized with reality: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "GameManager");
+            if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+                Log.System($"RealityManager successfully initialized with reality: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "GameManager");
         }
         else
         {
@@ -126,10 +128,10 @@ public partial class GameManager : Node
         Log.System("Event subscriptions active", "GameManager");
     }
 
-    private void OnPlayerDied(Vector2 deathPosition, int remainingHealth)
+    private void OnPlayerDied(MarrieGame.Core.Models.PlayerDeath death)
     {
         // Important game event - always log player deaths for analysis
-        Log.Error($"Coordinating player death response at {deathPosition} (Health: {remainingHealth})", "GameManager");
+        Log.Error($"Coordinating player death response at {death.Position} (Health: {death.RemainingHealth})", "GameManager");
 
         // Pause the game
         PauseGame();
@@ -168,7 +170,7 @@ public partial class GameManager : Node
         IsPaused = true;
         GetTree().Paused = true;
 
-        GameEventSystem.OnGameStateChanged("Paused");
+    GameEventSystem.OnGameStateChanged(MarrieGame.Core.Enums.GameState.Paused);
         Log.Gameplay("Game paused", "GameManager");
     }
 
@@ -179,7 +181,7 @@ public partial class GameManager : Node
         IsPaused = false;
         GetTree().Paused = false;
 
-        GameEventSystem.OnGameStateChanged("Active");
+    GameEventSystem.OnGameStateChanged(MarrieGame.Core.Enums.GameState.Active);
         Log.Gameplay("Game resumed", "GameManager");
     }
 
@@ -229,6 +231,9 @@ public partial class GameManager : Node
         {
             // Cleanup subscriptions
             GameEventSystem.GameRestart -= OnGameRestart;
+
+            // Clear any remaining static subscriptions to avoid memory leaks
+            GameEventSystem.ClearAllSubscriptions();
 
             Instance = null;
             Log.System("Cleaned up", "GameManager");

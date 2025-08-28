@@ -41,7 +41,7 @@ public partial class ReplayGem : Node2D
         if (RealityManager.IsInstanceAvailable)
         {
             Log.Replay($"RealityManager found during ReplayGem init - Current reality: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "ReplayGem");
-            RealityManager.Instance.RealityChanged += OnRealityChanged;
+            RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
         }
         else
         {
@@ -65,7 +65,7 @@ public partial class ReplayGem : Node2D
     {
         if (RealityManager.IsInstanceAvailable)
         {
-            RealityManager.Instance.RealityChanged += OnRealityChanged;
+            RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
             // Apply current reality immediately
             OnRealityChanged(RealityManager.Instance.CurrentReality);
         }
@@ -229,7 +229,7 @@ public partial class ReplayGem : Node2D
         // Clean up reality manager connection
         if (RealityManager.IsInstanceAvailable)
         {
-            RealityManager.Instance.RealityChanged -= OnRealityChanged;
+            RealityManager.Instance.RealityChangedEvent -= OnRealityChanged;
         }
     }
 
