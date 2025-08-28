@@ -305,7 +305,21 @@ public partial class Monster : CharacterBody2D, IPoolable
             CreateDamageArea();
         }
 
-        _damageArea.BodyEntered += OnPlayerEntered;
+        // Ensure we don't attach the handler multiple times and enable monitoring
+        try
+        {
+            var callable = new Callable(this, nameof(OnPlayerEntered));
+            if (!_damageArea.IsConnected("body_entered", callable))
+                _damageArea.BodyEntered += OnPlayerEntered;
+        }
+        catch
+        {
+            // Fallback: attach directly if the reflection-based check fails
+            try { _damageArea.BodyEntered += OnPlayerEntered; } catch { }
+        }
+
+        _damageArea.Monitoring = true;
+        _damageArea.Monitorable = true;
     }
 
     private void CreateDamageArea()
@@ -930,16 +944,16 @@ public partial class Monster : CharacterBody2D, IPoolable
             Log.Debug($"Monster {Name} collision with Player {body.Name} - IsGhost: {body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster")}", "Monster");
         }
 
-    if (!player.LifeSystem?.IsDead == true)
-        {
-            // Check if we can damage based on behavior mode
-            if (EnableFollowerBehavior && !CanTakeDamage()) return;
+        // Only proceed if player is alive
+        if (player.LifeSystem?.IsDead == true) return;
 
-            Log.Debug($"Monster {Name} attempting damage to player", "Monster");
-            if (player.TakeDamage(DamageAmount))
-            {
-                PlayDamageEffect();
-            }
+        // Check if we can damage based on behavior mode and invulnerability
+        if (EnableFollowerBehavior && !CanTakeDamage()) return;
+
+        Log.Debug($"Monster {Name} attempting damage to player", "Monster");
+        if (player.TakeDamage(DamageAmount))
+        {
+            PlayDamageEffect();
         }
     }
     #endregion

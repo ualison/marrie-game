@@ -23,6 +23,35 @@ public partial class Monster : CharacterBody2D
             SetCollisionMask(1u);
             SetCollisionLayer(1u);
 
+            // If the damage area exists, ensure it's monitoring and check for any
+            // overlapping players that might already be inside the area. Godot
+            // does not emit BodyEntered when an area's collision mask/layer is
+            // changed while another body is already overlapping, so we must
+            // manually check and process overlaps here to avoid requiring the
+            // player to exit/re-enter.
+            try
+            {
+                if (_damageArea != null)
+                {
+                    _damageArea.Monitoring = true;
+                    _damageArea.Monitorable = true;
+
+                    var overlappingBodies = _damageArea.GetOverlappingBodies();
+                    foreach (var b in overlappingBodies)
+                    {
+                        if (b is Node2D body && body.IsInGroup("player"))
+                        {
+                            // Call the same handler used by the BodyEntered signal
+                            OnPlayerEntered(body);
+                        }
+                    }
+                }
+            }
+            catch {
+                // Swallow any errors to avoid breaking fade-in flow; logging already
+                // happens elsewhere and this is defensive for editor/runtime differences.
+            }
+
             // Delay showing life bar slightly to ensure position is correct
             GetTree().CreateTimer(0.1f).Timeout += () =>
             {

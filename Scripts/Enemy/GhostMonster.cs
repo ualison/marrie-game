@@ -547,7 +547,19 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         {
             CreateDamageArea();
         }
-        _damageArea.BodyEntered += OnPlayerEntered;
+        try
+        {
+            var callable = new Callable(this, nameof(OnPlayerEntered));
+            if (!_damageArea.IsConnected("body_entered", callable))
+                _damageArea.BodyEntered += OnPlayerEntered;
+        }
+        catch
+        {
+            try { _damageArea.BodyEntered += OnPlayerEntered; } catch { }
+        }
+
+        _damageArea.Monitoring = true;
+        _damageArea.Monitorable = true;
     }
 
     private void CreateDamageArea()
@@ -571,16 +583,17 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         {
             return;
         }
-        bool isGhost = body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster");
-        Log.Debug($"GhostMonster {Name} collision with Player {body.Name} - IsGhost: {isGhost}", "GhostMonster");
-    if (!player.LifeSystem?.IsDead == true)
-        {
+            bool isGhost = body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster");
+            Log.Debug($"GhostMonster {Name} collision with Player {body.Name} - IsGhost: {isGhost}", "GhostMonster");
+
+            // Only proceed if player is alive
+            if (player.LifeSystem?.IsDead == true) return;
+
             Log.Debug($"GhostMonster {Name} attempting damage to player", "GhostMonster");
             if (player.TakeDamage(1)) // Default damage amount for ghost
             {
                 PlayDamageEffect(Colors.Purple);
             }
-        }
     }
 
     private void SetupLifeSystem()
