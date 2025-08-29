@@ -183,6 +183,36 @@ public partial class MonsterLife : Node, IHealthSystem
 
     private void NotifyLifeChanged()
     {
-        EmitSignal("LifeChanged", CurrentLife, MaxLife, PurpleHearts);
+        // Emit the current purple hearts (not the configured max) so listeners
+        // receive accurate, real-time state. This fixes incorrect UI/manager
+        // behavior that was observing the configured PurpleHearts value.
+        EmitSignal("LifeChanged", CurrentLife, MaxLife, CurrentPurpleHearts);
+    }
+
+    // Allows an external controller (e.g., EnemyManager) to synchronize the
+    // life values for paired entities. This sets the internal red/purple
+    // counters within valid bounds and notifies listeners. It's intentionally
+    // simple and idempotent to avoid recursive update storms.
+    public void SetHearts(int redHearts, int purpleHearts)
+    {
+        // Clamp values to valid ranges
+        int redMax = MaxLife - PurpleHearts;
+        int newRed = Mathf.Clamp(redHearts, 0, redMax);
+        int newPurple = Mathf.Clamp(purpleHearts, 0, PurpleHearts);
+
+        // If nothing changed, avoid emitting signals
+        if (newRed == _currentRedHearts && newPurple == _currentPurpleHearts)
+            return;
+
+        _currentRedHearts = newRed;
+        _currentPurpleHearts = newPurple;
+
+        NotifyLifeChanged();
+
+        if (IsDead)
+        {
+            // Emit death once if this transition caused death.
+            EmitSignal("MonsterDied");
+        }
     }
 }
