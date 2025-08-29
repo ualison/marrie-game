@@ -17,29 +17,18 @@ separation = 2
 [node name="FpsLabel" type="Label" parent="VBox/Panel/Inner"]
 text = "FPS:"
 
-[node name="FrameLabel" type="Label" parent="VBox/Panel/Inner"]
-text = "Frame:"
 
 [node name="MemLabel" type="Label" parent="VBox/Panel/Inner"]
-text = "Memory:"
+text = "System RAM:"
 
-[node name="DrawLabel" type="Label" parent="VBox/Panel/Inner"]
-text = "Draw calls:"
+
 
 [node name="NodeLabel" type="Label" parent="VBox/Panel/Inner"]
 text = "Nodes:"
 
-[node name="PhysLabel" type="Label" parent="VBox/Panel/Inner"]
-text = "Physics:"
-
-[node name="CpuLabel" type="Label" parent="VBox/Panel/Inner"]
-text = "CPU:"
 
 [node name="ProcRamLabel" type="Label" parent="VBox/Panel/Inner"]
-text = "Proc RAM:"
-
-[node name="GpuLabel" type="Label" parent="VBox/Panel/Inner"]
-text = "GPU:"
+text = "Process RAM:"
 
 [node name="VramLabel" type="Label" parent="VBox/Panel/Inner"]
 text = "VRAM:"

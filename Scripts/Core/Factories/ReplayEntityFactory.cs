@@ -228,6 +228,13 @@ public static class ReplayEntityFactory
         {
             parent.CallDeferred(Node.MethodName.AddChild, nodeToAdd);
 
+            // Notify EnemyManager that ghosts changed so it can rebuild pairings
+            var timerNotify = parent.GetTree().CreateTimer(0.02f);
+            timerNotify.Timeout += () =>
+            {
+                try { EnemyManager.Instance?.NotifyGhostsChanged(); } catch { }
+            };
+
             // Use a timer to call setup after the ghost is properly added
             var timer = parent.GetTree().CreateTimer(0.01f);
             timer.Timeout += () =>

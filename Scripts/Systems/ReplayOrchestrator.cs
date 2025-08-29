@@ -208,8 +208,17 @@ public partial class ReplayOrchestrator : Node
             }
             else if (monster is Node2D monsterNode2D)
             {
-                monsterNode2D.Show();
-                Log.Debug($"Monster {monster.Name} shown after replay", "ReplayOrchestrator");
+                // Don't show simple monsters that are hidden as part of a paired hide
+                var m = monster as Monster;
+                if (m != null && EnemyManager.Instance != null && EnemyManager.Instance.IsMonsterHiddenByPair(m))
+                {
+                    Log.Debug($"Skipping show for {monster.Name} after replay because it's hidden by pair", "ReplayOrchestrator");
+                }
+                else
+                {
+                    monsterNode2D.Show();
+                    Log.Debug($"Monster {monster.Name} shown after replay", "ReplayOrchestrator");
+                }
             }
         }
     }

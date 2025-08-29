@@ -33,18 +33,41 @@ public partial class Monster : CharacterBody2D
             {
                 if (_damageArea != null)
                 {
-                    _damageArea.Monitoring = true;
-                    _damageArea.Monitorable = true;
-
-                    var overlappingBodies = _damageArea.GetOverlappingBodies();
-                    foreach (var b in overlappingBodies)
+                    // Ensure the damage area is configured to detect players when we
+                    // enable it during fade-in. Area2D must be placed on a collision
+                    // layer that the player belongs to; otherwise GetOverlappingBodies
+                    // will return empty even if the bodies are overlapping.
+                    // Configure the area's collision mask to detect the player's
+                    // collision layer. Don't hardcode layer ids — read the player's
+                    // CollisionLayer at runtime if possible.
+                    try
                     {
-                        if (b is Node2D body && body.IsInGroup("player"))
+                        var playerNode = GetTree().GetFirstNodeInGroup("player") as PhysicsBody2D;
+                        if (playerNode != null)
                         {
-                            // Call the same handler used by the BodyEntered signal
-                            OnPlayerEntered(body);
+                            _damageArea.CollisionMask = playerNode.CollisionLayer;
                         }
+                        else
+                        {
+                            // Fallback to existing mask if present, otherwise common player layer 2
+                            _damageArea.CollisionMask = _damageArea.CollisionMask != 0 ? _damageArea.CollisionMask : 2;
+                        }
+
+                        // Keep the area's collision layer consistent with the monster's
+                        // collision layer so other systems that depend on layers behave
+                        // correctly.
+                        _damageArea.CollisionLayer = GetCollisionLayer();
+                        // Use deferred set to avoid calling into Godot core during signal handling
+                        try { _damageArea.SetDeferred("monitoring", true); } catch { _damageArea.Monitoring = true; }
+                        try { _damageArea.SetDeferred("monitorable", true); } catch { _damageArea.Monitorable = true; }
                     }
+                    catch { }
+
+                    // Defer the overlap check until after monitoring has been
+                    // applied. SetDeferred schedules the monitoring change for the
+                    // end of the frame; CallDeferred will run our overlap check
+                    // after that so GetOverlappingBodies() will work reliably.
+                    CallDeferred(nameof(HandleDamageAreaEnable));
                 }
             }
             catch {
@@ -84,6 +107,21 @@ public partial class Monster : CharacterBody2D
             _monsterLifeBar.Hide();
         }
 
+        // Disable the damage area while fading out so it doesn't continue to
+        // detect or report overlaps while the monster is invisible.
+        try
+        {
+                if (_damageArea != null)
+                {
+                    try { _damageArea.SetDeferred("monitoring", false); } catch { _damageArea.Monitoring = false; }
+                    try { _damageArea.SetDeferred("monitorable", false); } catch { _damageArea.Monitorable = false; }
+                    // Put the area on no layer to avoid any accidental detection
+                    // from other systems while hidden.
+                    _damageArea.CollisionLayer = 0;
+                }
+        }
+        catch { }
+
         _currentTween = CreateTween();
         _currentTween.TweenProperty(_spriteNode, "modulate:a", 0.0f, 0.5f);
         _currentTween.TweenCallback(Callable.From(() =>
@@ -103,6 +141,50 @@ public partial class Monster : CharacterBody2D
             _footstepAudio.Play();
         else if (!play)
             _footstepAudio.Stop();
+    }
+
+    // Helper invoked deferred after enabling the damage area's monitoring so
+    // GetOverlappingBodies() can be called without hitting the engine's locked state.
+    private void HandleDamageAreaEnable()
+    {
+        if (_damageArea == null) return;
+
+        try
+        {
+            var overlappingBodies = _damageArea.GetOverlappingBodies();
+            foreach (var b in overlappingBodies)
+            {
+                if (b is Node2D body && body.IsInGroup("player"))
+                    OnPlayerEntered(body);
+            }
+        }
+        catch { }
+
+        // Fallback proximity check
+        try
+        {
+            var playerNode = GetTree().GetFirstNodeInGroup("player") as Node2D;
+            if (playerNode != null)
+            {
+                float radius = 32.0f;
+                try
+                {
+                    foreach (Node child in _damageArea.GetChildren())
+                    {
+                        if (child is CollisionShape2D cs && cs.Shape is CircleShape2D circle)
+                        {
+                            radius = circle.Radius;
+                            break;
+                        }
+                    }
+                }
+                catch { }
+
+                if (playerNode.GlobalPosition.DistanceTo(GlobalPosition) <= radius)
+                    OnPlayerEntered(playerNode);
+            }
+        }
+        catch { }
     }
 
     public void PlayDamageEffect()

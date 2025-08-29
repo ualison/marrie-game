@@ -1,5 +1,6 @@
 using Godot;
 using MarrieGame.Core.Interfaces;
+using MarrieGame.Core.Enums;
 
 // Player mana management with regeneration and event notifications
 public partial class PlayerMana : Node, IManaSystem
@@ -100,8 +101,8 @@ public partial class PlayerMana : Node, IManaSystem
             GameEventSystem.OnPlayerManaDepleted();
         }
 
-        // Start regen delay if auto-regeneration is enabled and player is not paused
-        if (AutoRegenerate && !IsPlayerPaused())
+        // Start regen delay if regeneration is allowed by current game state
+        if (CanRegenerate())
             _regenDelayTimer.Start();
 
         return true;
@@ -161,8 +162,8 @@ public partial class PlayerMana : Node, IManaSystem
     #region Regeneration System
     private void StartRegeneration()
     {
-        // Begin mana regeneration if not at full capacity and player is not paused
-        if (!IsFull && AutoRegenerate && !IsPlayerPaused())
+    // Begin mana regeneration if not at full capacity and allowed by auto-regeneration policy
+    if (!IsFull && CanRegenerate())
         {
             IsRegenerating = true;
             _regenTimer.Start();
@@ -179,10 +180,10 @@ public partial class PlayerMana : Node, IManaSystem
 
     private void RegenerateMana()
     {
-        // Only regenerate if player is not paused (not in replay mode)
-        if (IsPlayerPaused())
+        // Only regenerate when allowed (not paused, not in PastReality, auto-regenerate enabled)
+        if (!CanRegenerate())
         {
-            // Pause regeneration during replay
+            // Pause regeneration while conditions are not met
             StopRegeneration();
             return;
         }
@@ -193,6 +194,26 @@ public partial class PlayerMana : Node, IManaSystem
         // Stop if at full capacity
         if (IsFull)
             StopRegeneration();
+    }
+
+    /// <summary>
+    /// Centralized check whether mana regeneration is allowed right now.
+    /// Disables regen during PastReality (replay), when auto-regenerate is off, or when player is paused.
+    /// </summary>
+    private bool CanRegenerate()
+    {
+        if (!AutoRegenerate)
+            return false;
+
+        // If RealityManager is available and we're in PastReality, don't regenerate
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance.CurrentReality == Reality.PastReality)
+            return false;
+
+        // Also ensure player isn't paused
+        if (IsPlayerPaused())
+            return false;
+
+        return true;
     }
 
     private bool IsPlayerPaused()

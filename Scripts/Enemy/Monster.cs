@@ -328,8 +328,32 @@ public partial class Monster : CharacterBody2D, IPoolable
         AddChild(_damageArea);
 
         // Set collision layers/masks to only detect players (layer 1)
-        _damageArea.CollisionLayer = 0; // Don't collide with anything as a layer
-        _damageArea.CollisionMask = 1; // Only detect objects on layer 1 (players)
+        // Configure the damage area's collision mask to detect the player's
+        // collision layer at runtime. Avoid hardcoding layer ids — find the
+        // player and use its CollisionLayer. If no player is present, fall
+        // back to the prefab's CollisionMask or a sensible default (2).
+        try
+        {
+            var playerNode = GetTree().GetFirstNodeInGroup("player") as PhysicsBody2D;
+            if (playerNode != null)
+            {
+                _damageArea.CollisionMask = playerNode.CollisionLayer;
+            }
+            else
+            {
+                _damageArea.CollisionMask = 2; // default player layer in prefabs
+            }
+        }
+        catch
+        {
+            _damageArea.CollisionMask = 2;
+        }
+
+        // Keep the Area on the monster's collision layer so it aligns with
+        // group/layer expectations elsewhere in the game.
+    _damageArea.CollisionLayer = GetCollisionLayer();
+    try { _damageArea.SetDeferred("monitoring", true); } catch { _damageArea.Monitoring = true; }
+    try { _damageArea.SetDeferred("monitorable", true); } catch { _damageArea.Monitorable = true; }
 
         var shape = new CollisionShape2D();
         shape.Shape = new CircleShape2D { Radius = 25.0f };
@@ -410,6 +434,14 @@ public partial class Monster : CharacterBody2D, IPoolable
     public void EnableAfterReplay()
     {
         if (!EnableFollowerBehavior) return;
+        // If EnemyManager exists and reports this monster is hidden due to paired depletion,
+        // skip enabling/resetting here. EnemyManager will restore the monster when appropriate.
+        if (EnemyManager.Instance != null && EnemyManager.Instance.IsMonsterHiddenByPair(this))
+        {
+            // Keep disabled; ReplayOrchestrator/EnemyManager will handle re-enable after pair timeout
+            Log.Debug("Monster.EnableAfterReplay: skipping enable because monster is hidden by paired depletion", "Monster");
+            return;
+        }
 
         IsDisabledForReplay = false;
         SetProcessMode(ProcessModeEnum.Always);

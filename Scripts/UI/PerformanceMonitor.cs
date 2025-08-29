@@ -25,23 +25,18 @@ public partial class PerformanceMonitor : Control
 
     private double frameTimeMs = 0.0;
     private double memMb = 0.0;
-    private int drawCalls = -1; // n/a by default
     private int nodeCount = 0;
-    private double physicsTimeMs = 0.0;
-    private double cpuPercent = 0.0;
     private double processRamMb = 0.0;
-    private double gpuUsagePercent = -1.0; // best-effort placeholder
     private double vramMb = -1.0; // best-effort placeholder
 
     private readonly StringBuilder csvBuilder = new();
 
     // Node refs (initialized to null; guarded before use)
     private Label fpsLabel = null;
-    private Label frameLabel = null;
-    private Label memLabel = null;
-    private Label drawLabel = null;
+    private Label memLabel = null; // now displays System RAM
     private Label nodeLabel = null;
-    private Label physLabel = null;
+    private Label procRamLabel = null; // process RAM label
+    private Label vramLabel = null; // optional VRAM display
     private Line2D graphLine = null;
 
     // CPU sampling
@@ -55,17 +50,16 @@ public partial class PerformanceMonitor : Control
     {
     // Try common paths; fall back to FindNode to be editor-safe
     fpsLabel = GetNodeOrNull<Label>("VBox/FpsLabel") ?? GetNodeOrNull<Label>("VBox/Panel/Inner/FpsLabel") ?? GetNodeOrNull<Label>("FpsLabel");
-    frameLabel = GetNodeOrNull<Label>("VBox/FrameLabel") ?? GetNodeOrNull<Label>("VBox/Panel/Inner/FrameLabel") ?? GetNodeOrNull<Label>("FrameLabel");
     memLabel = GetNodeOrNull<Label>("VBox/MemLabel") ?? GetNodeOrNull<Label>("VBox/Panel/Inner/MemLabel") ?? GetNodeOrNull<Label>("MemLabel");
-    drawLabel = GetNodeOrNull<Label>("VBox/DrawLabel") ?? GetNodeOrNull<Label>("VBox/Panel/Inner/DrawLabel") ?? GetNodeOrNull<Label>("DrawLabel");
     nodeLabel = GetNodeOrNull<Label>("VBox/NodeLabel") ?? GetNodeOrNull<Label>("VBox/Panel/Inner/NodeLabel") ?? GetNodeOrNull<Label>("NodeLabel");
-    physLabel = GetNodeOrNull<Label>("VBox/PhysLabel") ?? GetNodeOrNull<Label>("VBox/Panel/Inner/PhysLabel") ?? GetNodeOrNull<Label>("PhysLabel");
+    procRamLabel = GetNodeOrNull<Label>("VBox/ProcRamLabel") ?? GetNodeOrNull<Label>("VBox/Panel/Inner/ProcRamLabel") ?? GetNodeOrNull<Label>("ProcRamLabel");
+    vramLabel = GetNodeOrNull<Label>("VBox/VramLabel") ?? GetNodeOrNull<Label>("VBox/Panel/Inner/VramLabel") ?? GetNodeOrNull<Label>("VramLabel");
     graphLine = GetNodeOrNull<Line2D>("Graph/Line2D") ?? GetNodeOrNull<Line2D>("VBox/Panel/Graph/Line2D") ?? GetNodeOrNull<Line2D>("Line2D");
 
         // Pre-fill history
         for (int i = 0; i < HistorySize; i++) fpsHistory.Enqueue(0f);
 
-        csvBuilder.AppendLine("timestamp,fps,frame_ms,mem_mb,draw_calls,node_count,physics_ms");
+    csvBuilder.AppendLine("timestamp,fps,frame_ms,system_mem_mb,process_ram_mb,node_count,vram_mb");
 
 
         Visible = false;
@@ -127,30 +121,13 @@ public partial class PerformanceMonitor : Control
         fpsCurrent = (float)Engine.GetFramesPerSecond();
         frameTimeMs = fpsCurrent > 0 ? 1000.0 / Math.Max(1f, fpsCurrent) : 0.0;
 
-        // Memory in MB (system static) and process RAM
-        memMb = OS.GetStaticMemoryUsage() / (1024.0 * 1024.0);
-        processRamMb = currentProcess.WorkingSet64 / (1024.0 * 1024.0);
+    // Memory in MB (system static) and process RAM
+    memMb = OS.GetStaticMemoryUsage() / (1024.0 * 1024.0);
+    processRamMb = currentProcess.WorkingSet64 / (1024.0 * 1024.0);
 
-        // CPU usage approximation for current process (percent)
-        var now = DateTime.UtcNow;
-        var totalProc = currentProcess.TotalProcessorTime;
-        var elapsed = (now - prevSampleTime).TotalSeconds;
-        if (elapsed >= 0.01)
-        {
-            var deltaProc = (totalProc - prevTotalProcTime).TotalSeconds;
-            // CPU percent relative to logical processors
-            var cpu = (deltaProc / elapsed) * 100.0 / System.Environment.ProcessorCount;
-            cpuPercent = Math.Max(0.0, Math.Min(100.0, cpu));
-            prevTotalProcTime = totalProc;
-            prevSampleTime = now;
-        }
-
-        // Draw calls: not available consistently across backends; keep as -1
-        drawCalls = -1;
-
-        // Node count
-        var root = GetTree().Root;
-        nodeCount = CountNodes(root);
+    // Node count
+    var root = GetTree().Root;
+    nodeCount = CountNodes(root);
 
         // Update history
         fpsHistory.Enqueue(fpsCurrent);
@@ -169,8 +146,8 @@ public partial class PerformanceMonitor : Control
         fpsAvg = fpsHistory.Count > 0 ? (float)(sum / fpsHistory.Count) : 0f;
         if (float.IsInfinity(fpsMin) || fpsMin == float.MaxValue) fpsMin = 0f;
 
-    // Append CSV (extend with CPU/process RAM/GPU placeholders)
-    csvBuilder.AppendLine($"{DateTime.UtcNow:o},{fpsCurrent:F1},{frameTimeMs:F2},{memMb:F2},{processRamMb:F2},{cpuPercent:F2},{gpuUsagePercent},{vramMb},{drawCalls},{nodeCount},{physicsTimeMs:F3}");
+    // Append CSV with clearer memory naming and avoid removed metrics
+    csvBuilder.AppendLine($"{DateTime.UtcNow:o},{fpsCurrent:F1},{frameTimeMs:F2},{memMb:F2},{processRamMb:F2},{nodeCount},{vramMb}");
 
         if (Visible)
         {
@@ -181,11 +158,8 @@ public partial class PerformanceMonitor : Control
 
     public override void _PhysicsProcess(double delta)
     {
-        // Approximate physics time by measuring this callback (lightweight)
-        physicsStopwatch.Restart();
-        // no heavy work here
-        physicsStopwatch.Stop();
-        physicsTimeMs = physicsStopwatch.Elapsed.TotalMilliseconds;
+    // Physics timing removed from UI per design change; keep lightweight callback with no timing
+    // No action required here
     }
 
     private void UpdateUi()
@@ -196,21 +170,12 @@ public partial class PerformanceMonitor : Control
             fpsLabel.Text = $"FPS: {fpsCurrent:F1} (avg {fpsAvg:F1}, min {fpsMin:F1}, max {fpsMax:F1})";
             fpsLabel.AddThemeColorOverride("font_color", fpsColor);
         }
-    // New metrics labels
-    var cpuLabel = GetNodeOrNull<Label>("VBox/Panel/Inner/CpuLabel") ?? GetNodeOrNull<Label>("CpuLabel");
-    var procRamLabel = GetNodeOrNull<Label>("VBox/Panel/Inner/ProcRamLabel") ?? GetNodeOrNull<Label>("ProcRamLabel");
-    var gpuLabel = GetNodeOrNull<Label>("VBox/Panel/Inner/GpuLabel") ?? GetNodeOrNull<Label>("GpuLabel");
-    var vramLabel = GetNodeOrNull<Label>("VBox/Panel/Inner/VramLabel") ?? GetNodeOrNull<Label>("VramLabel");
-
-    if (cpuLabel != null) cpuLabel.Text = $"CPU: {cpuPercent:F1}%";
-    if (procRamLabel != null) procRamLabel.Text = $"Proc RAM: {processRamMb:F2} MB";
-    if (gpuLabel != null) gpuLabel.Text = (gpuUsagePercent >= 0 ? $"GPU: {gpuUsagePercent:F1}%" : "GPU: n/a");
+    // Process and system memory labels
+    if (procRamLabel != null) procRamLabel.Text = $"Process RAM: {processRamMb:F2} MB";
     if (vramLabel != null) vramLabel.Text = (vramMb >= 0 ? $"VRAM: {vramMb:F1} MB" : "VRAM: n/a");
-        if (frameLabel != null) frameLabel.Text = $"Frame: {frameTimeMs:F2} ms";
-        if (memLabel != null) memLabel.Text = $"Memory: {memMb:F2} MB";
-        if (drawLabel != null) drawLabel.Text = $"Draw calls: {(drawCalls >= 0 ? drawCalls.ToString() : "n/a")}";
+        if (memLabel != null) memLabel.Text = $"System RAM: {memMb:F2} MB";
         if (nodeLabel != null) nodeLabel.Text = $"Nodes: {nodeCount}";
-        if (physLabel != null) physLabel.Text = $"Physics: {physicsTimeMs:F3} ms";
+        
     }
 
     private void UpdateGraph()

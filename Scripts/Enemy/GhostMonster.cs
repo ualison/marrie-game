@@ -110,19 +110,30 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
 
     private void OnRealityChanged(Reality newReality)
     {
-        Log.Debug($"GhostMonster: Reality changed to {newReality}", "GhostMonster");
+        // Ignore callbacks on disposed/queued instances without noisy warnings.
+        if (!IsInstanceValid(this))
+            return;
+
         ApplyRealityToLifeBar(newReality);
     }
 
     private void ApplyRealityToLifeBar(Reality reality)
     {
+        // Guard against disposed ghosts
+        if (!IsInstanceValid(this))
+        {
+            Log.Warning("GhostMonster: ApplyRealityToLifeBar called on invalid instance, ignoring", "GhostMonster");
+            return;
+        }
+
         if (_monsterLifeBar == null)
         {
             Log.Debug("GhostMonster: Life bar is null when applying reality - attempting to (re)initialize life system", "GhostMonster");
             // Try to (re)discover or create the life bar dynamically in case setup failed earlier
             try
             {
-                SetupLifeSystem();
+                // SetupLifeSystem is safe-guarded itself; call only if this instance is valid
+                if (IsInstanceValid(this)) SetupLifeSystem();
             }
             catch (System.Exception ex)
             {
@@ -558,8 +569,21 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
             try { _damageArea.BodyEntered += OnPlayerEntered; } catch { }
         }
 
-        _damageArea.Monitoring = true;
-        _damageArea.Monitorable = true;
+        // Ensure damage area is on the player detection layer and actively monitoring
+        try
+        {
+            _damageArea.CollisionLayer = 1; // player layer
+            _damageArea.CollisionMask = 1;  // detect player
+                try { _damageArea.SetDeferred("monitoring", true); } catch { _damageArea.Monitoring = true; }
+                try { _damageArea.SetDeferred("monitorable", true); } catch { _damageArea.Monitorable = true; }
+            // Immediately check for overlapping players in case the player is
+            // already inside the area when the ghost becomes active. Godot
+            // doesn't emit body_entered for an area that was disabled while a
+            // body was overlapping, so we must manually detect and handle it.
+            // Defer overlap handling until monitoring is guaranteed to be active
+            CallDeferred(nameof(HandleGhostDamageAreaEnable));
+        }
+        catch { }
     }
 
     private void CreateDamageArea()
@@ -568,8 +592,17 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         AddChild(_damageArea);
 
         // Set collision layers/masks to only detect players (layer 1)
-        _damageArea.CollisionLayer = 0; // Don't collide with anything as a layer
-        _damageArea.CollisionMask = 1; // Only detect objects on layer 1 (players)
+        try
+        {
+            var playerNode = GetTree().GetFirstNodeInGroup("player") as PhysicsBody2D;
+            if (playerNode != null)
+                _damageArea.CollisionMask = playerNode.CollisionLayer;
+            else
+                _damageArea.CollisionMask = 2; // default player layer in prefabs
+        }
+        catch { _damageArea.CollisionMask = 2; }
+
+        _damageArea.CollisionLayer = GetCollisionLayer();
 
         var shape = new CollisionShape2D();
         shape.Shape = new CircleShape2D { Radius = 25.0f };
@@ -665,18 +698,27 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
                 if (lifeBarInstance != null)
                 {
                     lifeBarInstance.Name = "DynamicGhostLifeBar"; // Unique name to avoid conflicts
-                    GetTree().CurrentScene.AddChild(lifeBarInstance);
-                    lifeBarInstance.AutoDiscover = false;
-                    lifeBarInstance.ConnectToLifeSystem(_monsterLife);
-                    lifeBarInstance.SetFollowMonster(true);
-                    lifeBarInstance.SetRequiredReality(Reality.PastReality);
-                    lifeBarInstance.SetMonsterReference(this);
-                    float initialAlphaForBar = GHOST_TINT.A;
-                    var mbModTemp = lifeBarInstance.Modulate;
-                    lifeBarInstance.Modulate = new Color(mbModTemp.R, mbModTemp.G, mbModTemp.B, initialAlphaForBar);
-                    lifeBarInstance.Hide();
-                    _monsterLifeBar = lifeBarInstance;
-                    Log.Debug("GhostMonster: Created independent MonsterLifeBar instance", "GhostMonster");
+                    // Ensure this ghost is still valid before adding global UI
+                    if (IsInstanceValid(this) && GetTree() != null && GetTree().CurrentScene != null)
+                    {
+                        GetTree().CurrentScene.AddChild(lifeBarInstance);
+                        lifeBarInstance.AutoDiscover = false;
+                        try { lifeBarInstance.ConnectToLifeSystem(_monsterLife); } catch { }
+                        lifeBarInstance.SetFollowMonster(true);
+                        lifeBarInstance.SetRequiredReality(Reality.PastReality);
+                        try { lifeBarInstance.SetMonsterReference(this); } catch { }
+                        float initialAlphaForBar = GHOST_TINT.A;
+                        var mbModTemp = lifeBarInstance.Modulate;
+                        lifeBarInstance.Modulate = new Color(mbModTemp.R, mbModTemp.G, mbModTemp.B, initialAlphaForBar);
+                        lifeBarInstance.Hide();
+                        _monsterLifeBar = lifeBarInstance;
+                        Log.Debug("GhostMonster: Created independent MonsterLifeBar instance", "GhostMonster");
+                    }
+                    else
+                    {
+                        // Instance is no longer valid; free the created bar immediately to avoid leaks
+                        try { lifeBarInstance.QueueFree(); } catch { }
+                    }
                 }
             }
             else
@@ -716,6 +758,17 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
     {
         // Ensure cleanup when ghost is removed from scene
         CleanupLifeBar();
+        // Unsubscribe from RealityManager events to avoid callbacks to freed instances
+        try
+        {
+            if (_realityConnected && RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+            {
+                RealityManager.Instance.RealityChangedEvent -= OnRealityChanged;
+            }
+        }
+        catch { }
+        _realityConnected = false;
+
         base._ExitTree();
     }
 
@@ -883,6 +936,47 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
 
         // Store reference to current damage tween
         _currentFadeTween = tween;
+    }
+
+    private void HandleGhostDamageAreaEnable()
+    {
+        if (_damageArea == null) return;
+
+        try
+        {
+            var overlapping = _damageArea.GetOverlappingBodies();
+            foreach (var b in overlapping)
+            {
+                if (b is Node2D body && body.IsInGroup("player"))
+                    OnPlayerEntered(body);
+            }
+        }
+        catch { }
+
+        try
+        {
+            var playerNode = GetTree().GetFirstNodeInGroup("player") as Node2D;
+            if (playerNode != null)
+            {
+                float radius = 32.0f;
+                try
+                {
+                    foreach (Node child in _damageArea.GetChildren())
+                    {
+                        if (child is CollisionShape2D cs && cs.Shape is CircleShape2D circle)
+                        {
+                            radius = circle.Radius;
+                            break;
+                        }
+                    }
+                }
+                catch { }
+
+                if (playerNode.GlobalPosition.DistanceTo(GlobalPosition) <= radius)
+                    OnPlayerEntered(playerNode);
+            }
+        }
+        catch { }
     }
     // Expose life system as property and keep compatibility method
     public MonsterLife LifeSystem => _monsterLife;
