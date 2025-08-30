@@ -427,7 +427,7 @@ public partial class EnemyManager : Node
                 }
             }
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
             Log.Warning($"Failed to get purple hearts for ghost {ghost.Name}: {ex.Message}", "EnemyManager");
         }
@@ -460,11 +460,9 @@ public partial class EnemyManager : Node
 
     public bool IsMonsterHiddenByPair(Monster monster) => GetPair(monster)?.IsHidden ?? false;
 
-    /// <summary>
     /// Returns true if the specified monster is part of a pair that currently has a respawn timer scheduled.
     /// This is used by other systems (like ReplayOrchestrator) to avoid showing monsters that should remain hidden
     /// during a global respawn timeout even when reality returns to current.
-    /// </summary>
     public bool IsMonsterScheduledForRespawn(Monster monster)
     {
         var pair = GetPair(monster);

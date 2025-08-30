@@ -144,14 +144,27 @@ public partial class ReplayOrchestrator : Node
         {
             Log.Debug("Ghost player created successfully, starting replay setup...", "ReplayOrchestrator");
 
-            StartGhostReplay(ghostPlayer, playerFrames);
+                // If we have monster frames, compress the timeline to remove gaps where the monster was hidden
+                List<ReplayFrame> workingPlayerFrames = new List<ReplayFrame>(playerFrames);
+                List<ReplayFrame> workingMonsterFrames = monsterFrames != null ? new List<ReplayFrame>(monsterFrames) : null;
 
-            if (monsterFrames != null && monsterFrames.Count > 0)
-            {
-                CreateAndStartMonsterGhost(monsterFrames);
-            }
+                if (workingMonsterFrames != null && workingMonsterFrames.Count > 0)
+                {
+                    CompressTimelineToMonsterPresence(workingPlayerFrames, workingMonsterFrames, 0.35f);
+                }
 
-            ScheduleReplayCleanup(playerFrames);
+                // Trim trailing stationary frames to avoid long frozen periods at the end of a replay
+                var trimmedPlayerFrames = TrimTrailingStationaryFrames(workingPlayerFrames, 0.5f, 3);
+
+                StartGhostReplay(ghostPlayer, trimmedPlayerFrames);
+
+                if (workingMonsterFrames != null && workingMonsterFrames.Count > 0)
+                {
+                    var trimmedMonsterFrames = TrimTrailingStationaryFrames(workingMonsterFrames, 0.5f, 2);
+                    CreateAndStartMonsterGhost(trimmedMonsterFrames);
+                }
+
+                ScheduleReplayCleanup(trimmedPlayerFrames);
         }
         else
         {
@@ -167,6 +180,37 @@ public partial class ReplayOrchestrator : Node
             ghostMonster.StartReplay(monsterFrames, "Monster");
             _currentGhostMonster = ghostMonster;
             Log.Debug($"Ghost monster started with {monsterFrames.Count} frames", "ReplayOrchestrator");
+            
+            // If the monster's recorded data ends before the overall replay ends,
+            // schedule an automatic fade/destroy so the ghost doesn't remain frozen
+            // on its last frame until the entire replay completes.
+            try
+            {
+                if (monsterFrames != null && monsterFrames.Count > 0)
+                {
+                    float lastMonsterFrameTime = monsterFrames[monsterFrames.Count - 1].Timestamp;
+                    // Small buffer to allow final frame to be visible briefly
+                    float autoFadeDelay = lastMonsterFrameTime + 0.15f;
+
+                    // Schedule fade/destroy at the appropriate time relative to replay start
+                    this.CreateManagedTimer(autoFadeDelay, () =>
+                    {
+                        try
+                        {
+                            if (IsInstanceValid(ghostMonster))
+                            {
+                                Log.Debug($"Auto-fading ghost monster after last recorded frame at {lastMonsterFrameTime:F2}s", "ReplayOrchestrator");
+                                ghostMonster.FadeOutAndDestroy();
+                            }
+                        }
+                        catch { }
+                    });
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning($"Failed to schedule auto-fade for ghost monster: {ex.Message}", "ReplayOrchestrator");
+            }
         }
     }
 
@@ -194,6 +238,108 @@ public partial class ReplayOrchestrator : Node
             Log.Debug("Cleanup timer triggered - ending replay", "ReplayOrchestrator");
             CleanupAfterReplay();
         });
+    }
+
+    // Helper: Trim trailing stationary frames from a frame sequence.
+    // Keeps a small tail buffer (maxTrailing) after the last movement to preserve timing.
+    private List<ReplayFrame> TrimTrailingStationaryFrames(List<ReplayFrame> original, float minMovement = 0.5f, int maxTrailing = 3)
+    {
+        if (original == null || original.Count <= 2) return new List<ReplayFrame>(original ?? new List<ReplayFrame>());
+
+        var minMovSq = minMovement * minMovement;
+        int lastMovingIndex = -1;
+
+        for (int i = 1; i < original.Count; i++)
+        {
+            var prev = original[i - 1];
+            var cur = original[i];
+            if ((cur.Position - prev.Position).LengthSquared() > minMovSq)
+            {
+                lastMovingIndex = i;
+            }
+        }
+
+        // If no movement detected, keep only the first frame to avoid long freeze
+        if (lastMovingIndex == -1)
+        {
+            return new List<ReplayFrame> { original[0] };
+        }
+
+        // Include up to maxTrailing frames after the last movement to preserve a short tail
+        int cutoff = System.Math.Min(original.Count - 1, lastMovingIndex + maxTrailing);
+        var result = new List<ReplayFrame>(cutoff + 1);
+        for (int i = 0; i <= cutoff; i++) result.Add(original[i]);
+        return result;
+    }
+
+    // Compress both player and monster timelines to remove gaps where the monster had no frames
+    // This effectively skips periods when the monster was hidden in CurrentReality.
+    // Adjusts timestamps in-place on the provided lists.
+    private void CompressTimelineToMonsterPresence(List<ReplayFrame> playerFrames, List<ReplayFrame> monsterFrames, float gapThreshold = 0.4f)
+    {
+        if (playerFrames == null || monsterFrames == null || monsterFrames.Count == 0) return;
+
+        // Find intervals in monsterFrames where gap between consecutive frames exceeds gapThreshold.
+        var gaps = new List<(float start, float end)>();
+        for (int i = 1; i < monsterFrames.Count; i++)
+        {
+            float prevT = monsterFrames[i - 1].Timestamp;
+            float curT = monsterFrames[i].Timestamp;
+            float delta = curT - prevT;
+            if (delta > gapThreshold)
+            {
+                // Record gap start = prevT, end = curT
+                gaps.Add((prevT, curT));
+            }
+        }
+
+        if (gaps.Count == 0) return;
+
+        // We will subtract cumulative gap durations from subsequent frames to compress timeline
+        float cumulativeShift = 0f;
+        int gapIndex = 0;
+
+        // Build a list of (gapStart, gapDuration) in chronological order
+        var gapDurations = new List<(float at, float duration)>();
+        foreach (var g in gaps)
+        {
+            gapDurations.Add((g.start, g.end - g.start));
+        }
+
+        // Apply shifts to monster frames first (in-place replacement)
+        for (int i = 0; i < monsterFrames.Count; i++)
+        {
+            while (gapIndex < gapDurations.Count && monsterFrames[i].Timestamp >= gapDurations[gapIndex].at + cumulativeShift)
+            {
+                cumulativeShift += gapDurations[gapIndex].duration;
+                gapIndex++;
+            }
+
+            if (cumulativeShift > 0f)
+            {
+                var f = monsterFrames[i];
+                monsterFrames[i] = new ReplayFrame(f.Timestamp - cumulativeShift, f.Position, f.Rotation, f.AnimationId, f.SpriteFlip, f.IsVisible, f.Alpha, f.MonsterStateId, f.IsFullyVisible);
+            }
+        }
+
+        // Reset for player frames
+        cumulativeShift = 0f;
+        gapIndex = 0;
+
+        for (int i = 0; i < playerFrames.Count; i++)
+        {
+            while (gapIndex < gapDurations.Count && playerFrames[i].Timestamp >= gapDurations[gapIndex].at + cumulativeShift)
+            {
+                cumulativeShift += gapDurations[gapIndex].duration;
+                gapIndex++;
+            }
+
+            if (cumulativeShift > 0f)
+            {
+                var f = playerFrames[i];
+                playerFrames[i] = new ReplayFrame(f.Timestamp - cumulativeShift, f.Position, f.Rotation, f.AnimationId, f.SpriteFlip, f.IsVisible, f.Alpha, f.MonsterStateId, f.IsFullyVisible);
+            }
+        }
     }
     #endregion
 
