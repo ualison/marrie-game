@@ -49,14 +49,14 @@ public partial class MonsterLifeBar : Control
         InitializeContainer();
         CallDeferred(nameof(FindLifeSystem));
 
-    // Cache the camera if available to avoid repeated GetViewport().GetCamera2D() calls
-    _cachedCamera = GetViewport().GetCamera2D();
+        // Cache the camera if available to avoid repeated GetViewport().GetCamera2D() calls
+        _cachedCamera = GetViewport().GetCamera2D();
 
         // Connect to reality changes
         if (RealityManager.IsInstanceAvailable)
         {
-                RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
-                _subscription_helper.AddUnsubscriber(() => RealityManager.Instance.RealityChangedEvent -= OnRealityChanged);
+            RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
+            _subscription_helper.AddUnsubscriber(() => RealityManager.Instance.RealityChangedEvent -= OnRealityChanged);
         }
         else
         {
@@ -69,8 +69,8 @@ public partial class MonsterLifeBar : Control
     {
         if (RealityManager.IsInstanceAvailable)
         {
-                RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
-                _subscription_helper.AddUnsubscriber(() => RealityManager.Instance.RealityChangedEvent -= OnRealityChanged);
+            RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
+            _subscription_helper.AddUnsubscriber(() => RealityManager.Instance.RealityChangedEvent -= OnRealityChanged);
         }
     }
 
@@ -352,10 +352,10 @@ public partial class MonsterLifeBar : Control
     {
         Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
 
-    // Use typed properties when available
-    int currentRedHearts = _monsterLife != null ? _monsterLife.CurrentRedHearts : 0;
-    int currentPurpleHearts = _monsterLife != null ? _monsterLife.CurrentPurpleHearts : (_ghostLife != null ? _ghostLife.CurrentPurpleHearts : 0);
-    int maxRedHearts = (_monsterLife != null ? _monsterLife.MaxLife : maxLife) - purpleHearts;
+        // Use typed properties when available
+        int currentRedHearts = _monsterLife != null ? _monsterLife.CurrentRedHearts : 0;
+        int currentPurpleHearts = _monsterLife != null ? _monsterLife.CurrentPurpleHearts : (_ghostLife != null ? _ghostLife.CurrentPurpleHearts : 0);
+        int maxRedHearts = (_monsterLife != null ? _monsterLife.MaxLife : maxLife) - purpleHearts;
 
         if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.Debug))
         {
@@ -432,9 +432,9 @@ public partial class MonsterLifeBar : Control
     {
         Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
 
-    int currentRedHearts = _monsterLife != null ? _monsterLife.CurrentRedHearts : 0;
-    int currentPurpleHearts = _monsterLife != null ? _monsterLife.CurrentPurpleHearts : (_ghostLife != null ? _ghostLife.CurrentPurpleHearts : 0);
-    int maxRedHearts = (_monsterLife != null ? _monsterLife.MaxLife : maxLife) - purpleHearts;
+        int currentRedHearts = _monsterLife != null ? _monsterLife.CurrentRedHearts : 0;
+        int currentPurpleHearts = _monsterLife != null ? _monsterLife.CurrentPurpleHearts : (_ghostLife != null ? _ghostLife.CurrentPurpleHearts : 0);
+        int maxRedHearts = (_monsterLife != null ? _monsterLife.MaxLife : maxLife) - purpleHearts;
 
         // REALITY-SPECIFIC DISPLAY: Show only the relevant heart type
         if (currentReality == Reality.CurrentReality)
@@ -563,17 +563,8 @@ public partial class MonsterLifeBar : Control
         // If we have a ghost life typed instance, use it
         if (_ghostLife != null) return _ghostLife.MaxPurple;
 
-        // If we are attached to a monster, try querying EnemyManager's pool for its ghost purple count
-        if (_monster != null && EnemyManager.Instance != null)
-        {
-            var monster = _monster as Monster;
-            if (monster != null)
-            {
-                var pool = EnemyManager.Instance.GetLifePoolForMonster(monster);
-                if (pool != null) return pool.GhostPurpleHearts;
-            }
-        }
-
+        // For monsters, purple hearts are handled by paired ghosts
+        // No more life pool system - return 0 for monsters
         return 0;
     }
 
@@ -614,11 +605,11 @@ public partial class MonsterLifeBar : Control
     #region Cleanup
     public override void _ExitTree()
     {
-    // Centralized cleanup of subscriptions registered via helper
-    _subscription_helper.UnsubscribeAll();
+        // Centralized cleanup of subscriptions registered via helper
+        _subscription_helper.UnsubscribeAll();
 
-    // Clean up life system connection
-    DisconnectFromCurrentLifeSystem();
+        // Clean up life system connection
+        DisconnectFromCurrentLifeSystem();
     }
     #endregion
 }

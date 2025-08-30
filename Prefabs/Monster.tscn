@@ -11,7 +11,7 @@ size = Vector2(284, 369)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
 size = Vector2(262, 365)
 
-[node name="Root2" type="Node2D"]
+[node name="Root3" type="Node2D"]
 
 [node name="CharacterBody2D" type="CharacterBody2D" parent="."]
 position = Vector2(0, 4)

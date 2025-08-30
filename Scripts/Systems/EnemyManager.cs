@@ -1,56 +1,34 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using MarrieGame.Core.Enums;
 using MarrieGame.Core.Models;
-using MarrieGame.Systems.LifePools;
 
 public partial class EnemyManager : Node
 {
-    #region Fields & Config
-    [Export] public float GlobalMonsterHideTime { get; set; } = 80f; // Ghost death -> respawn time for both
-    [Export] public float LocalMonsterHideTime { get; set; } = 15f; // Monster red depletion -> monster respawn time
-
+    #region Configuration
+    [Export] public float GlobalHideTime { get; set; } = 45f; // Ghost death -> both respawn
+    [Export] public float LocalHideTime { get; set; } = 10f;  // Monster depleted -> monster respawn
+    
     public static EnemyManager Instance { get; private set; }
-
-    // Pair-centric model: each pair represents a Monster <-> Ghost relationship
+    #endregion
+    
+    #region Core Data
     private readonly List<EnemyPair> _pairs = new();
-    private readonly Dictionary<Monster, EnemyPair> _monsterToPair = new();
-    private readonly Dictionary<GhostMonster, EnemyPair> _ghostToPair = new();
-    private readonly Dictionary<EnemyPair, SeparateLifePool> _pairLifePools = new();
-
-    // Track individual lives for quick lookup
-    private readonly Dictionary<Monster, int> _monsterRedHearts = new();
-    // Ghost purple hearts are stored in the SeparateLifePool (GhostLifePool). No local store needed.
-
-    // Timer management keyed by pair for clarity
-    private readonly Dictionary<EnemyPair, Timer> _monsterRespawnTimers = new();
-    private readonly Dictionary<EnemyPair, Timer> _pairRespawnTimers = new();
-
+    private readonly Dictionary<Monster, EnemyPair> _monsterLookup = new();
+    private readonly Dictionary<GhostMonster, EnemyPair> _ghostLookup = new();
+    private readonly Dictionary<EnemyPair, Timer> _respawnTimers = new();
+    private readonly Dictionary<EnemyPair, RespawnType> _respawnTypes = new();
+    
     private bool _isPlayerDead = false;
     #endregion
 
-    // Small DTO so external UI code can read active respawn timers
-    public class RespawnTimerInfo
-    {
-        public string PairId { get; set; }
-        public float SecondsLeft { get; set; }
-        public string TimerType { get; set; }
-    }
-
-    #region Helpers
-    private EnemyPair GetPairForMonster(Monster monster)
-    {
-        if (monster == null) return null;
-        _monsterToPair.TryGetValue(monster, out var pair);
-        return pair;
-    }
-
-    private EnemyPair GetPairForGhost(GhostMonster ghost)
-    {
-        if (ghost == null) return null;
-        _ghostToPair.TryGetValue(ghost, out var pair);
-        return pair;
+    #region Respawn Types
+    private enum RespawnType 
+    { 
+        MonsterOnly,    // Only monster respawns (local timer)
+        FullPair        // Both monster and ghost respawn (global timer)
     }
     #endregion
 
@@ -70,365 +48,252 @@ public partial class EnemyManager : Node
         GameEventSystem.GameRestart += OnGameRestart;
 
         if (RealityManager.Instance != null)
-        {
             RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
-        }
 
         CallDeferred(nameof(Initialize));
     }
 
     private void Initialize()
     {
-    DiscoverAndPairEntities();
-    InitializeLifeSystems();
+        DiscoverPairs();
+        ConnectLifeEvents();
     }
     #endregion
 
-    #region Entity Discovery and Pairing
-    private void DiscoverAndPairEntities()
+    #region Entity Discovery
+    private void DiscoverPairs()
     {
-        // Cleanup existing
-        foreach (var pool in _pairLifePools.Values)
-            pool?.Cleanup();
+        ClearAll();
 
-        _pairs.Clear();
-        _monsterToPair.Clear();
-        _ghostToPair.Clear();
-        _pairLifePools.Clear();
+        var monsters = GetTree().GetNodesInGroup("enemies").OfType<Monster>().Where(IsInstanceValid).ToList();
+        var ghosts = GetTree().GetNodesInGroup("ghost_monster").OfType<GhostMonster>().Where(IsInstanceValid).ToList();
 
-        var monsters = new List<Monster>();
-        var ghosts = new List<GhostMonster>();
-
-        // Find all monsters
-        foreach (Node enemy in GetTree().GetNodesInGroup("enemies"))
-        {
-            if (enemy is Monster monster && IsInstanceValid(monster))
-                monsters.Add(monster);
-        }
-
-        // Find all ghosts
-        foreach (Node ghost in GetTree().GetNodesInGroup("ghost_monster"))
-        {
-            if (ghost is GhostMonster ghostMonster && IsInstanceValid(ghostMonster))
-                ghosts.Add(ghostMonster);
-        }
-
-        // Simple pairing by proximity, but store as pair-centric data
+        // Pair by proximity
         var usedGhosts = new HashSet<GhostMonster>();
         foreach (var monster in monsters)
         {
-            GhostMonster closestGhost = null;
-            float closestDistance = float.MaxValue;
-
-            foreach (var ghost in ghosts)
-            {
-                if (usedGhosts.Contains(ghost)) continue;
-
-                float distance = monster.GlobalPosition.DistanceTo(ghost.GlobalPosition);
-                if (distance < closestDistance)
-                {
-                    closestDistance = distance;
-                    closestGhost = ghost;
-                }
-            }
-
-            if (closestGhost != null)
-            {
-                usedGhosts.Add(closestGhost);
-
-                var pair = new EnemyPair
-                {
-                    Monster = monster,
-                    Ghost = closestGhost,
-                    PairId = $"{monster.Name}_{closestGhost.Name}",
-                    IsHidden = false
-                };
-
-                var pool = new SeparateLifePool(pair, this);
-                pool.Initialize();
-
-                _pairs.Add(pair);
-                _monsterToPair[monster] = pair;
-                _ghostToPair[closestGhost] = pair;
-                _pairLifePools[pair] = pool;
-
-                Log.Debug($"Paired: {monster.Name} <-> {closestGhost.Name}", "EnemyManager");
-            }
-        }
-
-        // Create entries for monsters that didn't find a ghost so they are still tracked
-        foreach (var monster in monsters)
-        {
-            if (_monsterToPair.ContainsKey(monster)) continue;
+            var closestGhost = ghosts
+                .Where(g => !usedGhosts.Contains(g))
+                .OrderBy(g => monster.GlobalPosition.DistanceTo(g.GlobalPosition))
+                .FirstOrDefault();
 
             var pair = new EnemyPair
             {
                 Monster = monster,
-                Ghost = null,
-                PairId = $"{monster.Name}_unpaired",
+                Ghost = closestGhost,
+                PairId = closestGhost != null ? $"{monster.Name}_{closestGhost.Name}" : $"{monster.Name}_solo",
                 IsHidden = false
             };
 
-            var pool = new SeparateLifePool(pair, this);
-            pool.Initialize();
-
             _pairs.Add(pair);
-            _monsterToPair[monster] = pair;
-            _pairLifePools[pair] = pool;
-
-            Log.Debug($"Created unpaired tracking for: {monster.Name}", "EnemyManager");
+            _monsterLookup[monster] = pair;
+            
+            if (closestGhost != null)
+            {
+                _ghostLookup[closestGhost] = pair;
+                usedGhosts.Add(closestGhost);
+            }
         }
 
-        Log.Debug($"Created {_pairs.Count} monster-ghost pairs", "EnemyManager");
+        Log.Debug($"Created {_pairs.Count} enemy pairs", "EnemyManager");
     }
-    #endregion
 
-    #region Life System Management
-    private void InitializeLifeSystems()
+    private void ConnectLifeEvents()
     {
-        _monsterRedHearts.Clear();
-    // No local ghost store to clear; pools hold authoritative ghost purple heart counts.
-        // Initialize heart tracking and connect events per pair
         foreach (var pair in _pairs)
         {
-            var monster = pair.Monster;
-            var ghost = pair.Ghost;
-
-            if (IsInstanceValid(monster))
+            if (IsInstanceValid(pair.Monster?.LifeSystem))
             {
-                var life = monster.LifeSystem;
-                if (life != null)
-                {
-                    _monsterRedHearts[monster] = life.CurrentRedHearts;
-                    life.LifeChanged += (current, max, purple) => OnMonsterLifeChanged(monster, current);
-                    life.MonsterDied += () => OnMonsterDied(monster);
-                }
+                pair.Monster.LifeSystem.LifeChanged += (current, max, purple) => OnMonsterLifeChanged(pair.Monster, current);
+                pair.Monster.LifeSystem.MonsterDied += () => OnMonsterDied(pair.Monster);
             }
 
-            if (IsInstanceValid(ghost))
+            if (IsInstanceValid(pair.Ghost?.LifeSystem))
             {
-                var life = ghost.LifeSystem;
-                if (life != null)
-                {
-                    // Pools will subscribe and track ghost purple counts; keep local monitoring minimal
-                    life.LifeChanged += (current, max, purple) => OnGhostLifeChanged(ghost, purple);
-                    life.MonsterDied += () => OnGhostDied(ghost);
-                }
+                pair.Ghost.LifeSystem.MonsterDied += () => OnGhostDied(pair.Ghost);
             }
         }
-    }
-
-    private void OnMonsterLifeChanged(Monster monster, int currentLife)
-    {
-        if (!_monsterRedHearts.ContainsKey(monster)) return;
-        
-        _monsterRedHearts[monster] = currentLife;
-        
-        // If red hearts depleted, hide monster temporarily
-        if (currentLife <= 0)
-        {
-            HandleMonsterRedDepleted(monster);
-        }
-    }
-
-    private void OnGhostLifeChanged(GhostMonster ghost, int purpleHearts)
-    {
-    // Ghost life changes are proxied through pools when needed; no local state update required.
-    // Keep this hook for compatibility and potential debug usage.
-    Log.Debug($"EnemyManager.OnGhostLifeChanged: ghost={ghost.Name} purple={purpleHearts}", "EnemyManager");
-    }
-
-    private void OnMonsterDied(Monster monster)
-    {
-        // Monster death is handled by red heart depletion
-        HandleMonsterRedDepleted(monster);
-    }
-
-    private void OnGhostDied(GhostMonster ghost)
-    {
-        // Ghost death triggers pair hiding
-        HandleGhostDeath(ghost);
     }
     #endregion
 
-    #region Death and Respawn Handling
-    private void HandleMonsterRedDepleted(Monster monster)
+    #region Life Events
+    private void OnMonsterLifeChanged(Monster monster, int currentLife)
     {
-        var pair = GetPairForMonster(monster);
-        if (pair == null)
+        if (currentLife <= 0)
+            HandleMonsterDepleted(monster);
+    }
+
+    private void OnMonsterDied(Monster monster) => HandleMonsterDepleted(monster);
+    private void OnGhostDied(GhostMonster ghost) => HandleGhostDeath(ghost);
+    #endregion
+
+    #region Death Handling - FIXED
+    private void HandleMonsterDepleted(Monster monster)
+    {
+        var pair = GetPair(monster);
+        if (pair == null) return;
+
+        // Check if pair already has a global timer (ghost death overrides monster depletion)
+        if (_respawnTypes.TryGetValue(pair, out var existingType) && existingType == RespawnType.FullPair)
         {
-            Log.Warning($"Monster red hearts depleted (unpaired) - hiding for {LocalMonsterHideTime}s", "EnemyManager");
-            if (IsInstanceValid(monster)) monster.ForceHide();
-            ScheduleMonsterRespawnForPairless(monster, LocalMonsterHideTime);
+            Log.Debug("Monster depleted but pair already scheduled for global respawn - ignoring local timer", "EnemyManager");
             return;
         }
 
-    Log.Warning($"Monster red hearts depleted - hiding for {LocalMonsterHideTime}s", "EnemyManager");
+        Log.Warning($"Monster depleted - hiding for {LocalHideTime}s (local timer)", "EnemyManager");
+        
+        HideMonster(pair.Monster);
         pair.IsHidden = true;
-
-        if (IsInstanceValid(monster)) monster.ForceHide();
-    ScheduleMonsterRespawn(pair, LocalMonsterHideTime);
+        ScheduleRespawn(pair, LocalHideTime, RespawnType.MonsterOnly);
     }
 
-    private void SchedulePairRespawn(EnemyPair pair, float seconds)
+    public void HandleGhostDeath(GhostMonster ghost)
     {
-        if (pair == null) return;
-        CancelPairRespawn(pair.Monster);
-
-        Log.Debug($"Scheduling pair respawn for {pair.PairId} in {seconds} seconds", "EnemyManager");
-
-        var timer = new Timer { OneShot = true, WaitTime = seconds };
-        AddChild(timer);
-        _pairRespawnTimers[pair] = timer;
-
-        timer.Timeout += () =>
+        var pair = GetPair(ghost);
+        if (pair == null)
         {
-            Log.Debug($"Pair respawn timer fired for {pair.PairId}", "EnemyManager");
-            RespawnPair(pair);
-            timer.QueueFree();
-            _pairRespawnTimers.Remove(pair);
-        };
-
-        timer.Start();
-    }
-
-    private void ScheduleMonsterRespawn(EnemyPair pair, float seconds)
-    {
-        if (pair == null) return;
-        CancelMonsterRespawn(pair.Monster);
-
-        var timer = new Timer { OneShot = true, WaitTime = seconds };
-        AddChild(timer);
-        _monsterRespawnTimers[pair] = timer;
-
-        timer.Timeout += () =>
-        {
-            Log.Debug($"Monster respawn timer fired for pair {pair.PairId}", "EnemyManager");
-            RespawnMonsterOnly(pair.Monster);
-            timer.QueueFree();
-            _monsterRespawnTimers.Remove(pair);
-        };
-
-        timer.Start();
-    }
-
-    // For unpaired monsters
-    private void ScheduleMonsterRespawnForPairless(Monster monster, float seconds)
-    {
-        CancelMonsterRespawn(monster);
-
-        var timer = new Timer { OneShot = true, WaitTime = seconds };
-        AddChild(timer);
-        // Use a short-lived anonymous mapping keyed by a new EnemyPair placeholder is not necessary; track by monster in local scope
-        timer.Timeout += () =>
-        {
-            RespawnMonsterOnly(monster);
-            timer.QueueFree();
-        };
-
-        timer.Start();
-    }
-
-    private void CancelPairRespawn(Monster monster)
-    {
-        var pair = GetPairForMonster(monster);
-        if (pair == null) return;
-
-        if (_pairRespawnTimers.TryGetValue(pair, out var timer))
-        {
-            timer.Stop();
-            timer.QueueFree();
-            _pairRespawnTimers.Remove(pair);
+            // Unpaired ghost - just destroy it
+            if (IsInstanceValid(ghost))
+                ghost.FadeOutAndDestroy();
+            return;
         }
+
+        HandleGhostDeath(pair);
     }
 
-    private void CancelMonsterRespawn(Monster monster)
+    public void HandleGhostDeath(EnemyPair pair)
     {
-        var pair = GetPairForMonster(monster);
-        if (pair != null)
+        if (pair == null) return;
+
+        Log.Warning($"Ghost died - hiding pair for {GlobalHideTime}s (global timer overrides any local)", "EnemyManager");
+
+        // Global timer always overrides local timer
+        CancelRespawn(pair);
+
+        // Hide both ghost and monster
+        if (IsInstanceValid(pair.Ghost))
         {
-            if (_monsterRespawnTimers.TryGetValue(pair, out var timer))
+            try
             {
-                timer.Stop();
-                timer.QueueFree();
-                _monsterRespawnTimers.Remove(pair);
+                pair.Ghost.FadeOutAndDisable();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"EnemyManager: FadeOutAndDisable failed for {pair.Ghost?.Name}: {ex.Message}", "EnemyManager");
+                try { pair.Ghost.StopReplay(); } catch { }
+                try { pair.Ghost.Hide(); } catch { }
             }
         }
-        else
+
+        if (IsInstanceValid(pair.Monster))
         {
-            // Nothing to cancel for pairless monsters in current mapping
+            HideMonster(pair.Monster);
         }
+
+        pair.IsHidden = true;
+
+        // Schedule full pair respawn (global timer)
+        ScheduleRespawn(pair, GlobalHideTime, RespawnType.FullPair);
+    }
+    #endregion
+
+    #region Respawn System - SIMPLIFIED
+    private void ScheduleRespawn(EnemyPair pair, float seconds, RespawnType type)
+    {
+        // Always cancel existing timer first
+        CancelRespawn(pair);
+
+        var timer = new Timer { OneShot = true, WaitTime = seconds };
+        AddChild(timer);
+        _respawnTimers[pair] = timer;
+        _respawnTypes[pair] = type;
+
+        timer.Timeout += () =>
+        {
+            if (type == RespawnType.MonsterOnly)
+                RespawnMonster(pair);
+            else
+                RespawnPair(pair);
+
+            timer.QueueFree();
+            _respawnTimers.Remove(pair);
+            _respawnTypes.Remove(pair);
+        };
+
+        timer.Start();
+        
+        Log.Debug($"Scheduled {type} respawn for pair {pair.PairId} in {seconds}s", "EnemyManager");
+    }
+
+    private void CancelRespawn(EnemyPair pair)
+    {
+        if (_respawnTimers.TryGetValue(pair, out var timer))
+        {
+            Log.Debug($"Cancelled existing respawn timer for pair {pair.PairId}", "EnemyManager");
+            timer.Stop();
+            timer.QueueFree();
+            _respawnTimers.Remove(pair);
+            _respawnTypes.Remove(pair);
+        }
+    }
+
+    private void RespawnMonster(EnemyPair pair)
+    {
+        if (!IsInstanceValid(pair.Monster)) return;
+
+        Log.System($"Respawning monster {pair.Monster.Name} after local depletion", "EnemyManager");
+        
+        pair.Monster.LifeSystem?.Reset();
+        
+        var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        pair.Monster.ForceEnableAfterRespawn();
+        
+        if (currentReality == Reality.CurrentReality)
+            pair.Monster.ForceShow();
+            
+        pair.IsHidden = false;
     }
 
     private void RespawnPair(EnemyPair pair)
     {
-        if (pair == null) return;
+        Log.System($"Respawning full pair {pair.PairId} after global timeout", "EnemyManager");
 
-        Log.System("Respawning monster-ghost pair", "EnemyManager");
-
-    Log.Debug($"RespawnPair invoked for {pair.PairId}", "EnemyManager");
-
-        var monster = pair.Monster;
-        var ghost = pair.Ghost;
-
-        if (IsInstanceValid(monster))
+        // Respawn monster
+        if (IsInstanceValid(pair.Monster))
         {
-            // Reset monster life and update internal tracking
-            monster.LifeSystem?.Reset();
-            var postResetRed = monster.LifeSystem?.CurrentRedHearts ?? 0;
-            _monsterRedHearts[monster] = postResetRed;
-
+            pair.Monster.LifeSystem?.Reset();
+            pair.Monster.ForceEnableAfterRespawn();
+            
             var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
-            Log.Debug($"RespawnPair: pair={pair.PairId} postResetRed={postResetRed} currentReality={currentReality}", "EnemyManager");
-
-            // Only force-show when we're in CurrentReality
             if (currentReality == Reality.CurrentReality)
             {
-                Log.Debug($"RespawnPair: calling ForceShow() on monster {monster.Name}", "EnemyManager");
-                monster.ForceShow();
-            }
-            else
-            {
-                Log.Debug($"RespawnPair: not showing monster {monster.Name} because currentReality={currentReality}", "EnemyManager");
+                pair.Monster.ForceShow();
+                
+                // Ensure monster is actually visible after respawn (bug fix)
+                CallDeferred(nameof(VerifyMonsterVisibility), pair.Monster);
             }
         }
 
-        if (IsInstanceValid(ghost))
+        // Reset ghost life (ghost will be recreated by replay system when needed)
+        if (IsInstanceValid(pair.Ghost))
         {
-            ghost.LifeSystem?.Reset();
-            // rely on life pools for current ghost purple hearts
+            pair.Ghost.LifeSystem?.Reset();
         }
 
         pair.IsHidden = false;
     }
 
-    private void RespawnMonsterOnly(Monster monster)
+    private void VerifyMonsterVisibility(Monster monster)
     {
-        Log.System("Respawning monster after red heart depletion", "EnemyManager");
         if (!IsInstanceValid(monster)) return;
 
-        // If this monster is part of a pair with a SeparateLifePool, update the pool
-        var pair = GetPairForMonster(monster);
-        if (pair != null && _pairLifePools.TryGetValue(pair, out var pool))
+        // Double-check visibility state and force if needed
+        if (!monster.Visible)
         {
-            Log.Debug($"Resetting pool red hearts for pair {pair.PairId}", "EnemyManager");
-            pool.ResetMonsterRedToFull();
-            _monsterRedHearts[monster] = pool.MonsterRedHearts;
+            Log.Warning($"Monster {monster.Name} not visible after respawn - forcing visibility", "EnemyManager");
+            monster.Show();
+            monster.Visible = true;
         }
-        else
-        {
-            var life = monster.LifeSystem;
-            if (life != null)
-            {
-                Log.Debug($"Before RespawnMonsterOnly (pairless): monster={monster.Name} currentRed={life.CurrentRedHearts} max={life.MaxLife}", "EnemyManager");
-                life.SetHearts(life.MaxLife, 0); // Full red hearts, no purple
-                Log.Debug($"After SetHearts (pairless): monster={monster.Name} currentRed={life.CurrentRedHearts}", "EnemyManager");
-                _monsterRedHearts[monster] = life.CurrentRedHearts;
-            }
-        }
-
-        Log.Debug($"Calling ForceShow on monster {monster.Name}", "EnemyManager");
-        monster.ForceShow();
     }
     #endregion
 
@@ -436,116 +301,73 @@ public partial class EnemyManager : Node
     private void OnRealityChanged(Reality newReality)
     {
         Log.System($"Reality changed to {newReality}", "EnemyManager");
+        
         foreach (var pair in _pairs)
         {
-            var monster = pair.Monster;
-            var ghost = pair.Ghost;
-
-            if (!IsInstanceValid(monster)) continue;
+            if (!IsInstanceValid(pair.Monster)) continue;
 
             if (newReality == Reality.CurrentReality)
             {
-                if (_monsterRedHearts.GetValueOrDefault(monster, 0) > 0)
-                    monster.ForceShow();
+                if (pair.Monster.LifeSystem?.CurrentRedHearts > 0 && !pair.IsHidden)
+                    pair.Monster.ForceShow();
 
-                if (IsInstanceValid(ghost))
-                    ghost.FadeOutAndDestroy();
+                if (IsInstanceValid(pair.Ghost))
+                    pair.Ghost.FadeOutAndDestroy();
             }
             else if (newReality == Reality.PastReality)
             {
-                monster.ForceHide();
+                pair.Monster.ForceHide();
                 // Ghost visibility handled by replay system
             }
         }
     }
     #endregion
 
-    #region Public API
-    public int GetMonsterRedHearts(Monster monster)
-    {
-        return _monsterRedHearts.GetValueOrDefault(monster, 0);
-    }
+    #region Public API - SIMPLIFIED
+    public EnemyPair GetPair(Monster monster) => _monsterLookup.GetValueOrDefault(monster);
+    public EnemyPair GetPair(GhostMonster ghost) => _ghostLookup.GetValueOrDefault(ghost);
 
-    public int GetGhostPurpleHearts(GhostMonster ghost)
-    {
-        var pool = GetLifePoolForGhost(ghost);
-        return pool?.GhostPurpleHearts ?? 0;
-    }
+    public int GetMonsterRedHearts(Monster monster) => monster?.LifeSystem?.CurrentRedHearts ?? 0;
+    public int GetGhostPurpleHearts(GhostMonster ghost) => ghost?.LifeSystem?.CurrentLife ?? 0;
 
-    public bool IsMonsterPaired(Monster monster)
+    public float GetRespawnTimeLeft(EnemyPair pair)
     {
-    return _monsterToPair.ContainsKey(monster);
-    }
-
-    public bool IsGhostPaired(GhostMonster ghost)
-    {
-    return _ghostToPair.ContainsKey(ghost);
-    }
-
-    // Returns a snapshot of active respawn timers for debug UI
-    public List<RespawnTimerInfo> GetActiveRespawnTimers()
-    {
-        var result = new List<RespawnTimerInfo>();
-
-        foreach (var kv in _pairRespawnTimers)
+        if (pair == null) return -1f;
+        if (_respawnTimers.TryGetValue(pair, out var timer))
         {
-            var pair = kv.Key;
-            var timer = kv.Value;
-            if (timer == null || pair == null) continue;
-            // Godot Timer provides TimeLeft property
-            float left = 0f;
-            try { left = (float)timer.TimeLeft; } catch { left = Mathf.Max(0f, (float)timer.WaitTime); }
-
-            result.Add(new RespawnTimerInfo
+            try
             {
-                PairId = pair.PairId,
-                SecondsLeft = left,
-                TimerType = "Pair"
-            });
-        }
-
-        foreach (var kv in _monsterRespawnTimers)
-        {
-            var pair = kv.Key;
-            var timer = kv.Value;
-            if (timer == null || pair == null) continue;
-            float left = 0f;
-            try { left = (float)timer.TimeLeft; } catch { left = Mathf.Max(0f, (float)timer.WaitTime); }
-
-            result.Add(new RespawnTimerInfo
+                return (float)timer.TimeLeft;
+            }
+            catch
             {
-                PairId = pair.PairId,
-                SecondsLeft = left,
-                TimerType = "Monster"
-            });
+                return -1f;
+            }
         }
-
-        return result;
+        return -1f;
     }
+
+    public string GetRespawnType(EnemyPair pair)
+    {
+        if (pair == null) return "None";
+        return _respawnTypes.TryGetValue(pair, out var type) ? type.ToString() : "None";
+    }
+
+    public bool IsMonsterHiddenByPair(Monster monster) => GetPair(monster)?.IsHidden ?? false;
 
     public void ResetAllEnemies()
     {
-        CancelAllTimers();
+        CancelAllRespawns();
+        
         foreach (var pair in _pairs)
         {
-            var monster = pair.Monster;
-            var ghost = pair.Ghost;
-
-            if (IsInstanceValid(monster))
-            {
-                monster.Reset();
-                _monsterRedHearts[monster] = monster.LifeSystem?.CurrentRedHearts ?? 0;
-            }
-
-                if (IsInstanceValid(ghost))
-                {
-                    ghost.LifeSystem?.Reset();
-                }
-
+            if (IsInstanceValid(pair.Monster))
+                pair.Monster.Reset();
+            
+            if (IsInstanceValid(pair.Ghost))
+                pair.Ghost.LifeSystem?.Reset();
+            
             pair.IsHidden = false;
-
-            if (_pairLifePools.TryGetValue(pair, out var pool))
-                pool?.ResetBothToFull();
         }
 
         Log.System("All enemies reset", "EnemyManager");
@@ -554,110 +376,12 @@ public partial class EnemyManager : Node
     public void NotifyGhostsChanged()
     {
         Log.System("Refreshing enemy-ghost pairs", "EnemyManager");
-    CancelAllTimers();
-    DiscoverAndPairEntities();
-    InitializeLifeSystems();
+        CancelAllRespawns();
+        DiscoverPairs();
+        ConnectLifeEvents();
     }
 
-    private void CancelAllTimers()
-    {
-        foreach (var timer in _pairRespawnTimers.Values)
-        {
-            timer.Stop();
-            timer.QueueFree();
-        }
-        _pairRespawnTimers.Clear();
-
-        foreach (var timer in _monsterRespawnTimers.Values)
-        {
-            timer.Stop();
-            timer.QueueFree();
-        }
-        _monsterRespawnTimers.Clear();
-
-        // Cleanup life pools
-        foreach (var pool in _pairLifePools.Values)
-        {
-            pool?.Cleanup();
-        }
-        _pairLifePools.Clear();
-        _monsterToPair.Clear();
-        _ghostToPair.Clear();
-        _pairs.Clear();
-    }
-    #endregion
-
-    #region LifePool & Pair API
-    public SeparateLifePool GetLifePoolForMonster(Monster monster)
-    {
-        if (monster == null) return null;
-    var pair = GetPairForMonster(monster);
-    if (pair == null) return null;
-    _pairLifePools.TryGetValue(pair, out var pool);
-    return pool;
-    }
-
-    public SeparateLifePool GetLifePoolForGhost(GhostMonster ghost)
-    {
-        if (ghost == null) return null;
-    var pair = GetPairForGhost(ghost);
-    if (pair == null) return null;
-    _pairLifePools.TryGetValue(pair, out var pool);
-    return pool;
-    }
-
-    public bool IsMonsterHiddenByPair(Monster monster)
-    {
-        if (monster == null) return false;
-    var pair = GetPairForMonster(monster);
-    return pair != null && pair.IsHidden;
-    }
-
-    // Adapter for SeparateLifePool -> call when monster red depleted via pool
-    public void HandleMonsterRedDepleted(EnemyPair pair)
-    {
-        if (pair == null) return;
-    pair.IsHidden = true;
-
-    if (IsInstanceValid(pair.Monster)) pair.Monster.ForceHide();
-
-    // Schedule monster-only respawn using pair keyed timer
-    ScheduleMonsterRespawn(pair, LocalMonsterHideTime);
-    }
-
-    // Adapter for SeparateLifePool -> call when ghost dies via pool
-    public void HandleGhostDeath(EnemyPair pair)
-    {
-        if (pair == null) return;
-    var monster = pair.Monster;
-    var ghost = pair.Ghost;
-
-    Log.System($"Ghost died - hiding both entities for {GlobalMonsterHideTime}s", "EnemyManager");
-
-    CancelMonsterRespawn(monster);
-
-    if (IsInstanceValid(monster)) monster.ForceHide();
-    if (IsInstanceValid(ghost)) ghost.FadeOutAndDestroy();
-
-    pair.IsHidden = true;
-    SchedulePairRespawn(pair, GlobalMonsterHideTime);
-    }
-
-    // Overload: called by GhostMonster instances when they die locally (unpaired or no pool)
-    public void HandleGhostDeath(GhostMonster ghost)
-    {
-        if (ghost == null) return;
-        var pair = GetPairForGhost(ghost);
-        if (pair == null)
-        {
-            Log.System($"Ghost died (unpaired) - destroying ghost instance", "EnemyManager");
-            if (IsInstanceValid(ghost)) ghost.FadeOutAndDestroy();
-            return;
-        }
-
-        // Reuse existing pair-based logic
-        HandleGhostDeath(pair);
-    }
+    public List<EnemyPair> GetAllPairsSnapshot() => new List<EnemyPair>(_pairs);
     #endregion
 
     #region Game Events
@@ -666,12 +390,10 @@ public partial class EnemyManager : Node
         if (_isPlayerDead) return;
         _isPlayerDead = true;
 
-        foreach (var monster in _monsterToPair.Keys)
+        foreach (var pair in _pairs)
         {
-            if (IsInstanceValid(monster))
-            {
-                monster.ForceHide();
-            }
+            if (IsInstanceValid(pair.Monster))
+                pair.Monster.ForceHide();
         }
 
         Log.System("Player died, hiding all monsters", "EnemyManager");
@@ -685,16 +407,41 @@ public partial class EnemyManager : Node
         var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
         if (currentReality == Reality.CurrentReality)
         {
-            foreach (var monster in _monsterToPair.Keys)
+            foreach (var pair in _pairs)
             {
-                if (IsInstanceValid(monster))
-                {
-                    monster.ForceShow();
-                }
+                if (IsInstanceValid(pair.Monster))
+                    pair.Monster.ForceShow();
             }
         }
 
         Log.System("Game restarted", "EnemyManager");
+    }
+    #endregion
+
+    #region Utility
+    private void HideMonster(Monster monster)
+    {
+        if (IsInstanceValid(monster))
+            monster.ForceHide();
+    }
+
+    private void CancelAllRespawns()
+    {
+        foreach (var timer in _respawnTimers.Values)
+        {
+            timer.Stop();
+            timer.QueueFree();
+        }
+        _respawnTimers.Clear();
+        _respawnTypes.Clear();
+    }
+
+    private void ClearAll()
+    {
+        CancelAllRespawns();
+        _pairs.Clear();
+        _monsterLookup.Clear();
+        _ghostLookup.Clear();
     }
     #endregion
 
@@ -703,7 +450,7 @@ public partial class EnemyManager : Node
     {
         if (Instance == this)
         {
-            CancelAllTimers();
+            ClearAll();
             Instance = null;
         }
     }
