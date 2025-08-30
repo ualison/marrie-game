@@ -614,7 +614,8 @@ public partial class Monster : CharacterBody2D, IPoolable
 
         if (lifePool != null)
         {
-            isPairDead = lifePool.GhostPurpleHearts <= 0;
+            // Only consider pair dead if there's an actual ghost tracked by the pool
+            isPairDead = lifePool.HasGhost && lifePool.GhostPurpleHearts <= 0;
         }
 
         if (isPairDead)

@@ -62,6 +62,7 @@ namespace MarrieGame.Systems.LifePools
         public void ResetToFull()
         {
             MonsterRedHearts = MaxMonsterRed;
+            Log.Debug($"MonsterLifePool.ResetToFull: setting MonsterRedHearts={MonsterRedHearts}", "MonsterLifePool");
             SyncToMonster();
             LifeChanged?.Invoke(MonsterRedHearts, MaxMonsterRed, 0);
         }
@@ -75,8 +76,9 @@ namespace MarrieGame.Systems.LifePools
             _syncInProgress = true;
             try
             {
+                Log.Debug($"MonsterLifePool.SyncToMonster: syncing R={MonsterRedHearts} to monster {(_monster != null ? _monster.Name : "<null>")}", "MonsterLifePool");
                 monsterLife.SetHearts(MonsterRedHearts, 0);
-                Log.Debug($"MonsterLifePool sync: R={MonsterRedHearts}", "MonsterLifePool");
+                Log.Debug($"MonsterLifePool sync complete: MonsterRedHearts={MonsterRedHearts}, monsterCurrent={monsterLife.CurrentRedHearts}", "MonsterLifePool");
             }
             finally
             {

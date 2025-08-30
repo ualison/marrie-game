@@ -74,6 +74,7 @@ namespace MarrieGame.Systems.LifePools
 
         public void ResetBothToFull()
         {
+            Log.Debug($"SeparateLifePool.ResetBothToFull for pair {_pair.PairId}", "SeparateLifePool");
             _monsterPool?.ResetToFull();
             _ghostPool?.ResetToFull();
             OnLifeChanged?.Invoke();
@@ -81,6 +82,7 @@ namespace MarrieGame.Systems.LifePools
 
         public void ResetMonsterRedToFull()
         {
+            Log.Debug($"SeparateLifePool.ResetMonsterRedToFull for pair {_pair.PairId}", "SeparateLifePool");
             _monsterPool?.ResetToFull();
             OnLifeChanged?.Invoke();
         }
@@ -98,6 +100,9 @@ namespace MarrieGame.Systems.LifePools
             if (_pair.IsHidden) return "PAIR_HIDDEN";
             return "ALIVE";
         }
+
+    // True when this pair has an actual ghost entity to track
+    public bool HasGhost => _pair.Ghost != null;
 
         private static bool IsInstanceValid(GodotObject obj) => GodotObject.IsInstanceValid(obj);
     }
