@@ -8,8 +8,8 @@ using MarrieGame.Systems.LifePools;
 public partial class EnemyManager : Node
 {
     #region Fields & Config
-    [Export] public float DeathHideTime { get; set; } = 180f; // Ghost death -> respawn time for both
-    [Export] public float MonsterHideTime { get; set; } = 10f; // Monster red depletion -> monster respawn time
+    [Export] public float GlobalMonsterHideTime { get; set; } = 80f; // Ghost death -> respawn time for both
+    [Export] public float LocalMonsterHideTime { get; set; } = 15f; // Monster red depletion -> monster respawn time
 
     public static EnemyManager Instance { get; private set; }
 
@@ -29,6 +29,14 @@ public partial class EnemyManager : Node
 
     private bool _isPlayerDead = false;
     #endregion
+
+    // Small DTO so external UI code can read active respawn timers
+    public class RespawnTimerInfo
+    {
+        public string PairId { get; set; }
+        public float SecondsLeft { get; set; }
+        public string TimerType { get; set; }
+    }
 
     #region Helpers
     private EnemyPair GetPairForMonster(Monster monster)
@@ -244,41 +252,22 @@ public partial class EnemyManager : Node
     #endregion
 
     #region Death and Respawn Handling
-    private void HandleGhostDeath(GhostMonster ghost)
-    {
-    var pair = GetPairForGhost(ghost);
-    if (pair == null) return;
-
-    var monster = pair.Monster;
-
-    Log.System($"Ghost died - hiding both entities for {DeathHideTime}s", "EnemyManager");
-
-    // Cancel any monster-only respawn for this pair
-    CancelMonsterRespawn(monster);
-
-    if (IsInstanceValid(monster)) monster.ForceHide();
-    if (IsInstanceValid(ghost)) ghost.FadeOutAndDestroy();
-
-    pair.IsHidden = true;
-    SchedulePairRespawn(pair, DeathHideTime);
-    }
-
     private void HandleMonsterRedDepleted(Monster monster)
     {
         var pair = GetPairForMonster(monster);
         if (pair == null)
         {
-            Log.Warning($"Monster red hearts depleted (unpaired) - hiding for {MonsterHideTime}s", "EnemyManager");
+            Log.Warning($"Monster red hearts depleted (unpaired) - hiding for {LocalMonsterHideTime}s", "EnemyManager");
             if (IsInstanceValid(monster)) monster.ForceHide();
-            ScheduleMonsterRespawnForPairless(monster, MonsterHideTime);
+            ScheduleMonsterRespawnForPairless(monster, LocalMonsterHideTime);
             return;
         }
 
-        Log.Warning($"Monster red hearts depleted - hiding for {MonsterHideTime}s", "EnemyManager");
+    Log.Warning($"Monster red hearts depleted - hiding for {LocalMonsterHideTime}s", "EnemyManager");
         pair.IsHidden = true;
 
         if (IsInstanceValid(monster)) monster.ForceHide();
-        ScheduleMonsterRespawn(pair, MonsterHideTime);
+    ScheduleMonsterRespawn(pair, LocalMonsterHideTime);
     }
 
     private void SchedulePairRespawn(EnemyPair pair, float seconds)
@@ -286,12 +275,15 @@ public partial class EnemyManager : Node
         if (pair == null) return;
         CancelPairRespawn(pair.Monster);
 
+        Log.Debug($"Scheduling pair respawn for {pair.PairId} in {seconds} seconds", "EnemyManager");
+
         var timer = new Timer { OneShot = true, WaitTime = seconds };
         AddChild(timer);
         _pairRespawnTimers[pair] = timer;
 
         timer.Timeout += () =>
         {
+            Log.Debug($"Pair respawn timer fired for {pair.PairId}", "EnemyManager");
             RespawnPair(pair);
             timer.QueueFree();
             _pairRespawnTimers.Remove(pair);
@@ -381,12 +373,24 @@ public partial class EnemyManager : Node
 
         if (IsInstanceValid(monster))
         {
+            // Reset monster life and update internal tracking
             monster.LifeSystem?.Reset();
-            _monsterRedHearts[monster] = monster.LifeSystem?.CurrentRedHearts ?? 0;
+            var postResetRed = monster.LifeSystem?.CurrentRedHearts ?? 0;
+            _monsterRedHearts[monster] = postResetRed;
 
             var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+            Log.Debug($"RespawnPair: pair={pair.PairId} postResetRed={postResetRed} currentReality={currentReality}", "EnemyManager");
+
+            // Only force-show when we're in CurrentReality
             if (currentReality == Reality.CurrentReality)
+            {
+                Log.Debug($"RespawnPair: calling ForceShow() on monster {monster.Name}", "EnemyManager");
                 monster.ForceShow();
+            }
+            else
+            {
+                Log.Debug($"RespawnPair: not showing monster {monster.Name} because currentReality={currentReality}", "EnemyManager");
+            }
         }
 
         if (IsInstanceValid(ghost))
@@ -476,6 +480,47 @@ public partial class EnemyManager : Node
     public bool IsGhostPaired(GhostMonster ghost)
     {
     return _ghostToPair.ContainsKey(ghost);
+    }
+
+    // Returns a snapshot of active respawn timers for debug UI
+    public List<RespawnTimerInfo> GetActiveRespawnTimers()
+    {
+        var result = new List<RespawnTimerInfo>();
+
+        foreach (var kv in _pairRespawnTimers)
+        {
+            var pair = kv.Key;
+            var timer = kv.Value;
+            if (timer == null || pair == null) continue;
+            // Godot Timer provides TimeLeft property
+            float left = 0f;
+            try { left = (float)timer.TimeLeft; } catch { left = Mathf.Max(0f, (float)timer.WaitTime); }
+
+            result.Add(new RespawnTimerInfo
+            {
+                PairId = pair.PairId,
+                SecondsLeft = left,
+                TimerType = "Pair"
+            });
+        }
+
+        foreach (var kv in _monsterRespawnTimers)
+        {
+            var pair = kv.Key;
+            var timer = kv.Value;
+            if (timer == null || pair == null) continue;
+            float left = 0f;
+            try { left = (float)timer.TimeLeft; } catch { left = Mathf.Max(0f, (float)timer.WaitTime); }
+
+            result.Add(new RespawnTimerInfo
+            {
+                PairId = pair.PairId,
+                SecondsLeft = left,
+                TimerType = "Monster"
+            });
+        }
+
+        return result;
     }
 
     public void ResetAllEnemies()
@@ -577,7 +622,7 @@ public partial class EnemyManager : Node
     if (IsInstanceValid(pair.Monster)) pair.Monster.ForceHide();
 
     // Schedule monster-only respawn using pair keyed timer
-    ScheduleMonsterRespawn(pair, MonsterHideTime);
+    ScheduleMonsterRespawn(pair, LocalMonsterHideTime);
     }
 
     // Adapter for SeparateLifePool -> call when ghost dies via pool
@@ -587,7 +632,7 @@ public partial class EnemyManager : Node
     var monster = pair.Monster;
     var ghost = pair.Ghost;
 
-    Log.System($"Ghost died - hiding both entities for {DeathHideTime}s", "EnemyManager");
+    Log.System($"Ghost died - hiding both entities for {GlobalMonsterHideTime}s", "EnemyManager");
 
     CancelMonsterRespawn(monster);
 
@@ -595,7 +640,23 @@ public partial class EnemyManager : Node
     if (IsInstanceValid(ghost)) ghost.FadeOutAndDestroy();
 
     pair.IsHidden = true;
-    SchedulePairRespawn(pair, DeathHideTime);
+    SchedulePairRespawn(pair, GlobalMonsterHideTime);
+    }
+
+    // Overload: called by GhostMonster instances when they die locally (unpaired or no pool)
+    public void HandleGhostDeath(GhostMonster ghost)
+    {
+        if (ghost == null) return;
+        var pair = GetPairForGhost(ghost);
+        if (pair == null)
+        {
+            Log.System($"Ghost died (unpaired) - destroying ghost instance", "EnemyManager");
+            if (IsInstanceValid(ghost)) ghost.FadeOutAndDestroy();
+            return;
+        }
+
+        // Reuse existing pair-based logic
+        HandleGhostDeath(pair);
     }
     #endregion
 

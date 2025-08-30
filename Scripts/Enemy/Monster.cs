@@ -823,36 +823,47 @@ public partial class Monster : CharacterBody2D, IPoolable
     // Update the ForceShow method to properly show life bar
     public void ForceShow()
     {
+        // Diagnostic logging for ForceShow decisions
+        int currentRed = _monsterLife?.CurrentRedHearts ?? 0;
+        var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        Log.Debug($"Monster.ForceShow() called - monster={Name} red={currentRed} reality={currentReality} follower={EnableFollowerBehavior} state={_currentState}", "Monster");
+
         // Check if monster has red hearts before showing
-        bool hasRedHearts = _monsterLife?.CurrentRedHearts > 0;
+        bool hasRedHearts = currentRed > 0;
 
         if (!hasRedHearts)
         {
-            Log.Debug($"Monster.ForceShow() blocked - no red hearts remaining", "Monster");
+            Log.Debug($"Monster.ForceShow() blocked - no red hearts remaining (red={currentRed})", "Monster");
             return;
         }
 
         if (EnableFollowerBehavior)
         {
+            Log.Debug($"Monster.ForceShow(): follower behavior - stopping timer and starting visible behavior for {Name}", "Monster");
             _stateTimer.Stop();
             StartVisibleBehavior();
         }
         else
         {
             // For simple monsters, directly set to visible state
+            Log.Debug($"Monster.ForceShow(): making simple monster {Name} visible", "Monster");
             _currentState = MonsterState.Visible;
             _isVisible = true;
             _isFullyVisible = true;
             Show();
 
             // Ensure life bar is shown in current reality
-            var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
             if (currentReality == Reality.CurrentReality && _monsterLifeBar != null)
             {
+                Log.Debug($"Monster.ForceShow(): showing life bar for {Name}", "Monster");
                 _monsterLifeBar.Show();
                 _monsterLifeBar.SetFollowMonster(true);
                 _monsterLifeBar.SetMonsterReference(this);
                 UpdateLifeBarPosition();
+            }
+            else
+            {
+                Log.Debug($"Monster.ForceShow(): not showing life bar for {Name} - currentReality={currentReality}", "Monster");
             }
         }
     }

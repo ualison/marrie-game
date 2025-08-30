@@ -136,7 +136,7 @@ script = ExtResource("13_r6l07")
 
 [node name="EnemyManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("7_r6l07")
-DeathHideTime = 120.0
+GlobalMonsterHideTime = 60.0
 
 [node name="ReplaySystemManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("14_r6l07")

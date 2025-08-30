@@ -49,7 +49,7 @@ StartingLife = 2
 [node name="PlayerMana" type="Node" parent="CharacterBody2D"]
 script = ExtResource("4_mana")
 MaxMana = 4
-StartingMana = 1
+StartingMana = 4
 
 [node name="Inventory" type="Node" parent="CharacterBody2D"]
 script = ExtResource("5_inventory")

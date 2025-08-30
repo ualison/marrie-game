@@ -60,8 +60,17 @@ namespace MarrieGame.Systems.LifePools
 
         public bool HandleGhostDamage(int damage, Reality reality)
         {
-            if (reality != Reality.PastReality) return false;
-            if (_ghostPool == null) return false;
+            if (reality != Reality.PastReality)
+            {
+                Log.Debug($"SeparateLifePool.HandleGhostDamage: rejected because reality={reality}", "SeparateLifePool");
+                return false;
+            }
+
+            if (_ghostPool == null)
+            {
+                Log.Debug($"SeparateLifePool.HandleGhostDamage: rejected because ghostPool is null for pair {_pair.PairId}", "SeparateLifePool");
+                return false;
+            }
 
             bool res = _ghostPool.HandleDamage(damage);
             if (res && _ghostPool.GhostPurpleHearts <= 0 && !_pair.IsHidden)

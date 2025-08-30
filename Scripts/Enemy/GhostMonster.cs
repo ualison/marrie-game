@@ -867,9 +867,11 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
     {
         Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
         Log.Debug($"GhostMonster.TakeRockDamage called - CurrentReality: {currentReality}", "GhostMonster");
+        // Diagnostic: check if centralized life pool exists for this ghost
+        var lifePool = EnemyManager.Instance?.GetLifePoolForGhost(this);
+        Log.Debug($"GhostMonster.TakeRockDamage: lifePool found={(lifePool != null)}", "GhostMonster");
 
         // Use centralized life pool for consistent damage handling
-        var lifePool = EnemyManager.Instance?.GetLifePoolForGhost(this);
         if (lifePool != null)
         {
             bool damaged = lifePool.HandleGhostDamage(damage, currentReality);
@@ -889,7 +891,11 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         }
         
         // Fallback to local handling if no centralized pool
-        if (_monsterLife == null) return false;
+        if (_ghostLife == null && _monsterLife == null)
+        {
+            Log.Debug($"GhostMonster.TakeRockDamage: no local life components available (ghostLife=null, monsterLife=null)", "GhostMonster");
+            return false;
+        }
 
         bool localDamaged = false;
 
@@ -921,6 +927,19 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
                 {
                     Log.Warning($"Rock hit GhostMonster in Past Reality but no purple hearts to damage", "GhostMonster");
                 }
+                    // If local damage killed the ghost, trigger ghost death handling so EnemyManager can hide pair and schedule respawn
+                    if (localDamaged)
+                    {
+                        bool isDead = false;
+                        if (_ghostLife != null) isDead = _ghostLife.IsDead;
+                        else if (_monsterLife != null) isDead = _monsterLife.IsDead;
+
+                        if (isDead)
+                        {
+                            Log.Debug("GhostMonster local death detected after rock damage - invoking OnGhostDeath", "GhostMonster");
+                            OnGhostDeath();
+                        }
+                    }
                 break;
         }
 
@@ -929,14 +948,18 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
     // Add this new method to handle ghost-specific death behavior
     private void OnGhostDeath()
     {
-        // Stop any ongoing replay
+        // Prefer notifying EnemyManager so pair-level hide/respawn logic runs
+        var mgr = EnemyManager.Instance;
+        if (mgr != null)
+        {
+            mgr.HandleGhostDeath(this);
+            return;
+        }
+
+        // Fallback: Stop any ongoing replay, destroy and log
         StopReplay();
-
-        // Trigger fade out and destruction
         FadeOutAndDestroy();
-
-        // Notify any systems that need to know about ghost death
-        Log.UI("GhostMonster has been destroyed by rock damage", "GhostMonster");
+        Log.UI("GhostMonster has been destroyed by rock damage (no EnemyManager)", "GhostMonster");
     }
 
 
