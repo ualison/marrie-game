@@ -8,25 +8,25 @@ using MarrieGame.Core.Models;
 public partial class EnemyManager : Node
 {
     #region Configuration
-    [Export] public float GlobalHideTime { get; set; } = 45f; // Ghost death -> both respawn
-    [Export] public float LocalHideTime { get; set; } = 10f;  // Monster depleted -> monster respawn
-    
+    [Export] public float GlobalHideTime { get; set; } = 80f; // Ghost death -> both respawn
+    [Export] public float LocalHideTime { get; set; } = 15f;  // Monster depleted -> monster respawn
+
     public static EnemyManager Instance { get; private set; }
     #endregion
-    
+
     #region Core Data
     private readonly List<EnemyPair> _pairs = new();
     private readonly Dictionary<Monster, EnemyPair> _monsterLookup = new();
     private readonly Dictionary<GhostMonster, EnemyPair> _ghostLookup = new();
     private readonly Dictionary<EnemyPair, Timer> _respawnTimers = new();
     private readonly Dictionary<EnemyPair, RespawnType> _respawnTypes = new();
-    
+
     private bool _isPlayerDead = false;
     #endregion
 
     #region Respawn Types
-    private enum RespawnType 
-    { 
+    private enum RespawnType
+    {
         MonsterOnly,    // Only monster respawns (local timer)
         FullPair        // Both monster and ghost respawn (global timer)
     }
@@ -87,7 +87,7 @@ public partial class EnemyManager : Node
 
             _pairs.Add(pair);
             _monsterLookup[monster] = pair;
-            
+
             if (closestGhost != null)
             {
                 _ghostLookup[closestGhost] = pair;
@@ -141,7 +141,7 @@ public partial class EnemyManager : Node
         }
 
         Log.Warning($"Monster depleted - hiding for {LocalHideTime}s (local timer)", "EnemyManager");
-        
+
         HideMonster(pair.Monster);
         pair.IsHidden = true;
         ScheduleRespawn(pair, LocalHideTime, RespawnType.MonsterOnly);
@@ -152,13 +152,15 @@ public partial class EnemyManager : Node
         var pair = GetPair(ghost);
         if (pair == null)
         {
-            // Unpaired ghost - just destroy it
+            // Unpaired ghost - just destroy it and check for auto-return
             if (IsInstanceValid(ghost))
                 ghost.FadeOutAndDestroy();
+
+            CheckForAutoReturn();
             return;
         }
 
-        HandleGhostDeath(pair);
+        HandleGhostDeath(pair); // This will also call CheckForAutoReturn
     }
 
     public void HandleGhostDeath(EnemyPair pair)
@@ -194,6 +196,54 @@ public partial class EnemyManager : Node
 
         // Schedule full pair respawn (global timer)
         ScheduleRespawn(pair, GlobalHideTime, RespawnType.FullPair);
+
+        // NEW: Check if we should auto-return to CurrentReality
+        CheckForAutoReturn();
+    }
+
+    // NEW METHOD: Check if all ghosts are dead and trigger auto-return
+    private void CheckForAutoReturn()
+    {
+        var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        if (currentReality != Reality.PastReality)
+        {
+            return; // Only auto-return when in PastReality
+        }
+
+        // Count active (visible and alive) ghosts
+        int activeGhosts = 0;
+        foreach (var pair in _pairs)
+        {
+            if (IsInstanceValid(pair.Ghost) && pair.Ghost.LifeSystem != null && !pair.Ghost.LifeSystem.IsDead)
+            {
+                activeGhosts++;
+            }
+        }
+
+        Log.Debug($"CheckForAutoReturn: Found {activeGhosts} active ghosts in PastReality", "EnemyManager");
+
+        if (activeGhosts == 0)
+        {
+            Log.Replay("All ghosts eliminated - triggering auto-return to CurrentReality", "EnemyManager");
+
+            // INCREASED DELAY: Give more time for death effects and ghost cleanup
+            GetTree().CreateTimer(1.5f).Timeout += () =>
+            {
+                if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+                {
+                    var stillInPast = RealityManager.Instance.CurrentReality == Reality.PastReality;
+                    if (stillInPast)
+                    {
+                        Log.Replay("EnemyManager executing auto-return to CurrentReality after 1.5s delay", "EnemyManager");
+                        RealityManager.Instance.EndReplay();
+                    }
+                    else
+                    {
+                        Log.Debug("Auto-return cancelled - already returned to CurrentReality", "EnemyManager");
+                    }
+                }
+            };
+        }
     }
     #endregion
 
@@ -221,7 +271,7 @@ public partial class EnemyManager : Node
         };
 
         timer.Start();
-        
+
         Log.Debug($"Scheduled {type} respawn for pair {pair.PairId} in {seconds}s", "EnemyManager");
     }
 
@@ -242,15 +292,23 @@ public partial class EnemyManager : Node
         if (!IsInstanceValid(pair.Monster)) return;
 
         Log.System($"Respawning monster {pair.Monster.Name} after local depletion", "EnemyManager");
-        
+
         pair.Monster.LifeSystem?.Reset();
-        
+
         var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
         pair.Monster.ForceEnableAfterRespawn();
-        
+
         if (currentReality == Reality.CurrentReality)
+        {
             pair.Monster.ForceShow();
-            
+
+            // Notify ReplayRecorder that monster is now visible again
+            if (ReplayRecorder.Instance != null)
+            {
+                ReplayRecorder.Instance.OnMonsterVisibilityChanged(pair.Monster, true);
+            }
+        }
+
         pair.IsHidden = false;
     }
 
@@ -263,14 +321,20 @@ public partial class EnemyManager : Node
         {
             pair.Monster.LifeSystem?.Reset();
             pair.Monster.ForceEnableAfterRespawn();
-            
+
             var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
             if (currentReality == Reality.CurrentReality)
             {
                 pair.Monster.ForceShow();
-                
+
                 // Ensure monster is actually visible after respawn (bug fix)
                 CallDeferred(nameof(VerifyMonsterVisibility), pair.Monster);
+
+                // Notify ReplayRecorder that monster is now visible again
+                if (ReplayRecorder.Instance != null)
+                {
+                    ReplayRecorder.Instance.OnMonsterVisibilityChanged(pair.Monster, true);
+                }
             }
         }
 
@@ -301,7 +365,7 @@ public partial class EnemyManager : Node
     private void OnRealityChanged(Reality newReality)
     {
         Log.System($"Reality changed to {newReality}", "EnemyManager");
-        
+
         foreach (var pair in _pairs)
         {
             if (!IsInstanceValid(pair.Monster)) continue;
@@ -328,7 +392,48 @@ public partial class EnemyManager : Node
     public EnemyPair GetPair(GhostMonster ghost) => _ghostLookup.GetValueOrDefault(ghost);
 
     public int GetMonsterRedHearts(Monster monster) => monster?.LifeSystem?.CurrentRedHearts ?? 0;
-    public int GetGhostPurpleHearts(GhostMonster ghost) => ghost?.LifeSystem?.CurrentLife ?? 0;
+
+    public int GetGhostPurpleHearts(GhostMonster ghost)
+    {
+        if (!IsInstanceValid(ghost)) return 0;
+
+        try
+        {
+            var ghostType = ghost.GetType();
+
+            // Try to get _ghostLife first (GhostMonsterLife - purple hearts only)
+            var ghostLifeField = ghostType.GetField("_ghostLife", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (ghostLifeField != null)
+            {
+                var ghostLife = ghostLifeField.GetValue(ghost) as Node;
+                if (ghostLife != null && IsInstanceValid(ghostLife))
+                {
+                    var currentLifeProp = ghostLife.GetType().GetProperty("CurrentLife");
+                    if (currentLifeProp != null)
+                        return (int)currentLifeProp.GetValue(ghostLife);
+                }
+            }
+
+            // Fallback to _monsterLife for backward compatibility
+            var monsterLifeField = ghostType.GetField("_monsterLife", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (monsterLifeField != null)
+            {
+                var monsterLife = monsterLifeField.GetValue(ghost) as Node;
+                if (monsterLife != null && IsInstanceValid(monsterLife))
+                {
+                    var purpleHeartsProp = monsterLife.GetType().GetProperty("CurrentPurpleHearts");
+                    if (purpleHeartsProp != null)
+                        return (int)purpleHeartsProp.GetValue(monsterLife);
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Log.Warning($"Failed to get purple hearts for ghost {ghost.Name}: {ex.Message}", "EnemyManager");
+        }
+
+        return 0;
+    }
 
     public float GetRespawnTimeLeft(EnemyPair pair)
     {
@@ -355,18 +460,30 @@ public partial class EnemyManager : Node
 
     public bool IsMonsterHiddenByPair(Monster monster) => GetPair(monster)?.IsHidden ?? false;
 
+    /// <summary>
+    /// Returns true if the specified monster is part of a pair that currently has a respawn timer scheduled.
+    /// This is used by other systems (like ReplayOrchestrator) to avoid showing monsters that should remain hidden
+    /// during a global respawn timeout even when reality returns to current.
+    /// </summary>
+    public bool IsMonsterScheduledForRespawn(Monster monster)
+    {
+        var pair = GetPair(monster);
+        if (pair == null) return false;
+        return _respawnTimers.ContainsKey(pair);
+    }
+
     public void ResetAllEnemies()
     {
         CancelAllRespawns();
-        
+
         foreach (var pair in _pairs)
         {
             if (IsInstanceValid(pair.Monster))
                 pair.Monster.Reset();
-            
+
             if (IsInstanceValid(pair.Ghost))
                 pair.Ghost.LifeSystem?.Reset();
-            
+
             pair.IsHidden = false;
         }
 
@@ -422,7 +539,15 @@ public partial class EnemyManager : Node
     private void HideMonster(Monster monster)
     {
         if (IsInstanceValid(monster))
+        {
             monster.ForceHide();
+
+            // Notify ReplayRecorder that monster is now hidden
+            if (ReplayRecorder.Instance != null)
+            {
+                ReplayRecorder.Instance.OnMonsterVisibilityChanged(monster, false);
+            }
+        }
     }
 
     private void CancelAllRespawns()

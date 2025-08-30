@@ -12,6 +12,7 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
     private static readonly Color GHOST_TINT = new(0.6f, 0.3f, 0.9f, 0.7f); // Purple gem-like color
     private const float ALPHA_TOLERANCE = 0.01f; // Avoid unnecessary updates
     private const float SMOOTH_SPEED = 10.0f; // Position interpolation speed for smooth movement
+
     #endregion
 
     #region State Variables
@@ -73,8 +74,8 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
             _activeSprite.Show();
         }
 
-    // Setup a GhostMonsterLife (purple-heart only) and LifeBar so ghost displays health in PastReality
-    SetupLifeSystem();
+        // Setup a GhostMonsterLife (purple-heart only) and LifeBar so ghost displays health in PastReality
+        SetupLifeSystem();
 
         // Setup damage area for player collision detection
         SetupDamageArea();
@@ -318,9 +319,9 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
 
     private void HandleStateBasedBehavior(ReplayFrame frame)
     {
-    // Extract state information from frame (use compact ids)
-    string newMonsterState = ReplayStringRegistry.GetMonsterStateName(frame.MonsterStateId);
-    bool newIsFullyVisible = frame.IsFullyVisible;
+        // Extract state information from frame (use compact ids)
+        string newMonsterState = ReplayStringRegistry.GetMonsterStateName(frame.MonsterStateId);
+        bool newIsFullyVisible = frame.IsFullyVisible;
         float finalAlpha = frame.Alpha * GHOST_TINT.A;
 
         // Update current alpha
@@ -482,8 +483,8 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         // Also hide life bar if present
         try { _monsterLifeBar?.Hide(); } catch { }
 
-    // Keep node in scene tree and in the group so debugging/respawn systems can still find it.
-    // (Do not remove from "ghost_monster" group here.)
+        // Keep node in scene tree and in the group so debugging/respawn systems can still find it.
+        // (Do not remove from "ghost_monster" group here.)
     }
 
     public bool IsReplaying() => _isReplaying;
@@ -611,8 +612,8 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         {
             _damageArea.CollisionLayer = 1; // player layer
             _damageArea.CollisionMask = 1;  // detect player
-                try { _damageArea.SetDeferred("monitoring", true); } catch { _damageArea.Monitoring = true; }
-                try { _damageArea.SetDeferred("monitorable", true); } catch { _damageArea.Monitorable = true; }
+            try { _damageArea.SetDeferred("monitoring", true); } catch { _damageArea.Monitoring = true; }
+            try { _damageArea.SetDeferred("monitorable", true); } catch { _damageArea.Monitorable = true; }
             // Immediately check for overlapping players in case the player is
             // already inside the area when the ghost becomes active. Godot
             // doesn't emit body_entered for an area that was disabled while a
@@ -653,17 +654,17 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         {
             return;
         }
-            bool isGhost = body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster");
-            Log.Debug($"GhostMonster {Name} collision with Player {body.Name} - IsGhost: {isGhost}", "GhostMonster");
+        bool isGhost = body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster");
+        Log.Debug($"GhostMonster {Name} collision with Player {body.Name} - IsGhost: {isGhost}", "GhostMonster");
 
-            // Only proceed if player is alive
-            if (player.LifeSystem?.IsDead == true) return;
+        // Only proceed if player is alive
+        if (player.LifeSystem?.IsDead == true) return;
 
-            Log.Debug($"GhostMonster {Name} attempting damage to player", "GhostMonster");
-            if (player.TakeDamage(1)) // Default damage amount for ghost
-            {
-                PlayDamageEffect(Colors.Purple);
-            }
+        Log.Debug($"GhostMonster {Name} attempting damage to player", "GhostMonster");
+        if (player.TakeDamage(1)) // Default damage amount for ghost
+        {
+            PlayDamageEffect(Colors.Purple);
+        }
     }
 
     private void SetupLifeSystem()
@@ -897,77 +898,155 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
     // NOTE: Recursive descendant search replaced by NodeHelpers.FindChildOfType and other helpers.
 
 
-   public bool TakeRockDamage(int damage = 1)
-{
-    Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
-    Log.Debug($"GhostMonster.TakeRockDamage called - CurrentReality: {currentReality}", "GhostMonster");
-    
-    // Direct local handling - no life pool system
-    if (_ghostLife == null && _monsterLife == null)
+    // UPDATED: Simplified TakeRockDamage without individual auto-return
+    public bool TakeRockDamage(int damage = 1)
     {
-        Log.Debug($"GhostMonster.TakeRockDamage: no local life components available", "GhostMonster");
-        return false;
-    }
+        Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        Log.Debug($"GhostMonster.TakeRockDamage called - CurrentReality: {currentReality}", "GhostMonster");
 
-    bool localDamaged = false;
+        // Direct local handling - no life pool system
+        if (_ghostLife == null && _monsterLife == null)
+        {
+            Log.Debug($"GhostMonster.TakeRockDamage: no local life components available", "GhostMonster");
+            return false;
+        }
 
-    switch (currentReality)
-    {
-        case Reality.CurrentReality:
-            // Ghosts don't take damage in current reality (Monster handles that)
-            Log.Warning($"Rock hit GhostMonster in Current Reality but ghosts shouldn't take damage in current reality", "GhostMonster");
-            break;
+        bool localDamaged = false;
 
-        case Reality.PastReality:
-            // Rocks only damage purple hearts in past reality for ghosts
-            if (_ghostLife != null)
-            {
-                localDamaged = _ghostLife.TakeRockDamageInPastReality(damage);
-            }
-            else if (_monsterLife != null)
-            {
-                localDamaged = _monsterLife.TakeRockDamageInPastReality(damage);
-            }
+        switch (currentReality)
+        {
+            case Reality.CurrentReality:
+                // Ghosts don't take damage in current reality (Monster handles that)
+                Log.Warning($"Rock hit GhostMonster in Current Reality but ghosts shouldn't take damage in current reality", "GhostMonster");
+                break;
 
-            if (localDamaged)
-            {
-                PlayDamageEffect(Colors.Purple);
-                Log.Info($"Rock hit GhostMonster in Past Reality - damaged purple hearts locally", "GhostMonster");
-                
-                // Check for death
-                bool isDead = false;
-                if (_ghostLife != null) isDead = _ghostLife.IsDead;
-                else if (_monsterLife != null) isDead = _monsterLife.IsDead;
-
-                if (isDead)
+            case Reality.PastReality:
+                // Rocks only damage purple hearts in past reality for ghosts
+                if (_ghostLife != null)
                 {
-                    Log.Debug("GhostMonster local death detected after rock damage - invoking OnGhostDeath", "GhostMonster");
-                    OnGhostDeath();
+                    localDamaged = _ghostLife.TakeRockDamageInPastReality(damage);
                 }
-            }
-            break;
+                else if (_monsterLife != null)
+                {
+                    localDamaged = _monsterLife.TakeRockDamageInPastReality(damage);
+                }
+
+                if (localDamaged)
+                {
+                    PlayDamageEffect(Colors.Purple);
+                    Log.Info($"Rock hit GhostMonster in Past Reality - damaged purple hearts locally", "GhostMonster");
+
+                    // Check for death
+                    bool isDead = false;
+                    if (_ghostLife != null) isDead = _ghostLife.IsDead;
+                    else if (_monsterLife != null) isDead = _monsterLife.IsDead;
+
+                    if (isDead)
+                    {
+                        Log.Debug("GhostMonster local death detected after rock damage - invoking OnGhostDeath", "GhostMonster");
+                        OnGhostDeath(); // This now delegates everything to EnemyManager
+                    }
+                }
+                break;
+        }
+
+        return localDamaged;
     }
-
-    return localDamaged;
-}
-
-    // Add this new method to handle ghost-specific death behavior
-   private void OnGhostDeath()
-{
-    // Prefer notifying EnemyManager so pair-level hide/respawn logic runs
-    var mgr = EnemyManager.Instance;
-    if (mgr != null)
+    //NEW METHOD: Centralized death handling with auto-return
+    private void HandleGhostDeathAndAutoReturn()
     {
-        // Use the method that takes GhostMonster directly
-        mgr.HandleGhostDeath(this);
-        return;
+        Log.Replay("=== GhostMonster HandleGhostDeathAndAutoReturn called ===", "GhostMonster");
+
+        // First handle the death through EnemyManager for pair logic
+        var mgr = EnemyManager.Instance;
+        if (mgr != null)
+        {
+            mgr.HandleGhostDeath(this);
+        }
+        else
+        {
+            // Fallback: Stop replay and destroy
+            StopReplay();
+            FadeOutAndDestroy();
+        }
+
+        // AUTO-RETURN FEATURE: Switch back to CurrentReality immediately when ghost dies in PastReality
+        var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        if (currentReality == Reality.PastReality)
+        {
+            Log.Replay("GhostMonster died in PastReality - triggering immediate auto-return to CurrentReality", "GhostMonster");
+
+            // Use CallDeferred to ensure death processing completes first
+            CallDeferred(nameof(ExecuteAutoReturn));
+        }
     }
 
-    // Fallback: Stop any ongoing replay, destroy and log
-    StopReplay();
-    FadeOutAndDestroy();
-    Log.UI("GhostMonster has been destroyed by rock damage (no EnemyManager)", "GhostMonster");
-}
+    // Deferred auto-return execution
+    private void ExecuteAutoReturn()
+    {
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+        {
+            var currentReality = RealityManager.Instance.CurrentReality;
+            Log.Replay($"ExecuteAutoReturn: Current reality is {currentReality}", "GhostMonster");
+
+            if (currentReality == Reality.PastReality)
+            {
+                Log.Replay("Executing auto-return to CurrentReality after ghost death", "GhostMonster");
+                RealityManager.Instance.EndReplay();
+
+                // Verify the switch worked
+                CallDeferred(nameof(VerifyAutoReturn));
+            }
+            else
+            {
+                Log.Debug("Auto-return not needed - already in CurrentReality", "GhostMonster");
+            }
+        }
+        else
+        {
+            Log.Error("Could not execute auto-return - RealityManager not available", "GhostMonster");
+        }
+    }
+
+    // Verify auto-return worked
+    private void VerifyAutoReturn()
+    {
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+        {
+            var newReality = RealityManager.Instance.CurrentReality;
+            Log.Replay($"Auto-return verification: Reality is now {newReality}", "GhostMonster");
+
+            if (newReality != Reality.CurrentReality)
+            {
+                Log.Error("Auto-return failed - still in PastReality. Attempting force switch.", "GhostMonster");
+                // Force switch as backup
+                RealityManager.Instance.SetReality(Reality.CurrentReality);
+            }
+        }
+    }
+
+    private void OnGhostDeath()
+    {
+        Log.Debug("GhostMonster OnGhostDeath called - delegating to EnemyManager", "GhostMonster");
+
+        // Delegate all death handling to EnemyManager (which handles auto-return at system level)
+        var mgr = EnemyManager.Instance;
+        if (mgr != null)
+        {
+            mgr.HandleGhostDeath(this);
+        }
+        else
+        {
+            // Fallback: Stop replay and destroy
+            StopReplay();
+            FadeOutAndDestroy();
+            Log.UI("GhostMonster destroyed (no EnemyManager)", "GhostMonster");
+        }
+
+        // NOTE: Auto-return is now handled by EnemyManager.CheckForAutoReturn()
+        // This prevents timing conflicts and ensures consistent system-level behavior
+    }
+
 
 
 
@@ -1040,68 +1119,84 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
     public MonsterLife LifeSystem => _monsterLife;
     public MonsterLife GetLifeSystem() => _monsterLife;
 
-   
-   public bool TakePhysicalDamage(int damage = 1)
-{
-    // Direct local handling - physical damage targets red hearts
-    if (_monsterLife == null) return false;
 
-    Log.Debug($"GhostMonster TakePhysicalDamage - CurrentRedHearts: {_monsterLife.CurrentRedHearts}", "GhostMonster");
-    bool localDamaged = _monsterLife.TakePhysicalDamage(damage);
-
-    if (localDamaged)
+    public bool TakePhysicalDamage(int damage = 1)
     {
-        PlayDamageEffect(Colors.Red);
-        Log.Debug($"GhostMonster took {damage} physical damage locally", "GhostMonster");
+        // Direct local handling - physical damage targets red hearts
+        if (_monsterLife == null) return false;
 
-        if (_monsterLife.IsDead)
-        {
-            OnGhostDeath();
-        }
-    }
+        Log.Debug($"GhostMonster TakePhysicalDamage - CurrentRedHearts: {_monsterLife.CurrentRedHearts}", "GhostMonster");
+        bool localDamaged = _monsterLife.TakePhysicalDamage(damage);
 
-    return localDamaged;
-}
-
-
-      // Enhanced TakeMagicalDamage for consistency with centralized system
-   public bool TakeMagicalDamage(int damage = 1)
-{
-    // Direct local handling - prefer ghost-specific life component for magical damage
-    if (_ghostLife != null)
-    {
-        Log.Debug($"GhostMonster TakeMagicalDamage - CurrentLife: {_ghostLife.CurrentLife}", "GhostMonster");
-        bool localDamagedGhost = _ghostLife.TakeMagicalDamage(damage);
-        if (localDamagedGhost)
-        {
-            PlayDamageEffect(Colors.Purple);
-            Log.Debug($"GhostMonster took {damage} magical damage on GhostMonsterLife", "GhostMonster");
-            if (_ghostLife.IsDead)
-            {
-                OnGhostDeath();
-            }
-        }
-        return localDamagedGhost;
-    }
-
-    // Legacy fallback: use MonsterLife if present
-    if (_monsterLife != null)
-    {
-        Log.Debug($"GhostMonster TakeMagicalDamage (legacy) - CurrentLife: {_monsterLife.CurrentLife}", "GhostMonster");
-        bool localDamaged = _monsterLife.TakeMagicalDamage(damage);
         if (localDamaged)
         {
-            PlayDamageEffect(Colors.Purple);
-            Log.Debug($"GhostMonster took {damage} magical damage locally (legacy)", "GhostMonster");
+            PlayDamageEffect(Colors.Red);
+            Log.Debug($"GhostMonster took {damage} physical damage locally", "GhostMonster");
+
             if (_monsterLife.IsDead)
             {
                 OnGhostDeath();
             }
         }
+
         return localDamaged;
     }
 
-    return false;
-}
+
+    // Enhanced TakeMagicalDamage for consistency with centralized system
+    public bool TakeMagicalDamage(int damage = 1)
+    {
+        // Direct local handling - prefer ghost-specific life component for magical damage
+        if (_ghostLife != null)
+        {
+            Log.Debug($"GhostMonster TakeMagicalDamage - CurrentLife: {_ghostLife.CurrentLife}", "GhostMonster");
+            bool localDamagedGhost = _ghostLife.TakeMagicalDamage(damage);
+            if (localDamagedGhost)
+            {
+                PlayDamageEffect(Colors.Purple);
+                Log.Debug($"GhostMonster took {damage} magical damage on GhostMonsterLife", "GhostMonster");
+                if (_ghostLife.IsDead)
+                {
+                    OnGhostDeath();
+                }
+            }
+            return localDamagedGhost;
+        }
+
+        // Legacy fallback: use MonsterLife if present
+        if (_monsterLife != null)
+        {
+            Log.Debug($"GhostMonster TakeMagicalDamage (legacy) - CurrentLife: {_monsterLife.CurrentLife}", "GhostMonster");
+            bool localDamaged = _monsterLife.TakeMagicalDamage(damage);
+            if (localDamaged)
+            {
+                PlayDamageEffect(Colors.Purple);
+                Log.Debug($"GhostMonster took {damage} magical damage locally (legacy)", "GhostMonster");
+                if (_monsterLife.IsDead)
+                {
+                    OnGhostDeath();
+                }
+            }
+            return localDamaged;
+        }
+
+        return false;
+    }
+
+    public int CurrentPurpleHearts
+    {
+        get
+        {
+            // Prefer GhostMonsterLife if available (dedicated purple heart system)
+            if (_ghostLife != null && IsInstanceValid(_ghostLife))
+                return _ghostLife.CurrentPurpleHearts;
+
+            // Fallback to MonsterLife purple hearts for backward compatibility
+            if (_monsterLife != null && IsInstanceValid(_monsterLife))
+                return _monsterLife.CurrentPurpleHearts;
+
+            return 0;
+        }
+    }
     #endregion
 }

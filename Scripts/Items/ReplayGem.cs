@@ -26,59 +26,79 @@ public partial class ReplayGem : Node2D
     #endregion
 
     #region Initialization
+    // UPDATED METHOD: Better initialization with immediate reality check
     public override void _Ready()
     {
-        // Setup components and hide gem initially
-    // Note: for reliable behavior during paused state, set the scene PauseMode to PauseModeEnum.Process
-    Log.Replay("ReplayGem _Ready - ensure scene PauseMode is set to Process if replay should run while tree is paused", "ReplayGem");
+        Log.Replay("ReplayGem _Ready - ensure scene PauseMode is set to Process if replay should run while tree is paused", "ReplayGem");
         InitializeComponents();
         ConnectSignals();
         SetupPromptLabel();
         HideInitially();
         EnableInputProcessing();
 
-        // Check RealityManager availability during initialization
-        Log.Replay($"ReplayGem _Ready - RealityManager availability: {RealityManager.IsInstanceAvailable}", "ReplayGem");
-        if (RealityManager.IsInstanceAvailable)
+        // IMPROVED: Immediate reality check and connection
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
         {
             Log.Replay($"RealityManager found during ReplayGem init - Current reality: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "ReplayGem");
             RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
+
+            // Apply initial reality state immediately
+            OnRealityChanged(RealityManager.Instance.CurrentReality);
         }
         else
         {
-            Log.Replay("RealityManager not yet available during ReplayGem init - this may be normal if RealityManager initializes later", "ReplayGem");
+            Log.Replay("RealityManager not yet available during ReplayGem init", "ReplayGem");
             CallDeferred(nameof(ConnectToRealityManager));
         }
 
         // Add delay before allowing interaction to prevent auto-triggering
-        GetTree().CreateTimer(1.0f).Timeout += () => {
+        GetTree().CreateTimer(1.0f).Timeout += () =>
+        {
             _canInteract = true;
             Log.Replay("ReplayGem interaction enabled", "ReplayGem");
-            
-            // Check RealityManager again after delay
-            Log.Replay($"ReplayGem interaction enabled - RealityManager availability: {RealityManager.IsInstanceAvailable}", "ReplayGem");
+
+            // Final reality check after interaction is enabled
+            if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+            {
+                var currentReality = RealityManager.Instance.CurrentReality;
+                if (currentReality == Reality.PastReality)
+                {
+                    Log.Debug("ReplayGem: Ensuring hidden state in PastReality after interaction enabled", "ReplayGem");
+                    ForceHideCompletely();
+                }
+            }
         };
 
         Log.Replay("ReplayGem ready - hidden until activated", "ReplayGem");
     }
 
+    //UPDATED METHOD: Improved connection to RealityManager
     private void ConnectToRealityManager()
     {
-        if (RealityManager.IsInstanceAvailable)
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
         {
+            Log.Debug("ReplayGem connecting to RealityManager", "ReplayGem");
             RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
-            // Apply current reality immediately
-            OnRealityChanged(RealityManager.Instance.CurrentReality);
+
+            // Apply current reality immediately to ensure correct initial state
+            var currentReality = RealityManager.Instance.CurrentReality;
+            Log.Debug($"ReplayGem applying initial reality state: {currentReality}", "ReplayGem");
+            OnRealityChanged(currentReality);
+        }
+        else
+        {
+            // Retry connection after a short delay
+            Log.Debug("RealityManager not available, retrying connection in 0.1s", "ReplayGem");
+            GetTree().CreateTimer(0.1f).Timeout += ConnectToRealityManager;
         }
     }
-
     private void InitializeComponents()
     {
         // Get required child nodes with error handling
-    _detectionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "DetectionArea");
-    _gemSprite = NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "GemSprite");
-    _promptLabel = NodeHelpers.GetNodeOrNull<Label>(this, null, "PromptLabel");
-        
+        _detectionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "DetectionArea");
+        _gemSprite = NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "GemSprite");
+        _promptLabel = NodeHelpers.GetNodeOrNull<Label>(this, null, "PromptLabel");
+
         // Store original gem position for floating animation
         if (_gemSprite != null)
             _originalGemPosition = _gemSprite.Position;
@@ -131,7 +151,7 @@ public partial class ReplayGem : Node2D
     private void HandleReplayActivation()
     {
         Log.Replay("=== ReplayGem HandleReplayActivation called ===", "ReplayGem");
-        
+
         // Check if player has enough mana (requires 1 mana)
         var playerMana = GetPlayerManaSystem();
         if (playerMana == null)
@@ -156,10 +176,10 @@ public partial class ReplayGem : Node2D
         }
 
         Log.Replay("Consumed 1 mana for replay activation", "ReplayGem");
-        
+
         // Change reality to PastReality when starting replay
         Log.Replay($"Attempting to start replay - RealityManager availability: {RealityManager.IsInstanceAvailable}", "ReplayGem");
-        
+
         if (RealityManager.IsInstanceAvailable)
         {
             Log.Replay($"Current reality before replay: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "ReplayGem");
@@ -171,10 +191,10 @@ public partial class ReplayGem : Node2D
             Log.Warning("RealityManager.Instance is null - cannot change reality. This suggests RealityManager hasn't been initialized yet.", "ReplayGem");
             Log.Warning("Check that RealityManager is properly added to the scene tree before ReplayGem activation.", "ReplayGem");
         }
-        
+
         // Get death record and start replay through orchestrator
         var deathRecord = GetDeathRecord();
-        if (deathRecord == null) 
+        if (deathRecord == null)
         {
             Log.Warning("No death record available for replay", "ReplayGem");
             // Refund mana if replay fails
@@ -216,7 +236,7 @@ public partial class ReplayGem : Node2D
     {
         // Stop floating animation during replay
         StopFloatingAnimation();
-        
+
         if (_promptLabel != null)
         {
             _promptLabel.Hide();
@@ -260,7 +280,7 @@ public partial class ReplayGem : Node2D
     {
         // Hide gem completely and cleanup
         _detectionArea.SetDeferred("monitoring", false);
-        
+
         // Stop floating animation
         StopFloatingAnimation();
 
@@ -280,36 +300,83 @@ public partial class ReplayGem : Node2D
     // Handles reality changes: hide when entering PastReality, restore when leaving
     private void OnRealityChanged(Reality newReality)
     {
-        Log.Debug($"ReplayGem OnRealityChanged called - newReality={newReality}", "ReplayGem");
+        Log.Debug($"ReplayGem OnRealityChanged called - newReality={newReality}, currentVisible={Visible}", "ReplayGem");
 
         if (newReality == Reality.PastReality)
         {
             // Remember if the gem was visible so we can restore later
-            _wasVisibleBeforeRealityChange = Visible;
+            _wasVisibleBeforeRealityChange = Visible && (_gemSprite?.Visible ?? false);
             Log.Replay($"Hiding ReplayGem because reality is PastReality (wasVisible={_wasVisibleBeforeRealityChange})", "ReplayGem");
-            HideGem();
+
+            // IMPROVED: Force hide everything immediately
+            ForceHideCompletely();
         }
-        else
+        else if (newReality == Reality.CurrentReality)
         {
             // If we were visible before the reality switch, restore visuals
             if (_wasVisibleBeforeRealityChange)
             {
                 Log.Replay("Restoring ReplayGem after returning from PastReality", "ReplayGem");
-                // Ensure node and visual children are shown and monitoring restored
+
+                // Restore full visibility
                 Show();
+                Visible = true;
+
                 if (_gemSprite != null)
                 {
                     _gemSprite.Show();
+                    _gemSprite.Visible = true;
                     StartFloatingAnimation();
                 }
+
                 if (_promptLabel != null)
                 {
                     _promptLabel.Hide(); // show only when player nearby
                 }
-                _detectionArea?.SetDeferred("monitoring", true);
+
+                if (_detectionArea != null)
+                {
+                    _detectionArea.SetDeferred("monitoring", true);
+                }
             }
             _wasVisibleBeforeRealityChange = false;
         }
+    }
+
+    // NEW METHOD: Force complete hiding of gem
+    private void ForceHideCompletely()
+    {
+        // Disable all interaction first
+        if (_detectionArea != null)
+        {
+            _detectionArea.SetDeferred("monitoring", false);
+            _detectionArea.SetDeferred("monitorable", false);
+        }
+
+        // Stop any animations
+        StopFloatingAnimation();
+
+        // Hide all visual components
+        if (_promptLabel != null)
+        {
+            _promptLabel.Hide();
+            _promptLabel.Visible = false;
+        }
+
+        if (_gemSprite != null)
+        {
+            _gemSprite.Hide();
+            _gemSprite.Visible = false;
+        }
+
+        // Hide the main node
+        Hide();
+        Visible = false;
+
+        // Clear player nearby state
+        _playerNearby = false;
+
+        Log.Debug("ReplayGem completely hidden for PastReality", "ReplayGem");
     }
     #endregion
 
@@ -369,31 +436,31 @@ public partial class ReplayGem : Node2D
     private void StartFloatingAnimation()
     {
         if (_floatingTween == null || _gemSprite == null) return;
-        
+
         // Stop any existing animation
         _floatingTween.Kill();
         _floatingTween = CreateTween();
         _floatingTween.SetLoops(); // Loop infinitely
-        
+
         // Reset to original position
         _gemSprite.Position = _originalGemPosition;
-        
+
         // Create floating motion: up -> down -> up (continuous)
         var upPosition = new Vector2(_originalGemPosition.X, _originalGemPosition.Y - FloatingDistance);
         var downPosition = new Vector2(_originalGemPosition.X, _originalGemPosition.Y + FloatingDistance);
-        
+
         _floatingTween.TweenProperty(_gemSprite, "position", upPosition, FloatingDuration / 2.0f);
         _floatingTween.TweenProperty(_gemSprite, "position", downPosition, FloatingDuration);
         _floatingTween.TweenProperty(_gemSprite, "position", _originalGemPosition, FloatingDuration / 2.0f);
     }
-    
+
     private void StopFloatingAnimation()
     {
         if (_floatingTween != null)
         {
             _floatingTween.Kill();
         }
-        
+
         // Reset gem to original position
         if (_gemSprite != null)
         {
@@ -411,10 +478,10 @@ public partial class ReplayGem : Node2D
             _gemSprite.Show();
             StartFloatingAnimation();
         }
-        
+
         // End replay in RealityManager to return to CurrentReality
         Log.Replay($"Attempting to end replay - RealityManager availability: {RealityManager.IsInstanceAvailable}", "ReplayGem");
-        
+
         if (RealityManager.IsInstanceAvailable)
         {
             Log.Replay($"Current reality before ending replay: {RealityManager.Instance.GetCurrentRealityWithLogging()}", "ReplayGem");
