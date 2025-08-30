@@ -95,10 +95,14 @@ public partial class RespawnDebug : Control
     private void UpdateHeader()
     {
         var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
-        var globalTime = EnemyManager.Instance.GlobalHideTime;
-        var localTime = EnemyManager.Instance.LocalHideTime;
+    // Prefer showing active timer lefts when a respawn timer is scheduled, otherwise show configured defaults
+    float activeGlobalLeft = EnemyManager.Instance.GlobalRespawnTimeLeft;
+    float activeLocalLeft = EnemyManager.Instance.LocalRespawnTimeLeft;
 
-        _headerLabel.Text = $"Reality: {currentReality} \n Monster Global Time: {globalTime:F1}s \nMonster Local Time: {localTime:F1}s";
+    var globalDisplay = activeGlobalLeft > 0 ? $"{activeGlobalLeft:F1}s (active)" : $"{EnemyManager.Instance.GlobalHideTime:F1}s (config)";
+    var localDisplay = activeLocalLeft > 0 ? $"{activeLocalLeft:F1}s (active)" : $"{EnemyManager.Instance.LocalHideTime:F1}s (config)";
+
+    _headerLabel.Text = $"Reality: {currentReality} \n Monster Global Time: {globalDisplay} \nMonster Local Time: {localDisplay}";
     }
 
     private void UpdatePairsList()

@@ -8,8 +8,8 @@ using MarrieGame.Core.Models;
 public partial class EnemyManager : Node
 {
     #region Configuration
-    [Export] public float GlobalHideTime { get; set; } = 80f; // Ghost death -> both respawn
-    [Export] public float LocalHideTime { get; set; } = 15f;  // Monster depleted -> monster respawn
+    [Export] public float GlobalHideTime { get; set; } = 40f; // Ghost death -> both respawn
+    [Export] public float LocalHideTime { get; set; } = 10f;  // Monster depleted -> monster respawn
 
     public static EnemyManager Instance { get; private set; }
     #endregion
@@ -252,8 +252,10 @@ public partial class EnemyManager : Node
     {
         // Always cancel existing timer first
         CancelRespawn(pair);
-
-        var timer = new Timer { OneShot = true, WaitTime = seconds };
+    var timer = new Timer { OneShot = true, WaitTime = seconds };
+    // Ensure respawn timers continue to run even when the SceneTree is paused
+    // (e.g. during player-death pause). This prevents "slow" or frozen countdowns.
+    timer.ProcessMode = ProcessModeEnum.Always;
         AddChild(timer);
         _respawnTimers[pair] = timer;
         _respawnTypes[pair] = type;
@@ -497,6 +499,42 @@ public partial class EnemyManager : Node
     }
 
     public List<EnemyPair> GetAllPairsSnapshot() => new List<EnemyPair>(_pairs);
+
+    // Public helpers for UI/debugging: return the currently configured global/local hide times
+    // and the remaining time on any scheduled respawn timers.
+    public float GlobalRespawnTimeLeft
+    {
+        get
+        {
+            // If any pair has a FullPair timer, return the smallest time left (next global event)
+            float min = float.PositiveInfinity;
+            foreach (var kvp in _respawnTimers)
+            {
+                if (_respawnTypes.TryGetValue(kvp.Key, out var t) && t == RespawnType.FullPair)
+                {
+                    try { min = Math.Min(min, (float)kvp.Value.TimeLeft); } catch { }
+                }
+            }
+            return float.IsPositiveInfinity(min) ? -1f : min;
+        }
+    }
+
+    public float LocalRespawnTimeLeft
+    {
+        get
+        {
+            // If any pair has a MonsterOnly timer, return the smallest time left (next local event)
+            float min = float.PositiveInfinity;
+            foreach (var kvp in _respawnTimers)
+            {
+                if (_respawnTypes.TryGetValue(kvp.Key, out var t) && t == RespawnType.MonsterOnly)
+                {
+                    try { min = Math.Min(min, (float)kvp.Value.TimeLeft); } catch { }
+                }
+            }
+            return float.IsPositiveInfinity(min) ? -1f : min;
+        }
+    }
     #endregion
 
     #region Game Events
