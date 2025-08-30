@@ -21,7 +21,7 @@ public partial class EnemyManager : Node
 
     // Track individual lives for quick lookup
     private readonly Dictionary<Monster, int> _monsterRedHearts = new();
-    private readonly Dictionary<GhostMonster, int> _ghostPurpleHearts = new();
+    // Ghost purple hearts are stored in the SeparateLifePool (GhostLifePool). No local store needed.
 
     // Timer management keyed by pair for clarity
     private readonly Dictionary<EnemyPair, Timer> _monsterRespawnTimers = new();
@@ -179,7 +179,7 @@ public partial class EnemyManager : Node
     private void InitializeLifeSystems()
     {
         _monsterRedHearts.Clear();
-        _ghostPurpleHearts.Clear();
+    // No local ghost store to clear; pools hold authoritative ghost purple heart counts.
         // Initialize heart tracking and connect events per pair
         foreach (var pair in _pairs)
         {
@@ -202,7 +202,7 @@ public partial class EnemyManager : Node
                 var life = ghost.LifeSystem;
                 if (life != null)
                 {
-                    _ghostPurpleHearts[ghost] = life.CurrentPurpleHearts;
+                    // Pools will subscribe and track ghost purple counts; keep local monitoring minimal
                     life.LifeChanged += (current, max, purple) => OnGhostLifeChanged(ghost, purple);
                     life.MonsterDied += () => OnGhostDied(ghost);
                 }
@@ -225,9 +225,9 @@ public partial class EnemyManager : Node
 
     private void OnGhostLifeChanged(GhostMonster ghost, int purpleHearts)
     {
-        if (!_ghostPurpleHearts.ContainsKey(ghost)) return;
-        
-        _ghostPurpleHearts[ghost] = purpleHearts;
+    // Ghost life changes are proxied through pools when needed; no local state update required.
+    // Keep this hook for compatibility and potential debug usage.
+    Log.Debug($"EnemyManager.OnGhostLifeChanged: ghost={ghost.Name} purple={purpleHearts}", "EnemyManager");
     }
 
     private void OnMonsterDied(Monster monster)
@@ -268,13 +268,13 @@ public partial class EnemyManager : Node
         var pair = GetPairForMonster(monster);
         if (pair == null)
         {
-            Log.System($"Monster red hearts depleted (unpaired) - hiding for {MonsterHideTime}s", "EnemyManager");
+            Log.Warning($"Monster red hearts depleted (unpaired) - hiding for {MonsterHideTime}s", "EnemyManager");
             if (IsInstanceValid(monster)) monster.ForceHide();
             ScheduleMonsterRespawnForPairless(monster, MonsterHideTime);
             return;
         }
 
-        Log.System($"Monster red hearts depleted - hiding for {MonsterHideTime}s", "EnemyManager");
+        Log.Warning($"Monster red hearts depleted - hiding for {MonsterHideTime}s", "EnemyManager");
         pair.IsHidden = true;
 
         if (IsInstanceValid(monster)) monster.ForceHide();
@@ -392,7 +392,7 @@ public partial class EnemyManager : Node
         if (IsInstanceValid(ghost))
         {
             ghost.LifeSystem?.Reset();
-            _ghostPurpleHearts[ghost] = ghost.LifeSystem?.CurrentPurpleHearts ?? 0;
+            // rely on life pools for current ghost purple hearts
         }
 
         pair.IsHidden = false;
@@ -464,7 +464,8 @@ public partial class EnemyManager : Node
 
     public int GetGhostPurpleHearts(GhostMonster ghost)
     {
-        return _ghostPurpleHearts.GetValueOrDefault(ghost, 0);
+        var pool = GetLifePoolForGhost(ghost);
+        return pool?.GhostPurpleHearts ?? 0;
     }
 
     public bool IsMonsterPaired(Monster monster)
@@ -491,11 +492,10 @@ public partial class EnemyManager : Node
                 _monsterRedHearts[monster] = monster.LifeSystem?.CurrentRedHearts ?? 0;
             }
 
-            if (IsInstanceValid(ghost))
-            {
-                ghost.LifeSystem?.Reset();
-                _ghostPurpleHearts[ghost] = ghost.LifeSystem?.CurrentPurpleHearts ?? 0;
-            }
+                if (IsInstanceValid(ghost))
+                {
+                    ghost.LifeSystem?.Reset();
+                }
 
             pair.IsHidden = false;
 

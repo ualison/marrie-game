@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using GodotCollections = Godot.Collections;
 using MarrieGame.Core.Enums;
 using MarrieGame.Core.Utils;
+using MarrieGame.Core.Interfaces;
 
 // Ghost version of monster that replays recorded movements and interactions - Performance Optimized
 public partial class GhostMonster : CharacterBody2D, IPoolable
@@ -25,8 +26,9 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
     private AnimatedSprite2D _animatedSprite;
     private Sprite2D _sprite;
     private Node2D _activeSprite;
-    // Monster life for the ghost so UI and damage work like real Monster
+    // Monster/Ghost life for the ghost so UI and damage work like real Monster
     private MonsterLife _monsterLife;
+    private GhostMonsterLife _ghostLife;
     private MonsterLifeBar _monsterLifeBar;
     private Area2D _damageArea;
     #endregion
@@ -71,8 +73,8 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
             _activeSprite.Show();
         }
 
-        // Setup a MonsterLife and LifeBar so ghost displays health like a real monster
-        SetupLifeSystem();
+    // Setup a GhostMonsterLife (purple-heart only) and LifeBar so ghost displays health in PastReality
+    SetupLifeSystem();
 
         // Setup damage area for player collision detection
         SetupDamageArea();
@@ -638,27 +640,33 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
         // The life components should be direct children of this CharacterBody2D
 
         // Look for the correct MonsterLife node using helper utilities
-        _monsterLife = NodeHelpers.GetNodeOrNull<MonsterLife>(this, null, "GhostMonsterLife");
-        if (_monsterLife == null)
+        // Prefer GhostMonsterLife if available (purple-heart only), fall back to MonsterLife for compatibility
+        var ghostLife = NodeHelpers.GetNodeOrNull<GhostMonsterLife>(this, null, "GhostMonsterLife");
+        if (ghostLife != null)
         {
-            _monsterLife = NodeHelpers.GetNodeOrNull<MonsterLife>(this, null, "MonsterLife");
-        }
-        if (_monsterLife == null)
-        {
-            _monsterLife = NodeHelpers.FindChildOfType<MonsterLife>(this);
-        }
-
-        if (_monsterLife == null)
-        {
-            Log.Debug("GhostMonster: GhostMonsterLife not found in scene, creating independent MonsterLife", "GhostMonster");
-            // Create independent MonsterLife for ghost - completely separate from Monster
-            _monsterLife = new MonsterLife { Name = "GhostMonsterLife" };
-            AddChild(_monsterLife);
-            Log.Debug("GhostMonster: Created independent MonsterLife for ghost", "GhostMonster");
+            _ghostLife = ghostLife;
+            _monsterLife = null;
+            Log.Debug($"GhostMonster: Using existing GhostMonsterLife component at: {_ghostLife.GetPath()}", "GhostMonster");
         }
         else
         {
-            Log.Debug($"GhostMonster: Using existing GhostMonsterLife component at: {_monsterLife.GetPath()}", "GhostMonster");
+            // Try to find a MonsterLife for backward compatibility
+            _monsterLife = NodeHelpers.GetNodeOrNull<MonsterLife>(this, null, "MonsterLife")
+                           ?? NodeHelpers.FindChildOfType<MonsterLife>(this);
+
+            if (_monsterLife != null)
+            {
+                Log.Debug($"GhostMonster: Using existing MonsterLife component at: {_monsterLife.GetPath()}", "GhostMonster");
+            }
+            else
+            {
+                // Create a GhostMonsterLife if nothing found
+                Log.Debug("GhostMonster: GhostMonsterLife not found in scene, creating independent GhostMonsterLife", "GhostMonster");
+                var created = new GhostMonsterLife { Name = "GhostMonsterLife" };
+                AddChild(created);
+                _ghostLife = created;
+                Log.Debug("GhostMonster: Created independent GhostMonsterLife for ghost", "GhostMonster");
+            }
         }
 
         // Look for the correct MonsterLifeBar node
@@ -677,7 +685,11 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
             Log.Debug($"GhostMonster: Found existing GhostMonsterLifeBar at: {_monsterLifeBar.GetPath()}", "GhostMonster");
             // Use the existing life bar from the scene
             _monsterLifeBar.AutoDiscover = false;
-            _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
+            // Connect to either MonsterLife or GhostMonsterLife (ConnectToLifeSystem accepts IHealthSystem)
+            if ((object)_monsterLife != null)
+                _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
+            else if ((object)_ghostLife != null)
+                _monsterLifeBar.ConnectToLifeSystem(_ghostLife);
             _monsterLifeBar.SetFollowMonster(true);
             _monsterLifeBar.Hide(); // Start hidden
             _monsterLifeBar.SetRequiredReality(Reality.PastReality);
@@ -703,7 +715,7 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
                     {
                         GetTree().CurrentScene.AddChild(lifeBarInstance);
                         lifeBarInstance.AutoDiscover = false;
-                        try { lifeBarInstance.ConnectToLifeSystem(_monsterLife); } catch { }
+                        try { lifeBarInstance.ConnectToLifeSystem((IHealthSystem)_monsterLife ?? _ghostLife); } catch { }
                         lifeBarInstance.SetFollowMonster(true);
                         lifeBarInstance.SetRequiredReality(Reality.PastReality);
                         try { lifeBarInstance.SetMonsterReference(this); } catch { }

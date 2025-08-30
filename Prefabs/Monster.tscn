@@ -56,5 +56,5 @@ OffsetFromMonster = Vector2(-80, -220)
 [node name="MonsterLife" type="Node2D" parent="CharacterBody2D"]
 position = Vector2(0, -195)
 script = ExtResource("3_monsterlife")
-MaxLife = 3
-StartingLife = 3
+MaxLife = 2
+StartingLife = 2
