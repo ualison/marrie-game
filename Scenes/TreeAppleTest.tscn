@@ -1,6 +1,7 @@
-[gd_scene load_steps=13 format=3 uid="uid://54o6xy0qaoae"]
+[gd_scene load_steps=14 format=3 uid="uid://54o6xy0qaoae"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
+[ext_resource type="PackedScene" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="2_bcr4f"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
 [ext_resource type="PackedScene" uid="uid://dbt3v1ee4f7fr" path="res://Prefabs/AppleTree.tscn" id="8_2e0hl"]
@@ -35,6 +36,14 @@ mouse_filter = 2
 
 [node name="ScreenElements" parent="UserInterface/HUD" instance=ExtResource("16_screen")]
 layout_mode = 1
+
+[node name="PerformanceMonitor" parent="UserInterface/HUD" instance=ExtResource("2_bcr4f")]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 9.0
+offset_top = 1.0
+offset_right = 9.0
+offset_bottom = 1.0
 
 [node name="Overlays" type="Control" parent="UserInterface"]
 layout_mode = 3

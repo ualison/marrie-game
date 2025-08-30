@@ -29,6 +29,8 @@ public partial class RockThrower : Node2D
     private Inventory _inventory;
     private Camera2D _camera;
     private Vector2[] _currentGlobalTrajectory; // Store current trajectory in global coordinates
+    // Cached prefab to avoid repeated GD.Load
+    private PackedScene _rockPrefab;
     #endregion
 
     #region Initialization
@@ -36,6 +38,8 @@ public partial class RockThrower : Node2D
     {
         SetupTrajectoryLine();
         FindComponents();
+    // Cache commonly used prefabs
+    _rockPrefab = RockProjectileScene ?? GD.Load<PackedScene>("res://Prefabs/Rock.tscn");
         // Only log critical issues that prevent functionality
         if (_inventory == null)
             Log.Error("RockThrower cannot function without inventory", "RockThrower");
@@ -283,19 +287,20 @@ public partial class RockThrower : Node2D
 
     private void CreateRockProjectile()
     {
-        // Load and instantiate rock from scene file
-        var rockScene = GD.Load<PackedScene>("res://Prefabs/Rock.tscn");
-        var rock = rockScene.Instantiate() as Rock;
-        
+        // Acquire rock from pool or instantiate from cached prefab
+        var prefab = _rockPrefab ?? GD.Load<PackedScene>("res://Prefabs/Rock.tscn");
+        var key = prefab?.ResourcePath;
+        var rock = PoolManager.Acquire(prefab, key) as Rock;
+
         if (rock == null)
         {
-            Log.Warning("Failed to instantiate rock from scene", "RockThrower");
+            Log.Warning("Failed to obtain rock instance from pool or prefab", "RockThrower");
             return;
         }
-        
+
         rock.TravelSpeed = RockVelocity; // Set the rock movement speed
         GetTree().CurrentScene.AddChild(rock);
-        
+
         // Use the stored global trajectory points
         if (_currentGlobalTrajectory != null && _currentGlobalTrajectory.Length > 0)
         {
@@ -306,7 +311,10 @@ public partial class RockThrower : Node2D
         else
         {
             Log.Warning("No trajectory data available for rock projectile", "RockThrower");
-            rock.QueueFree();
+            if (rock.IsFromPool)
+                PoolManager.Release(rock, key);
+            else
+                rock.QueueFree();
         }
     }
 

@@ -1,8 +1,9 @@
 using Godot;
 using System.Collections.Generic;
+using MarrieGame.Core.Utils;
 
 // Ghost version of player that replays recorded movements with smooth interpolation
-public partial class GhostPlayer : CharacterBody2D
+public partial class GhostPlayer : CharacterBody2D, IPoolable
 {
     #region Constants and Configuration
     private const float RECORD_INTERVAL = 0.1f; // Match ReplayRecorder interval
@@ -244,7 +245,7 @@ public partial class GhostPlayer : CharacterBody2D
                     frame.Timestamp - timeCompression,
                     frame.Position,
                     frame.Rotation,
-                    frame.Animation,
+                    frame.AnimationId,
                     frame.SpriteFlip,
                     frame.IsVisible,
                     frame.Alpha
@@ -345,14 +346,15 @@ public partial class GhostPlayer : CharacterBody2D
             }
         }
 
-        // Play animation if available and valid
-        if (_animatedSprite != null && !string.IsNullOrEmpty(frame.Animation))
+        // Play animation if available and valid (use compact id -> name lookup)
+        if (_animatedSprite != null)
         {
-            if (_animatedSprite.SpriteFrames?.HasAnimation(frame.Animation) == true)
+            var animName = ReplayStringRegistry.GetAnimationName(frame.AnimationId);
+            if (!string.IsNullOrEmpty(animName) && _animatedSprite.SpriteFrames?.HasAnimation(animName) == true)
             {
-                if (_animatedSprite.Animation != frame.Animation)
+                if (_animatedSprite.Animation != animName)
                 {
-                    _animatedSprite.Play(frame.Animation);
+                    _animatedSprite.Play(animName);
                 }
             }
         }
@@ -369,18 +371,17 @@ public partial class GhostPlayer : CharacterBody2D
 
     private void DiscoverSpriteComponents()
     {
-        // Try animated sprite first (most common)
-        _animatedSprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
+        // Use NodeHelpers to discover sprites with consistent fallbacks
+        _animatedSprite = NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(this, null, "AnimatedSprite2D");
         if (_animatedSprite != null)
         {
             _activeSprite = _animatedSprite;
             return;
         }
 
-        // Check for various sprite node names as fallback
-        _sprite = GetNodeOrNull<Sprite2D>("Sprite2D")
-            ?? GetNodeOrNull<Sprite2D>("GhostMarrieSprite")
-            ?? GetNodeOrNull<Sprite2D>("MarrieSprite");
+        _sprite = NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "Sprite2D")
+            ?? NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "GhostMarrieSprite")
+            ?? NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "MarrieSprite");
 
         if (_sprite != null)
         {
@@ -388,9 +389,8 @@ public partial class GhostPlayer : CharacterBody2D
             return;
         }
 
-        // Check if custom names are actually AnimatedSprite2D
-        _animatedSprite = GetNodeOrNull<AnimatedSprite2D>("GhostMarrieSprite")
-            ?? GetNodeOrNull<AnimatedSprite2D>("MarrieSprite");
+        _animatedSprite = NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(this, null, "GhostMarrieSprite")
+            ?? NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(this, null, "MarrieSprite");
 
         if (_animatedSprite != null)
         {
@@ -443,6 +443,53 @@ public partial class GhostPlayer : CharacterBody2D
         // Prevent ghost from interfering with physics
         SetCollisionLayerValue(1, false);
         SetCollisionMaskValue(1, false);
+    }
+
+    // Pooling support
+    public bool IsFromPool { get; set; } = false;
+
+    public void ResetForReuse()
+    {
+        // Stop replay and tweens
+        try { StopReplay(); } catch { }
+
+        _isReplaying = false;
+        _replayFrames = null;
+        _currentFrameIndex = 0;
+        _elapsedTime = 0f;
+
+        // Reset visual caches
+        if (_activeSprite != null)
+        {
+            _activeSprite.Show();
+            _activeSprite.Modulate = GHOST_TINT;
+            _activeSprite.Scale = Vector2.One;
+        }
+        if (_animatedSprite != null)
+        {
+            try { _animatedSprite.Stop(); } catch { }
+            _animatedSprite.FlipH = false;
+        }
+
+        // Reset movement smoothing
+        _currentPosition = Vector2.Zero;
+        _targetPosition = Vector2.Zero;
+
+        // Visibility defaults
+        Show();
+
+        // Disable collisions while pooled
+        DisableCollisions();
+        RemoveFromGroup("ghost_player");
+    }
+
+    public void OnReleasedToPool()
+    {
+        // Final cleanup: remove any runtime signals or references
+        try { RemoveFromGroup("ghost_player"); } catch { }
+
+        // Hide and detach any heavy resources
+        try { Hide(); } catch { }
     }
     #endregion
 

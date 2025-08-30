@@ -1,5 +1,6 @@
 using Godot;
 using System.Collections.Generic;
+using MarrieGame.Core.Enums;
 
 /// <summary>
 /// Handles replay orchestration - coordinates game state changes and ghost management during replay
@@ -27,6 +28,16 @@ public partial class ReplayOrchestrator : Node
             Instance = this;
             ProcessMode = ProcessModeEnum.Always;
             Log.Debug("ReplayOrchestrator initialized", "ReplayOrchestrator");
+            // Subscribe to reality changes so orchestrator can react to external auto-returns
+            if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+            {
+                RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
+            }
+            else
+            {
+                // Defer connection if RealityManager isn't ready yet
+                CallDeferred(nameof(ConnectToRealityManager));
+            }
         }
         else
         {
@@ -40,6 +51,13 @@ public partial class ReplayOrchestrator : Node
         {
             Instance = null;
             _replayCleanupTimer?.Cancel();
+            // Unsubscribe from reality changes
+            try
+            {
+                if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+                    RealityManager.Instance.RealityChangedEvent -= OnRealityChanged;
+            }
+            catch { }
         }
     }
     #endregion
@@ -83,6 +101,36 @@ public partial class ReplayOrchestrator : Node
     {
         _replayInProgress = false;
         CleanupAfterReplay();
+    }
+    #endregion
+
+    #region Reality Integration
+    private void ConnectToRealityManager()
+    {
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+        {
+            RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
+            Log.Debug("ReplayOrchestrator connected to RealityManager", "ReplayOrchestrator");
+        }
+        else
+        {
+            // Try again shortly if not ready
+            GetTree().CreateTimer(0.1f).Timeout += ConnectToRealityManager;
+        }
+    }
+
+    private void OnRealityChanged(Reality newReality)
+    {
+        // If reality returned to CurrentReality while a replay is in progress, ensure ghosts are removed
+        if (newReality == Reality.CurrentReality)
+        {
+            Log.Debug("Reality changed to CurrentReality - ensuring replay cleanup", "ReplayOrchestrator");
+            // Immediately stop and cleanup any replay artifacts
+            _replayInProgress = false;
+            // Cancel any scheduled cleanup timers
+            _replayCleanupTimer?.Cancel();
+            CleanupAfterReplay();
+        }
     }
     #endregion
 
@@ -208,6 +256,17 @@ public partial class ReplayOrchestrator : Node
             }
             else if (monster is Node2D monsterNode2D)
             {
+                // Don't show simple monsters that are hidden as part of a paired hide or scheduled respawn
+                var m = monster as Monster;
+                if (m != null && EnemyManager.Instance != null)
+                {
+                    if (EnemyManager.Instance.IsMonsterHiddenByPair(m) || EnemyManager.Instance.IsMonsterScheduledForRespawn(m))
+                    {
+                        Log.Debug($"Skipping show for {monster.Name} after replay because it's hidden or scheduled for respawn", "ReplayOrchestrator");
+                        continue;
+                    }
+                }
+
                 monsterNode2D.Show();
                 Log.Debug($"Monster {monster.Name} shown after replay", "ReplayOrchestrator");
             }
@@ -309,7 +368,15 @@ public partial class ReplayOrchestrator : Node
             if (_currentGhost.GetParent() != null)
             {
                 _currentGhost.GetParent().RemoveChild(_currentGhost);
-                _currentGhost.CallDeferred("queue_free");
+                if (_currentGhost is IPoolable)
+                {
+                    // Use PoolManager to release pooled ghost when possible
+                    PoolManager.Release(_currentGhost, _currentGhost.GetType().Name);
+                }
+                else
+                {
+                    _currentGhost.CallDeferred("queue_free");
+                }
             }
             else
             {
@@ -328,7 +395,14 @@ public partial class ReplayOrchestrator : Node
             if (_currentGhostMonster.GetParent() != null)
             {
                 _currentGhostMonster.GetParent().RemoveChild(_currentGhostMonster);
-                _currentGhostMonster.CallDeferred("queue_free");
+                if (_currentGhostMonster is IPoolable)
+                {
+                    PoolManager.Release(_currentGhostMonster, _currentGhostMonster.GetType().Name);
+                }
+                else
+                {
+                    _currentGhostMonster.CallDeferred("queue_free");
+                }
             }
             else
             {
@@ -350,7 +424,14 @@ public partial class ReplayOrchestrator : Node
                     if (ghost.GetParent() != null)
                     {
                         ghost.GetParent().RemoveChild(ghost);
-                        ghost.CallDeferred("queue_free");
+                        if (ghost is IPoolable)
+                        {
+                            PoolManager.Release(ghost, ghost.GetType().Name);
+                        }
+                        else
+                        {
+                            ghost.CallDeferred("queue_free");
+                        }
                     }
                     else
                     {
@@ -375,7 +456,14 @@ public partial class ReplayOrchestrator : Node
                     if (ghost.GetParent() != null)
                     {
                         ghost.GetParent().RemoveChild(ghost);
-                        ghost.CallDeferred("queue_free");
+                        if (ghost is IPoolable)
+                        {
+                            PoolManager.Release(ghost, ghost.GetType().Name);
+                        }
+                        else
+                        {
+                            ghost.CallDeferred("queue_free");
+                        }
                     }
                     else
                     {

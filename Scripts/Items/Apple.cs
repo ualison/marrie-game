@@ -1,5 +1,6 @@
 using Godot;
 using Core.Enums;
+using MarrieGame.Core.Utils;
 
 /// <summary>
 /// Apple item with different state cycles for tree vs fallen apples:
@@ -63,12 +64,12 @@ public partial class Apple : Node2D
 
     private void InitializeComponents()
     {
-    _detectionArea = GetNodeOrNull<Area2D>("RigidBody2D/DetectionArea");
-    _rigidBody = GetNodeOrNull<RigidBody2D>("RigidBody2D");
-    _appleSprite = GetNodeOrNull<Sprite2D>("RigidBody2D/AppleSprite");
-    _promptLabel = GetNodeOrNull<Label>("RigidBody2D/PromptLabel");
-    _rockDetectionArea = GetNodeOrNull<Area2D>("RigidBody2D/RockDetectionArea");
-    _groundDetectionArea = GetNodeOrNull<Area2D>("RigidBody2D/GroundDetectionArea");
+    _detectionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "RigidBody2D/DetectionArea");
+    _rigidBody = NodeHelpers.GetNodeOrNull<RigidBody2D>(this, null, "RigidBody2D");
+    _appleSprite = NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "RigidBody2D/AppleSprite");
+    _promptLabel = NodeHelpers.GetNodeOrNull<Label>(this, null, "RigidBody2D/PromptLabel");
+    _rockDetectionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "RigidBody2D/RockDetectionArea");
+    _groundDetectionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "RigidBody2D/GroundDetectionArea");
     }
 
     private void SetupRigidBody()
@@ -190,8 +191,8 @@ public partial class Apple : Node2D
         Log.Debug($"Consumed red apple - restoring {LifeRestoreAmount} life", "Apple");
         
         // Find player and restore life
-        var player = GetTree().GetFirstNodeInGroup("player") as Node;
-        var playerLife = player?.GetNodeOrNull<PlayerLife>("PlayerLife");
+    var player = GetTree().GetFirstNodeInGroup("player") as Node;
+    var playerLife = player != null ? NodeHelpers.GetNodeOrNull<PlayerLife>(player, null, "PlayerLife") : null;
         
         if (playerLife != null)
         {
@@ -209,8 +210,8 @@ public partial class Apple : Node2D
         Log.Debug($"Consumed purple apple - restoring {ManaRestoreAmount} mana", "Apple");
         
         // Find player and restore mana
-        var player = GetTree().GetFirstNodeInGroup("player") as Node;
-        var playerMana = player?.GetNodeOrNull<PlayerMana>("PlayerMana");
+    var player = GetTree().GetFirstNodeInGroup("player") as Node;
+    var playerMana = player != null ? NodeHelpers.GetNodeOrNull<PlayerMana>(player, null, "PlayerMana") : null;
         
         if (playerMana != null)
         {
@@ -422,7 +423,7 @@ public partial class Apple : Node2D
         _rigidBody.Freeze = true;
         
         // Disable physical collision with player (keep only detection area)
-        var physicsCollision = _rigidBody.GetNodeOrNull<CollisionShape2D>("PhysicsCollision");
+    var physicsCollision = NodeHelpers.GetNodeOrNull<CollisionShape2D>(_rigidBody, null, "PhysicsCollision");
         if (physicsCollision != null)
         {
             physicsCollision.Disabled = true;

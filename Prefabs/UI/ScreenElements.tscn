@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://dxvamghbt08mr"]
+[gd_scene load_steps=9 format=3 uid="uid://dxvamghbt08mr"]
 
 [ext_resource type="Script" uid="uid://g3qhhrdutgk5" path="res://Scripts/UI/LifeBar.cs" id="1_lifebar"]
 [ext_resource type="Texture2D" uid="uid://c8u1u42hhwaci" path="res://Art/FullLifeHeart.png" id="2_fulllife"]
@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" uid="uid://c4jx5vo5jcqtn" path="res://Art/FullManaHeart.png" id="5_fullmana"]
 [ext_resource type="Texture2D" uid="uid://cj0t7aq24040y" path="res://Art/EmptyManaHeart.png" id="6_emptymana"]
 [ext_resource type="PackedScene" uid="uid://844rfld3y4ee" path="res://Prefabs/UI/RockCount.tscn" id="7_rockcount"]
+[ext_resource type="PackedScene" uid="uid://cld6sntxsh51w" path="res://Prefabs/UI/RespawnDebug.tscn" id="8_respawndebug"]
 
 [node name="ScreenElements" type="Control"]
 layout_mode = 3
@@ -16,6 +17,17 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+
+[node name="RespawnDebug" parent="." instance=ExtResource("8_respawndebug")]
+custom_minimum_size = Vector2(0, 0)
+layout_mode = 2
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 21.0
+offset_top = 386.0
+offset_right = 208.0
+offset_bottom = 469.0
 
 [node name="BottomLeftContainer" type="VBoxContainer" parent="."]
 layout_mode = 1

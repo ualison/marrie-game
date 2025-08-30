@@ -224,9 +224,9 @@ public partial class UIManager : Node
         }
     }
     
-    private void OnPlayerDied(Vector2 deathPosition, int remainingHealth)
+    private void OnPlayerDied(MarrieGame.Core.Models.PlayerDeath death)
     {
-    Log.UI($"Received player death event at {deathPosition}", "UIManager");
+    Log.UI($"Received player death event at {death.Position}", "UIManager");
     if (_gameOverShown) return;
     _gameOverShown = true;
     // Wait 1 second before showing game over UI

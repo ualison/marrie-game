@@ -2,14 +2,17 @@ using Godot;
 using System.Collections.Generic;
 using GodotCollections = Godot.Collections;
 using MarrieGame.Core.Enums;
+using MarrieGame.Core.Utils;
+using MarrieGame.Core.Interfaces;
 
 // Ghost version of monster that replays recorded movements and interactions - Performance Optimized
-public partial class GhostMonster : CharacterBody2D
+public partial class GhostMonster : CharacterBody2D, IPoolable
 {
     #region Constants and Configuration
     private static readonly Color GHOST_TINT = new(0.6f, 0.3f, 0.9f, 0.7f); // Purple gem-like color
     private const float ALPHA_TOLERANCE = 0.01f; // Avoid unnecessary updates
     private const float SMOOTH_SPEED = 10.0f; // Position interpolation speed for smooth movement
+
     #endregion
 
     #region State Variables
@@ -24,8 +27,9 @@ public partial class GhostMonster : CharacterBody2D
     private AnimatedSprite2D _animatedSprite;
     private Sprite2D _sprite;
     private Node2D _activeSprite;
-    // Monster life for the ghost so UI and damage work like real Monster
+    // Monster/Ghost life for the ghost so UI and damage work like real Monster
     private MonsterLife _monsterLife;
+    private GhostMonsterLife _ghostLife;
     private MonsterLifeBar _monsterLifeBar;
     private Area2D _damageArea;
     #endregion
@@ -70,7 +74,7 @@ public partial class GhostMonster : CharacterBody2D
             _activeSprite.Show();
         }
 
-        // Setup a MonsterLife and LifeBar so ghost displays health like a real monster
+        // Setup a GhostMonsterLife (purple-heart only) and LifeBar so ghost displays health in PastReality
         SetupLifeSystem();
 
         // Setup damage area for player collision detection
@@ -94,8 +98,8 @@ public partial class GhostMonster : CharacterBody2D
 
         if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
         {
-            // Connect using Godot signals to receive the raw emitted value
-            RealityManager.Instance.Connect("RealityChanged", new Callable(this, nameof(OnRealityChangedSignal)));
+            // Subscribe to typed C# event for direct enum delivery
+            RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
             _realityConnected = true;
             Log.Debug("GhostMonster: Successfully connected to RealityManager signals", "GhostMonster");
         }
@@ -105,48 +109,45 @@ public partial class GhostMonster : CharacterBody2D
         }
     }
 
-    // Wrapper for the Godot signal which emits an int; convert it to the Reality enum and forward
-    private void OnRealityChangedSignal(object rawValue)
-    {
-        try
-        {
-            int intVal = -1;
-
-            // Godot may send signal args as an object array or Godot.Collections.Array
-            if (rawValue is object[] objArr && objArr.Length > 0)
-            {
-                intVal = System.Convert.ToInt32(objArr[0]);
-            }
-            else if (rawValue is GodotCollections.Array gdArr && gdArr.Count > 0)
-            {
-                intVal = System.Convert.ToInt32(gdArr[0]);
-            }
-            else
-            {
-                intVal = System.Convert.ToInt32(rawValue);
-            }
-
-            var reality = (MarrieGame.Core.Enums.Reality)intVal;
-            OnRealityChanged(reality);
-        }
-        catch (System.Exception ex)
-        {
-            Log.Warning($"GhostMonster: Received RealityChanged signal with unexpected value - {ex.Message}", "GhostMonster");
-        }
-    }
+    // OnRealityChanged(Reality) will be invoked directly via RealityChangedEvent (typed C# event)
 
     private void OnRealityChanged(Reality newReality)
     {
-        Log.Debug($"GhostMonster: Reality changed to {newReality}", "GhostMonster");
+        // Ignore callbacks on disposed/queued instances without noisy warnings.
+        if (!IsInstanceValid(this))
+            return;
+
         ApplyRealityToLifeBar(newReality);
     }
 
     private void ApplyRealityToLifeBar(Reality reality)
     {
+        // Guard against disposed ghosts
+        if (!IsInstanceValid(this))
+        {
+            Log.Warning("GhostMonster: ApplyRealityToLifeBar called on invalid instance, ignoring", "GhostMonster");
+            return;
+        }
+
         if (_monsterLifeBar == null)
         {
-            Log.Warning("GhostMonster: Cannot apply reality - life bar is null", "GhostMonster");
-            return;
+            Log.Debug("GhostMonster: Life bar is null when applying reality - attempting to (re)initialize life system", "GhostMonster");
+            // Try to (re)discover or create the life bar dynamically in case setup failed earlier
+            try
+            {
+                // SetupLifeSystem is safe-guarded itself; call only if this instance is valid
+                if (IsInstanceValid(this)) SetupLifeSystem();
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning($"GhostMonster: Exception while attempting SetupLifeSystem: {ex.Message}", "GhostMonster");
+            }
+
+            if (_monsterLifeBar == null)
+            {
+                Log.Warning("GhostMonster: Cannot apply reality - life bar is still null after reinitialization", "GhostMonster");
+                return;
+            }
         }
 
         Log.Debug($"GhostMonster: Applying reality {reality} to life bar", "GhostMonster");
@@ -305,20 +306,21 @@ public partial class GhostMonster : CharacterBody2D
         }
 
         // Only update animation if it changed and we have animation capability
-        if (_hasAnimationFrames && _lastAnimation != frame.Animation)
+        var animName = ReplayStringRegistry.GetAnimationName(frame.AnimationId);
+        if (_hasAnimationFrames && _lastAnimation != animName)
         {
-            if (!string.IsNullOrEmpty(frame.Animation))
+            if (!string.IsNullOrEmpty(animName))
             {
-                _animatedSprite?.Play(frame.Animation);
-                _lastAnimation = frame.Animation;
+                _animatedSprite?.Play(animName);
+                _lastAnimation = animName;
             }
         }
     }
 
     private void HandleStateBasedBehavior(ReplayFrame frame)
     {
-        // Extract state information from frame
-        string newMonsterState = frame.MonsterState;
+        // Extract state information from frame (use compact ids)
+        string newMonsterState = ReplayStringRegistry.GetMonsterStateName(frame.MonsterStateId);
         bool newIsFullyVisible = frame.IsFullyVisible;
         float finalAlpha = frame.Alpha * GHOST_TINT.A;
 
@@ -441,10 +443,48 @@ public partial class GhostMonster : CharacterBody2D
         }
         tween.TweenCallback(Callable.From(() =>
         {
-            Log.Debug("Ghost monster faded out and destroyed", "GhostMonster");
+            Log.Debug("Ghost monster faded out and released/destroyed", "GhostMonster");
             CleanupLifeBar();
-            QueueFree();
+            if (IsFromPool)
+                PoolManager.Release(this);
+            else
+                QueueFree();
         }));
+    }
+
+    // Soft-disable the ghost: fade out visuals, stop replay and collisions, but keep the instance
+    // so the EnemyManager can re-enable it after a global timeout.
+    public void FadeOutAndDisable()
+    {
+        try
+        {
+            StopReplay();
+        }
+        catch { }
+
+        // Fade visuals and life bar, then disable monitoring/collisions
+        if (_activeSprite != null)
+        {
+            var tween = CreateTween();
+            tween.TweenProperty(_activeSprite, "modulate:a", 0.0f, 0.35f);
+            if (_monsterLifeBar != null)
+                tween.TweenProperty(_monsterLifeBar, "modulate:a", 0.0f, 0.35f);
+            tween.TweenCallback(Callable.From(() =>
+            {
+                try { _activeSprite.Visible = false; } catch { }
+                try { if (_damageArea != null) { _damageArea.Monitoring = false; _damageArea.Monitorable = false; } } catch { }
+            }));
+        }
+        else
+        {
+            try { if (_damageArea != null) { _damageArea.Monitoring = false; _damageArea.Monitorable = false; } } catch { }
+        }
+
+        // Also hide life bar if present
+        try { _monsterLifeBar?.Hide(); } catch { }
+
+        // Keep node in scene tree and in the group so debugging/respawn systems can still find it.
+        // (Do not remove from "ghost_monster" group here.)
     }
 
     public bool IsReplaying() => _isReplaying;
@@ -474,48 +514,25 @@ public partial class GhostMonster : CharacterBody2D
         // FIXED: Since the script is attached to CharacterBody2D, search directly in this node
         // The sprite should be a direct child of this CharacterBody2D
 
-        // Try to find AnimatedSprite2D first (for animated monsters)
-        _animatedSprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
-        if (_animatedSprite == null)
+        // Use centralized helper to discover a sprite node (animated or static)
+        var found = NodeHelpers.FindSpriteNode(this, null);
+        if (found is AnimatedSprite2D as2d)
         {
-            _animatedSprite = GetNodeOrNull<AnimatedSprite2D>("GhostMonsterSprite");
-        }
-        if (_animatedSprite == null)
-        {
-            _animatedSprite = FindDescendantOfType<AnimatedSprite2D>(this);
-        }
-
-        if (_animatedSprite != null)
-        {
+            _animatedSprite = as2d;
             _activeSprite = _animatedSprite;
             Log.Debug($"GhostMonster: Found AnimatedSprite2D: {_animatedSprite.Name}", "GhostMonster");
             return;
         }
 
-        // Try to find Sprite2D (this should match "GhostMonsterSprite" from the .tscn)
-        _sprite = GetNodeOrNull<Sprite2D>("GhostMonsterSprite");
-        if (_sprite == null)
+        if (found is Sprite2D s2d)
         {
-            _sprite = GetNodeOrNull<Sprite2D>("Sprite2D");
-        }
-        if (_sprite == null)
-        {
-            _sprite = GetNodeOrNull<Sprite2D>("MonsterSprite"); // fallback for other monster types
-        }
-        if (_sprite == null)
-        {
-            _sprite = FindDescendantOfType<Sprite2D>(this);
-        }
-
-        if (_sprite != null)
-        {
+            _sprite = s2d;
             _activeSprite = _sprite;
             Log.Debug($"GhostMonster: Found Sprite2D: {_sprite.Name}", "GhostMonster");
         }
         else
         {
-            Log.Warning("GhostMonster: No sprite found, creating fallback", "GhostMonster");
-            Log.Warning($"GhostMonster: Searched paths: GhostMonsterSprite, AnimatedSprite2D, Sprite2D, MonsterSprite, recursive search", "GhostMonster");
+            Log.Warning("GhostMonster: No sprite found via NodeHelpers, creating fallback", "GhostMonster");
             CreateFallbackVisual();
         }
     }
@@ -574,12 +591,37 @@ public partial class GhostMonster : CharacterBody2D
     // Setup DamageArea for player collision detection (similar to Monster.cs)
     private void SetupDamageArea()
     {
-        _damageArea = GetNodeOrNull<Area2D>("DamageArea");
+        _damageArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "DamageArea");
         if (_damageArea == null)
         {
             CreateDamageArea();
         }
-        _damageArea.BodyEntered += OnPlayerEntered;
+        try
+        {
+            var callable = new Callable(this, nameof(OnPlayerEntered));
+            if (!_damageArea.IsConnected("body_entered", callable))
+                _damageArea.BodyEntered += OnPlayerEntered;
+        }
+        catch
+        {
+            try { _damageArea.BodyEntered += OnPlayerEntered; } catch { }
+        }
+
+        // Ensure damage area is on the player detection layer and actively monitoring
+        try
+        {
+            _damageArea.CollisionLayer = 1; // player layer
+            _damageArea.CollisionMask = 1;  // detect player
+            try { _damageArea.SetDeferred("monitoring", true); } catch { _damageArea.Monitoring = true; }
+            try { _damageArea.SetDeferred("monitorable", true); } catch { _damageArea.Monitorable = true; }
+            // Immediately check for overlapping players in case the player is
+            // already inside the area when the ghost becomes active. Godot
+            // doesn't emit body_entered for an area that was disabled while a
+            // body was overlapping, so we must manually detect and handle it.
+            // Defer overlap handling until monitoring is guaranteed to be active
+            CallDeferred(nameof(HandleGhostDamageAreaEnable));
+        }
+        catch { }
     }
 
     private void CreateDamageArea()
@@ -588,8 +630,17 @@ public partial class GhostMonster : CharacterBody2D
         AddChild(_damageArea);
 
         // Set collision layers/masks to only detect players (layer 1)
-        _damageArea.CollisionLayer = 0; // Don't collide with anything as a layer
-        _damageArea.CollisionMask = 1; // Only detect objects on layer 1 (players)
+        try
+        {
+            var playerNode = GetTree().GetFirstNodeInGroup("player") as PhysicsBody2D;
+            if (playerNode != null)
+                _damageArea.CollisionMask = playerNode.CollisionLayer;
+            else
+                _damageArea.CollisionMask = 2; // default player layer in prefabs
+        }
+        catch { _damageArea.CollisionMask = 2; }
+
+        _damageArea.CollisionLayer = GetCollisionLayer();
 
         var shape = new CollisionShape2D();
         shape.Shape = new CircleShape2D { Radius = 25.0f };
@@ -605,13 +656,14 @@ public partial class GhostMonster : CharacterBody2D
         }
         bool isGhost = body.IsInGroup("ghost_player") || body.IsInGroup("ghost_monster");
         Log.Debug($"GhostMonster {Name} collision with Player {body.Name} - IsGhost: {isGhost}", "GhostMonster");
-        if (!player.GetLifeSystem()?.IsDead == true)
+
+        // Only proceed if player is alive
+        if (player.LifeSystem?.IsDead == true) return;
+
+        Log.Debug($"GhostMonster {Name} attempting damage to player", "GhostMonster");
+        if (player.TakeDamage(1)) // Default damage amount for ghost
         {
-            Log.Debug($"GhostMonster {Name} attempting damage to player", "GhostMonster");
-            if (player.TakeDamage(1)) // Default damage amount for ghost
-            {
-                PlayDamageEffect(Colors.Purple);
-            }
+            PlayDamageEffect(Colors.Purple);
         }
     }
 
@@ -623,39 +675,45 @@ public partial class GhostMonster : CharacterBody2D
         // FIXED: Since the script is attached to CharacterBody2D, search directly in this node
         // The life components should be direct children of this CharacterBody2D
 
-        // Look for the correct MonsterLife node
-        _monsterLife = GetNodeOrNull<MonsterLife>("GhostMonsterLife");
-        if (_monsterLife == null)
+        // Look for the correct MonsterLife node using helper utilities
+        // Prefer GhostMonsterLife if available (purple-heart only), fall back to MonsterLife for compatibility
+        var ghostLife = NodeHelpers.GetNodeOrNull<GhostMonsterLife>(this, null, "GhostMonsterLife");
+        if (ghostLife != null)
         {
-            _monsterLife = GetNodeOrNull<MonsterLife>("MonsterLife");
-        }
-        if (_monsterLife == null)
-        {
-            _monsterLife = FindDescendantOfType<MonsterLife>(this);
-        }
-
-        if (_monsterLife == null)
-        {
-            Log.Debug("GhostMonster: GhostMonsterLife not found in scene, creating independent MonsterLife", "GhostMonster");
-            // Create independent MonsterLife for ghost - completely separate from Monster
-            _monsterLife = new MonsterLife { Name = "GhostMonsterLife" };
-            AddChild(_monsterLife);
-            Log.Debug("GhostMonster: Created independent MonsterLife for ghost", "GhostMonster");
+            _ghostLife = ghostLife;
+            _monsterLife = null;
+            Log.Debug($"GhostMonster: Using existing GhostMonsterLife component at: {_ghostLife.GetPath()}", "GhostMonster");
         }
         else
         {
-            Log.Debug($"GhostMonster: Using existing GhostMonsterLife component at: {_monsterLife.GetPath()}", "GhostMonster");
+            // Try to find a MonsterLife for backward compatibility
+            _monsterLife = NodeHelpers.GetNodeOrNull<MonsterLife>(this, null, "MonsterLife")
+                           ?? NodeHelpers.FindChildOfType<MonsterLife>(this);
+
+            if (_monsterLife != null)
+            {
+                Log.Debug($"GhostMonster: Using existing MonsterLife component at: {_monsterLife.GetPath()}", "GhostMonster");
+            }
+            else
+            {
+                // Create a GhostMonsterLife if nothing found
+                Log.Debug("GhostMonster: GhostMonsterLife not found in scene, creating independent GhostMonsterLife", "GhostMonster");
+                var created = new GhostMonsterLife { Name = "GhostMonsterLife" };
+                AddChild(created);
+                _ghostLife = created;
+                Log.Debug("GhostMonster: Created independent GhostMonsterLife for ghost", "GhostMonster");
+            }
         }
 
         // Look for the correct MonsterLifeBar node
-        _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>("GhostMonsterLifeBar");
+        _monsterLifeBar = NodeHelpers.GetNodeOrNull<MonsterLifeBar>(this, null, "GhostMonsterLifeBar");
         if (_monsterLifeBar == null)
         {
-            _monsterLifeBar = GetNodeOrNull<MonsterLifeBar>("MonsterLifeBar");
+            _monsterLifeBar = NodeHelpers.GetNodeOrNull<MonsterLifeBar>(this, null, "MonsterLifeBar");
         }
         if (_monsterLifeBar == null)
         {
-            _monsterLifeBar = FindDescendantOfType<MonsterLifeBar>(this);
+            _monsterLifeBar = NodeHelpers.FindChildOfType<MonsterLifeBar>(this);
         }
 
         if (_monsterLifeBar != null)
@@ -663,7 +721,11 @@ public partial class GhostMonster : CharacterBody2D
             Log.Debug($"GhostMonster: Found existing GhostMonsterLifeBar at: {_monsterLifeBar.GetPath()}", "GhostMonster");
             // Use the existing life bar from the scene
             _monsterLifeBar.AutoDiscover = false;
-            _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
+            // Connect to either MonsterLife or GhostMonsterLife (ConnectToLifeSystem accepts IHealthSystem)
+            if ((object)_monsterLife != null)
+                _monsterLifeBar.ConnectToLifeSystem(_monsterLife);
+            else if ((object)_ghostLife != null)
+                _monsterLifeBar.ConnectToLifeSystem(_ghostLife);
             _monsterLifeBar.SetFollowMonster(true);
             _monsterLifeBar.Hide(); // Start hidden
             _monsterLifeBar.SetRequiredReality(Reality.PastReality);
@@ -684,18 +746,27 @@ public partial class GhostMonster : CharacterBody2D
                 if (lifeBarInstance != null)
                 {
                     lifeBarInstance.Name = "DynamicGhostLifeBar"; // Unique name to avoid conflicts
-                    GetTree().CurrentScene.AddChild(lifeBarInstance);
-                    lifeBarInstance.AutoDiscover = false;
-                    lifeBarInstance.ConnectToLifeSystem(_monsterLife);
-                    lifeBarInstance.SetFollowMonster(true);
-                    lifeBarInstance.SetRequiredReality(Reality.PastReality);
-                    lifeBarInstance.SetMonsterReference(this);
-                    float initialAlphaForBar = GHOST_TINT.A;
-                    var mbModTemp = lifeBarInstance.Modulate;
-                    lifeBarInstance.Modulate = new Color(mbModTemp.R, mbModTemp.G, mbModTemp.B, initialAlphaForBar);
-                    lifeBarInstance.Hide();
-                    _monsterLifeBar = lifeBarInstance;
-                    Log.Debug("GhostMonster: Created independent MonsterLifeBar instance", "GhostMonster");
+                    // Ensure this ghost is still valid before adding global UI
+                    if (IsInstanceValid(this) && GetTree() != null && GetTree().CurrentScene != null)
+                    {
+                        GetTree().CurrentScene.AddChild(lifeBarInstance);
+                        lifeBarInstance.AutoDiscover = false;
+                        try { lifeBarInstance.ConnectToLifeSystem((IHealthSystem)_monsterLife ?? _ghostLife); } catch { }
+                        lifeBarInstance.SetFollowMonster(true);
+                        lifeBarInstance.SetRequiredReality(Reality.PastReality);
+                        try { lifeBarInstance.SetMonsterReference(this); } catch { }
+                        float initialAlphaForBar = GHOST_TINT.A;
+                        var mbModTemp = lifeBarInstance.Modulate;
+                        lifeBarInstance.Modulate = new Color(mbModTemp.R, mbModTemp.G, mbModTemp.B, initialAlphaForBar);
+                        lifeBarInstance.Hide();
+                        _monsterLifeBar = lifeBarInstance;
+                        Log.Debug("GhostMonster: Created independent MonsterLifeBar instance", "GhostMonster");
+                    }
+                    else
+                    {
+                        // Instance is no longer valid; free the created bar immediately to avoid leaks
+                        try { lifeBarInstance.QueueFree(); } catch { }
+                    }
                 }
             }
             else
@@ -735,84 +806,247 @@ public partial class GhostMonster : CharacterBody2D
     {
         // Ensure cleanup when ghost is removed from scene
         CleanupLifeBar();
+        // Unsubscribe from RealityManager events to avoid callbacks to freed instances
+        try
+        {
+            if (_realityConnected && RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+            {
+                RealityManager.Instance.RealityChangedEvent -= OnRealityChanged;
+            }
+        }
+        catch { }
+        _realityConnected = false;
+
         base._ExitTree();
     }
 
-    // FIXED: Helper method for recursive node search - now properly implemented
-    private T FindDescendantOfType<T>(Node parent) where T : Node
-    {
-        foreach (Node child in parent.GetChildren())
-        {
-            if (child is T found)
-                return found;
+    // Pooling support
+    public bool IsFromPool { get; set; } = false;
 
-            var descendant = FindDescendantOfType<T>(child);
-            if (descendant != null) return descendant;
+    public void ResetForReuse()
+    {
+        // Stop any active replay and tweens
+        try { StopReplay(); } catch { }
+        _isReplaying = false;
+        _replayFrames = null;
+        _currentFrameIndex = 0;
+        _elapsedTime = 0f;
+
+        // Reset visual and state caches
+        _isCurrentlyFullyVisible = true;
+        _currentMonsterState = "";
+        _lastAlpha = -1f;
+        _lastFlipState = false;
+        _lastAnimation = "";
+        _currentFadeTween?.Kill();
+
+        // Reset positions
+        _currentPosition = Vector2.Zero;
+        _targetPosition = Vector2.Zero;
+
+        // Restore visibility and basic visual defaults
+        Show();
+        if (_activeSprite != null)
+        {
+            _activeSprite.Show();
+            _activeSprite.Modulate = GHOST_TINT;
+            _activeSprite.Scale = Vector2.One;
         }
-        return null;
+
+        if (_animatedSprite != null)
+        {
+            try { _animatedSprite.Stop(); } catch { }
+        }
+
+        // Disable damage area while pooled
+        if (_damageArea != null)
+        {
+            _damageArea.Monitoring = false;
+            _damageArea.Monitorable = false;
+        }
+
+        // Reset lifebar reference but don't free scene-based bars here
+        // CleanupLifeBar will be called when released to pool
     }
 
+    public void OnReleasedToPool()
+    {
+        // Disconnect runtime signals
+        try { if (_damageArea != null) _damageArea.BodyEntered -= OnPlayerEntered; } catch { }
 
-    // Allow external systems (like rocks) to apply rock damage to ghost
-    // Replace the existing TakeRockDamage method with this implementation
+        // Unsubscribe from RealityManager if connected
+        try
+        {
+            if (_realityConnected && RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+            {
+                RealityManager.Instance.RealityChangedEvent -= OnRealityChanged;
+            }
+        }
+        catch { }
+        _realityConnected = false;
+
+        // Cleanup life bar (will QueueFree dynamic bars and hide scene bars)
+        CleanupLifeBar();
+
+        // Remove from groups to avoid stray callbacks while pooled
+        try { RemoveFromGroup("ghost_monster"); } catch { }
+
+        // Disable collisions to keep pooled node inert
+        try { DisableCollisions(); } catch { }
+    }
+
+    // NOTE: Recursive descendant search replaced by NodeHelpers.FindChildOfType and other helpers.
+
+
+    // UPDATED: Simplified TakeRockDamage without individual auto-return
     public bool TakeRockDamage(int damage = 1)
     {
         Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        Log.Debug($"GhostMonster.TakeRockDamage called - CurrentReality: {currentReality}", "GhostMonster");
 
-        if (_monsterLife == null) return false;
+        // Direct local handling - no life pool system
+        if (_ghostLife == null && _monsterLife == null)
+        {
+            Log.Debug($"GhostMonster.TakeRockDamage: no local life components available", "GhostMonster");
+            return false;
+        }
 
-        bool damaged = false;
+        bool localDamaged = false;
 
         switch (currentReality)
         {
             case Reality.CurrentReality:
-                damaged = _monsterLife.TakeRockDamageInCurrentReality(damage);
-                if (damaged)
-                {
-                    PlayDamageEffect(Colors.Red);
-                    Log.Info($"Rock hit GhostMonster in Current Reality - damaged red hearts", "GhostMonster");
-                }
-                else
-                {
-                    Log.Warning($"Rock hit GhostMonster in Current Reality but no red hearts to damage", "GhostMonster");
-                }
+                // Ghosts don't take damage in current reality (Monster handles that)
+                Log.Warning($"Rock hit GhostMonster in Current Reality but ghosts shouldn't take damage in current reality", "GhostMonster");
                 break;
 
             case Reality.PastReality:
-                damaged = _monsterLife.TakeRockDamageInPastReality(damage);
-                if (damaged)
+                // Rocks only damage purple hearts in past reality for ghosts
+                if (_ghostLife != null)
+                {
+                    localDamaged = _ghostLife.TakeRockDamageInPastReality(damage);
+                }
+                else if (_monsterLife != null)
+                {
+                    localDamaged = _monsterLife.TakeRockDamageInPastReality(damage);
+                }
+
+                if (localDamaged)
                 {
                     PlayDamageEffect(Colors.Purple);
-                    Log.Info($"Rock hit GhostMonster in Past Reality - damaged purple hearts", "GhostMonster");
+                    Log.Info($"Rock hit GhostMonster in Past Reality - damaged purple hearts locally", "GhostMonster");
 
-                    /* Check for ghost death when all purple hearts lost
-                   if (_monsterLife.CurrentPurpleHearts <= 0)
+                    // Check for death
+                    bool isDead = false;
+                    if (_ghostLife != null) isDead = _ghostLife.IsDead;
+                    else if (_monsterLife != null) isDead = _monsterLife.IsDead;
+
+                    if (isDead)
                     {
-                        Log.UI($"GhostMonster died - all purple hearts lost in Past Reality", "GhostMonster");
-                        OnGhostDeath();
-                    } */
-                }
-                else
-                {
-                    Log.Warning($"Rock hit GhostMonster in Past Reality but no purple hearts to damage", "GhostMonster");
+                        Log.Debug("GhostMonster local death detected after rock damage - invoking OnGhostDeath", "GhostMonster");
+                        OnGhostDeath(); // This now delegates everything to EnemyManager
+                    }
                 }
                 break;
         }
 
-        return damaged;
+        return localDamaged;
     }
-    // Add this new method to handle ghost-specific death behavior
+    //NEW METHOD: Centralized death handling with auto-return
+    private void HandleGhostDeathAndAutoReturn()
+    {
+        Log.Replay("=== GhostMonster HandleGhostDeathAndAutoReturn called ===", "GhostMonster");
+
+        // First handle the death through EnemyManager for pair logic
+        var mgr = EnemyManager.Instance;
+        if (mgr != null)
+        {
+            mgr.HandleGhostDeath(this);
+        }
+        else
+        {
+            // Fallback: Stop replay and destroy
+            StopReplay();
+            FadeOutAndDestroy();
+        }
+
+        // AUTO-RETURN FEATURE: Switch back to CurrentReality immediately when ghost dies in PastReality
+        var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        if (currentReality == Reality.PastReality)
+        {
+            Log.Replay("GhostMonster died in PastReality - triggering immediate auto-return to CurrentReality", "GhostMonster");
+
+            // Use CallDeferred to ensure death processing completes first
+            CallDeferred(nameof(ExecuteAutoReturn));
+        }
+    }
+
+    // Deferred auto-return execution
+    private void ExecuteAutoReturn()
+    {
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+        {
+            var currentReality = RealityManager.Instance.CurrentReality;
+            Log.Replay($"ExecuteAutoReturn: Current reality is {currentReality}", "GhostMonster");
+
+            if (currentReality == Reality.PastReality)
+            {
+                Log.Replay("Executing auto-return to CurrentReality after ghost death", "GhostMonster");
+                RealityManager.Instance.EndReplay();
+
+                // Verify the switch worked
+                CallDeferred(nameof(VerifyAutoReturn));
+            }
+            else
+            {
+                Log.Debug("Auto-return not needed - already in CurrentReality", "GhostMonster");
+            }
+        }
+        else
+        {
+            Log.Error("Could not execute auto-return - RealityManager not available", "GhostMonster");
+        }
+    }
+
+    // Verify auto-return worked
+    private void VerifyAutoReturn()
+    {
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+        {
+            var newReality = RealityManager.Instance.CurrentReality;
+            Log.Replay($"Auto-return verification: Reality is now {newReality}", "GhostMonster");
+
+            if (newReality != Reality.CurrentReality)
+            {
+                Log.Error("Auto-return failed - still in PastReality. Attempting force switch.", "GhostMonster");
+                // Force switch as backup
+                RealityManager.Instance.SetReality(Reality.CurrentReality);
+            }
+        }
+    }
+
     private void OnGhostDeath()
     {
-        // Stop any ongoing replay
-        StopReplay();
+        Log.Debug("GhostMonster OnGhostDeath called - delegating to EnemyManager", "GhostMonster");
 
-        // Trigger fade out and destruction
-        FadeOutAndDestroy();
+        // Delegate all death handling to EnemyManager (which handles auto-return at system level)
+        var mgr = EnemyManager.Instance;
+        if (mgr != null)
+        {
+            mgr.HandleGhostDeath(this);
+        }
+        else
+        {
+            // Fallback: Stop replay and destroy
+            StopReplay();
+            FadeOutAndDestroy();
+            Log.UI("GhostMonster destroyed (no EnemyManager)", "GhostMonster");
+        }
 
-        // Notify any systems that need to know about ghost death
-        Log.UI("GhostMonster has been destroyed by rock damage", "GhostMonster");
+        // NOTE: Auto-return is now handled by EnemyManager.CheckForAutoReturn()
+        // This prevents timing conflicts and ensures consistent system-level behavior
     }
+
 
 
 
@@ -840,53 +1074,129 @@ public partial class GhostMonster : CharacterBody2D
         // Store reference to current damage tween
         _currentFadeTween = tween;
     }
-    // Compatibility API to match Monster's public interface
+
+    private void HandleGhostDamageAreaEnable()
+    {
+        if (_damageArea == null) return;
+
+        try
+        {
+            var overlapping = _damageArea.GetOverlappingBodies();
+            foreach (var b in overlapping)
+            {
+                if (b is Node2D body && body.IsInGroup("player"))
+                    OnPlayerEntered(body);
+            }
+        }
+        catch { }
+
+        try
+        {
+            var playerNode = GetTree().GetFirstNodeInGroup("player") as Node2D;
+            if (playerNode != null)
+            {
+                float radius = 32.0f;
+                try
+                {
+                    foreach (Node child in _damageArea.GetChildren())
+                    {
+                        if (child is CollisionShape2D cs && cs.Shape is CircleShape2D circle)
+                        {
+                            radius = circle.Radius;
+                            break;
+                        }
+                    }
+                }
+                catch { }
+
+                if (playerNode.GlobalPosition.DistanceTo(GlobalPosition) <= radius)
+                    OnPlayerEntered(playerNode);
+            }
+        }
+        catch { }
+    }
+    // Expose life system as property and keep compatibility method
+    public MonsterLife LifeSystem => _monsterLife;
     public MonsterLife GetLifeSystem() => _monsterLife;
 
-    // Enhanced TakePhysicalDamage for consistency
+
     public bool TakePhysicalDamage(int damage = 1)
     {
+        // Direct local handling - physical damage targets red hearts
         if (_monsterLife == null) return false;
 
         Log.Debug($"GhostMonster TakePhysicalDamage - CurrentRedHearts: {_monsterLife.CurrentRedHearts}", "GhostMonster");
-        bool damaged = _monsterLife.TakePhysicalDamage(damage);
+        bool localDamaged = _monsterLife.TakePhysicalDamage(damage);
 
-        if (damaged)
+        if (localDamaged)
         {
             PlayDamageEffect(Colors.Red);
-            Log.Debug($"GhostMonster took {damage} physical damage", "GhostMonster");
+            Log.Debug($"GhostMonster took {damage} physical damage locally", "GhostMonster");
 
-            // Check for death
             if (_monsterLife.IsDead)
             {
                 OnGhostDeath();
             }
         }
 
-        return damaged;
+        return localDamaged;
     }
 
-    // Enhanced TakeMagicalDamage for consistency
+
+    // Enhanced TakeMagicalDamage for consistency with centralized system
     public bool TakeMagicalDamage(int damage = 1)
     {
-        if (_monsterLife == null) return false;
-
-        Log.Debug($"GhostMonster TakeMagicalDamage - CurrentLife: {_monsterLife.CurrentLife}", "GhostMonster");
-        bool damaged = _monsterLife.TakeMagicalDamage(damage);
-
-        if (damaged)
+        // Direct local handling - prefer ghost-specific life component for magical damage
+        if (_ghostLife != null)
         {
-            PlayDamageEffect(Colors.Purple);
-            Log.Debug($"GhostMonster took {damage} magical damage", "GhostMonster");
-
-            // Check for death
-            if (_monsterLife.IsDead)
+            Log.Debug($"GhostMonster TakeMagicalDamage - CurrentLife: {_ghostLife.CurrentLife}", "GhostMonster");
+            bool localDamagedGhost = _ghostLife.TakeMagicalDamage(damage);
+            if (localDamagedGhost)
             {
-                OnGhostDeath();
+                PlayDamageEffect(Colors.Purple);
+                Log.Debug($"GhostMonster took {damage} magical damage on GhostMonsterLife", "GhostMonster");
+                if (_ghostLife.IsDead)
+                {
+                    OnGhostDeath();
+                }
             }
+            return localDamagedGhost;
         }
 
-        return damaged;
+        // Legacy fallback: use MonsterLife if present
+        if (_monsterLife != null)
+        {
+            Log.Debug($"GhostMonster TakeMagicalDamage (legacy) - CurrentLife: {_monsterLife.CurrentLife}", "GhostMonster");
+            bool localDamaged = _monsterLife.TakeMagicalDamage(damage);
+            if (localDamaged)
+            {
+                PlayDamageEffect(Colors.Purple);
+                Log.Debug($"GhostMonster took {damage} magical damage locally (legacy)", "GhostMonster");
+                if (_monsterLife.IsDead)
+                {
+                    OnGhostDeath();
+                }
+            }
+            return localDamaged;
+        }
+
+        return false;
+    }
+
+    public int CurrentPurpleHearts
+    {
+        get
+        {
+            // Prefer GhostMonsterLife if available (dedicated purple heart system)
+            if (_ghostLife != null && IsInstanceValid(_ghostLife))
+                return _ghostLife.CurrentPurpleHearts;
+
+            // Fallback to MonsterLife purple hearts for backward compatibility
+            if (_monsterLife != null && IsInstanceValid(_monsterLife))
+                return _monsterLife.CurrentPurpleHearts;
+
+            return 0;
+        }
     }
     #endregion
 }

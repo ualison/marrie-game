@@ -19,7 +19,7 @@ public partial class PlayerStateManager : Node
     #endregion
     
     #region Events
-    public static event System.Action<Vector2, int> PlayerDied;
+    public static event System.Action<MarrieGame.Core.Models.PlayerDeath> PlayerDied;
     public static event System.Action PlayerRespawned;
     #endregion
     
@@ -65,7 +65,7 @@ public partial class PlayerStateManager : Node
     private void DiscoverPlayerComponents()
     {
         _player = GetTree().GetFirstNodeInGroup("player") as Player;
-        _playerLife = _player?.GetLifeSystem();
+    _playerLife = _player?.LifeSystem;
         
         // Debug level - routine component discovery
         Log.Debug($"Player found: {_player != null}, Life system: {_playerLife != null}", "PlayerStateManager");
@@ -160,8 +160,9 @@ public partial class PlayerStateManager : Node
 #endif
     }
     Log.System("Firing PlayerDied event", "PlayerStateManager");
-    PlayerDied?.Invoke(deathPosition, _playerLife?.CurrentHealth ?? 0);
-    GameEventSystem.OnPlayerDied(deathPosition, _playerLife?.CurrentHealth ?? 0);
+    var payload = new MarrieGame.Core.Models.PlayerDeath(deathPosition, _playerLife?.CurrentHealth ?? 0);
+    PlayerDied?.Invoke(payload);
+    GameEventSystem.OnPlayerDied(payload);
     }
     
     public void RespawnPlayer()

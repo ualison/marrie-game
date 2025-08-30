@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://d0e7xcevrndxm" path="res://Scripts/Enemy/GhostMonster.cs" id="1_uqgqf"]
 [ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monster.png" id="2_uqgqf"]
-[ext_resource type="Script" uid="uid://2hx87sinu6t" path="res://Scripts/Enemy/MonsterLife.cs" id="3_monsterlife"]
+[ext_resource type="Script" uid="uid://dq22yqfge47s5" path="res://Scripts/Enemy/GhostMonsterLife.cs" id="4_6ib6h"]
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_damage"]
@@ -43,6 +43,5 @@ RequiredReality = 1
 
 [node name="GhostMonsterLife" type="Node2D" parent="CharacterBody2D"]
 position = Vector2(-2, -221)
-script = ExtResource("3_monsterlife")
-MaxLife = 3
-StartingLife = 3
+script = ExtResource("4_6ib6h")
+MaxPurple = 2

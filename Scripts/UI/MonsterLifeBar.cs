@@ -1,5 +1,7 @@
 using Godot;
 using MarrieGame.Core.Enums;
+using MarrieGame.Core.Utils;
+using MarrieGame.Core.Interfaces;
 
 // Monster health display with red and purple hearts that follows the monster
 // Hearts display differently based on reality - showing which hearts are vulnerable to damage
@@ -22,9 +24,19 @@ public partial class MonsterLifeBar : Control
     #endregion
 
     #region Components
+    // Editor-exposed NodePaths to reduce fragile string lookups
+    [Export] public NodePath HeartsContainerPath;
+    [Export] public NodePath MonsterLifePath;
+    [Export] public NodePath MonsterNodePath;
+
     private HBoxContainer _heartsContainer;
-    private MonsterLife _lifeSystem;
+    // Generic interface reference so both MonsterLife and GhostMonsterLife can be used
+    private IHealthSystem _lifeSystem;
+    // Typed references for property access and event wiring
+    private MonsterLife _monsterLife;
+    private GhostMonsterLife _ghostLife;
     private Node2D _monster;
+    private EventSubscriptionHelper _subscription_helper = new();
     private Camera2D _cachedCamera;
     private Vector2 _lastMonsterPos = new Vector2(float.NaN, float.NaN);
     private Vector2 _lastCameraPos = new Vector2(float.NaN, float.NaN);
@@ -37,13 +49,14 @@ public partial class MonsterLifeBar : Control
         InitializeContainer();
         CallDeferred(nameof(FindLifeSystem));
 
-    // Cache the camera if available to avoid repeated GetViewport().GetCamera2D() calls
-    _cachedCamera = GetViewport().GetCamera2D();
+        // Cache the camera if available to avoid repeated GetViewport().GetCamera2D() calls
+        _cachedCamera = GetViewport().GetCamera2D();
 
         // Connect to reality changes
         if (RealityManager.IsInstanceAvailable)
         {
-            RealityManager.Instance.RealityChanged += OnRealityChanged;
+            RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
+            _subscription_helper.AddUnsubscriber(() => RealityManager.Instance.RealityChangedEvent -= OnRealityChanged);
         }
         else
         {
@@ -56,14 +69,22 @@ public partial class MonsterLifeBar : Control
     {
         if (RealityManager.IsInstanceAvailable)
         {
-            RealityManager.Instance.RealityChanged += OnRealityChanged;
+            RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
+            _subscription_helper.AddUnsubscriber(() => RealityManager.Instance.RealityChangedEvent -= OnRealityChanged);
         }
     }
 
     private void InitializeContainer()
     {
-        // Ensure hearts container exists in scene structure
-        _heartsContainer = GetNodeOrNull<HBoxContainer>("HeartsContainer");
+        // Prefer an editor-assigned NodePath when present
+        if (HeartsContainerPath != null && HeartsContainerPath.ToString() != "")
+        {
+            _heartsContainer = NodeHelpers.GetNodeOrNull<HBoxContainer>(this, HeartsContainerPath, "HeartsContainer");
+            if (_heartsContainer != null) return;
+        }
+
+        // Fallback: ensure hearts container exists in scene structure
+        _heartsContainer = NodeHelpers.GetNodeOrNull<HBoxContainer>(this, null, "HeartsContainer");
 
         if (_heartsContainer == null)
         {
@@ -74,21 +95,16 @@ public partial class MonsterLifeBar : Control
 
     private void FindLifeSystem()
     {
-        // Automatically discover and connect to monster's MonsterLife unless auto-discovery is disabled
+        // Automatically discover and connect to monster's MonsterLife/GhostMonsterLife unless auto-discovery is disabled
         if (!AutoDiscover)
-        {
-            // Auto-discovery disabled by caller; defer until an explicit ConnectToLifeSystem is invoked.
             return;
-        }
 
-        _lifeSystem = DiscoverMonsterLife();
-
-        if (_lifeSystem != null)
+        var discovered = DiscoverMonsterLife();
+        if (discovered != null)
         {
-            ConnectToLifeSystem();
+            EstablishLifeConnection(discovered);
             FindMonsterNode();
-            // Debug level - successful connection is routine
-            Log.Debug("Connected to MonsterLife!", "MonsterLifeBarUI");
+            Log.Debug("Connected to life system!", "MonsterLifeBarUI");
         }
         else
         {
@@ -96,64 +112,57 @@ public partial class MonsterLifeBar : Control
         }
     }
 
-    private MonsterLife DiscoverMonsterLife()
+    private IHealthSystem DiscoverMonsterLife()
     {
-        // Try multiple strategies to find MonsterLife component
+        // Try multiple strategies to find MonsterLife or GhostMonsterLife component
         return FindLifeSystemViaParent()
             ?? FindLifeSystemViaGroup();
     }
 
-    private MonsterLife FindLifeSystemViaParent()
+    private IHealthSystem FindLifeSystemViaParent()
     {
-        // Strategy 1: Check parent node for MonsterLife or GhostMonsterLife
         var parent = GetParent();
+        if (parent == null) return null;
 
-        if (parent != null)
+        _monster = parent as Node2D;
+
+        // If the parent is a Monster, prefer its MonsterLife child
+        if (parent is Monster monster)
         {
-            // First, try to find the monster node directly
-            _monster = parent as Node2D;
-
-            // Check for regular Monster
-            if (parent is Monster monster)
-            {
-                return monster.GetNodeOrNull<MonsterLife>("MonsterLife");
-            }
-
-            // Check for GhostMonster by looking for GhostMonsterLife node
-            var ghostLife = parent.GetNodeOrNull<MonsterLife>("GhostMonsterLife");
-            if (ghostLife != null)
-            {
-                Log.Debug($"Found GhostMonsterLife in parent: {parent.Name}", "MonsterLifeBarUI");
-                return ghostLife;
-            }
-
-            // Check for regular MonsterLife as fallback
-            var regularLife = parent.GetNodeOrNull<MonsterLife>("MonsterLife");
-            if (regularLife != null)
-            {
-                return regularLife;
-            }
+            var ml = NodeHelpers.GetNodeOrNull<MonsterLife>(monster, null, "MonsterLife");
+            if (ml != null) return ml;
         }
 
-        // Strategy 2: Check parent's parent
-        if (parent?.GetParent() is Monster monsterGrandparent)
+        // Prefer a GhostMonsterLife if present
+        var ghostLife = NodeHelpers.GetNodeOrNull<GhostMonsterLife>(parent, null, "GhostMonsterLife");
+        if (ghostLife != null)
+        {
+            Log.Debug($"Found GhostMonsterLife in parent: {parent.Name}", "MonsterLifeBarUI");
+            return ghostLife;
+        }
+
+        // Fallback to MonsterLife on parent
+        var regularLife = NodeHelpers.GetNodeOrNull<MonsterLife>(parent, null, "MonsterLife");
+        if (regularLife != null) return regularLife;
+
+        // Check parent's parent for Monster
+        if (parent.GetParent() is Monster monsterGrandparent)
         {
             _monster = monsterGrandparent;
-            return monsterGrandparent.GetNodeOrNull<MonsterLife>("MonsterLife");
+            return NodeHelpers.GetNodeOrNull<MonsterLife>(monsterGrandparent, null, "MonsterLife");
         }
 
         return null;
     }
 
-    private MonsterLife FindLifeSystemViaGroup()
+    private IHealthSystem FindLifeSystemViaGroup()
     {
-        // Strategy 3: Search by group membership
         var monsters = GetTree().GetNodesInGroup("enemies");
         foreach (Node monsterNode in monsters)
         {
             if (monsterNode is Monster monster)
             {
-                var monsterLife = monster.GetNodeOrNull<MonsterLife>("MonsterLife");
+                var monsterLife = NodeHelpers.GetNodeOrNull<MonsterLife>(monster, null, "MonsterLife");
                 if (monsterLife != null)
                 {
                     _monster = monster;
@@ -166,18 +175,36 @@ public partial class MonsterLifeBar : Control
 
     private void FindMonsterNode()
     {
-        // Try to find the monster node if not already found
-        if (_monster == null && _lifeSystem != null)
-        {
-            _monster = _lifeSystem.GetParent() as Node2D;
-        }
+        if (_monster != null) return;
+        if (_monsterLife != null)
+            _monster = _monsterLife.GetParent() as Node2D;
+        else if (_ghostLife != null)
+            _monster = _ghostLife.GetParent() as Node2D;
     }
 
-    private void ConnectToLifeSystem()
+    private void EstablishLifeConnection(IHealthSystem lifeSystem)
     {
-        // Connect to health change events for real-time updates
-        _lifeSystem.LifeChanged += OnLifeChanged;
-        OnLifeChanged(_lifeSystem.CurrentLife, _lifeSystem.MaxLife, _lifeSystem.PurpleHearts);
+        // Disconnect previous
+        DisconnectFromCurrentLifeSystem();
+
+        _lifeSystem = lifeSystem;
+        _monsterLife = lifeSystem as MonsterLife;
+        _ghostLife = lifeSystem as GhostMonsterLife;
+
+        if (_monsterLife != null)
+        {
+            _monsterLife.LifeChanged += OnLifeChanged;
+            int purple = ResolveMaxPurple();
+            OnLifeChanged(_monsterLife.CurrentLife, _monsterLife.MaxLife, purple);
+            return;
+        }
+
+        if (_ghostLife != null)
+        {
+            _ghostLife.LifeChanged += OnLifeChanged;
+            OnLifeChanged(_ghostLife.CurrentLife, _ghostLife.MaxPurple, _ghostLife.CurrentPurpleHearts);
+            return;
+        }
     }
 
     private void LogLifeSystemError()
@@ -204,7 +231,10 @@ public partial class MonsterLifeBar : Control
             // Refresh heart display to show correct vulnerability based on new reality
             if (_lifeSystem != null)
             {
-                UpdateHearts(_lifeSystem.CurrentLife, _lifeSystem.MaxLife, _lifeSystem.PurpleHearts);
+                int current = _monsterLife != null ? _monsterLife.CurrentLife : (_ghostLife != null ? _ghostLife.CurrentLife : _lifeSystem.CurrentHealth);
+                int max = _monsterLife != null ? _monsterLife.MaxLife : (_ghostLife != null ? _ghostLife.MaxPurple : _lifeSystem.MaxHealth);
+                int purple = ResolveMaxPurple();
+                UpdateHearts(current, max, purple);
             }
         }
         else
@@ -272,7 +302,18 @@ public partial class MonsterLifeBar : Control
     private void OnLifeChanged(int currentLife, int maxLife, int purpleHearts)
     {
         // Respond to health changes from MonsterLife
+        if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System))
+            Log.System($"[Debug] MonsterLifeBar.OnLifeChanged called - Current: {currentLife}, Max: {maxLife}, Purple: {purpleHearts}", "MonsterLifeBarUI");
+
         UpdateHearts(currentLife, maxLife, purpleHearts);
+
+        // Force a redraw to ensure visual update (helpful under some engine redraw timing cases)
+        if (_heartsContainer != null)
+        {
+            if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.Debug))
+                Log.Debug($"MonsterLifeBar: Hearts container child count after update: {_heartsContainer.GetChildCount()}", "MonsterLifeBarUI");
+            _heartsContainer.QueueRedraw();
+        }
     }
 
     private void UpdateHearts(int currentLife, int maxLife, int purpleHearts)
@@ -311,10 +352,10 @@ public partial class MonsterLifeBar : Control
     {
         Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
 
-        // Use MonsterLife's corrected property calculations
-        int currentRedHearts = _lifeSystem?.CurrentRedHearts ?? 0;
-        int currentPurpleHearts = _lifeSystem?.CurrentPurpleHearts ?? 0;
-        int maxRedHearts = maxLife - purpleHearts;
+        // Use typed properties when available
+        int currentRedHearts = _monsterLife != null ? _monsterLife.CurrentRedHearts : 0;
+        int currentPurpleHearts = _monsterLife != null ? _monsterLife.CurrentPurpleHearts : (_ghostLife != null ? _ghostLife.CurrentPurpleHearts : 0);
+        int maxRedHearts = (_monsterLife != null ? _monsterLife.MaxLife : maxLife) - purpleHearts;
 
         if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.Debug))
         {
@@ -345,7 +386,7 @@ public partial class MonsterLifeBar : Control
         }
     }
 
-    private void CreateRedTextureHearts(int maxCount, int currentCount, bool vulnerable)
+    private void CreateRedTextureHearts(int maxCount, int currentCount, int purpleCount, bool vulnerable)
     {
         for (int i = 0; i < maxCount; i++)
         {
@@ -391,9 +432,9 @@ public partial class MonsterLifeBar : Control
     {
         Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
 
-        int currentRedHearts = _lifeSystem?.CurrentRedHearts ?? 0;
-        int currentPurpleHearts = _lifeSystem?.CurrentPurpleHearts ?? 0;
-        int maxRedHearts = maxLife - purpleHearts;
+        int currentRedHearts = _monsterLife != null ? _monsterLife.CurrentRedHearts : 0;
+        int currentPurpleHearts = _monsterLife != null ? _monsterLife.CurrentPurpleHearts : (_ghostLife != null ? _ghostLife.CurrentPurpleHearts : 0);
+        int maxRedHearts = (_monsterLife != null ? _monsterLife.MaxLife : maxLife) - purpleHearts;
 
         // REALITY-SPECIFIC DISPLAY: Show only the relevant heart type
         if (currentReality == Reality.CurrentReality)
@@ -419,7 +460,7 @@ public partial class MonsterLifeBar : Control
     }
 
 
-    private void CreateRedTextHearts(int maxCount, int currentCount, bool vulnerable)
+    private void CreateRedTextHearts(int maxCount, int currentCount, int purpleCount, bool vulnerable)
     {
         for (int i = 0; i < maxCount; i++)
         {
@@ -472,37 +513,59 @@ public partial class MonsterLifeBar : Control
 
         // Refresh display if already connected to life system
         if (_lifeSystem != null)
-            UpdateHearts(_lifeSystem.CurrentLife, _lifeSystem.MaxLife, _lifeSystem.PurpleHearts);
+        {
+            int current = _monsterLife != null ? _monsterLife.CurrentLife : (_ghostLife != null ? _ghostLife.CurrentLife : _lifeSystem.CurrentHealth);
+            int max = _monsterLife != null ? _monsterLife.MaxLife : (_ghostLife != null ? _ghostLife.MaxPurple : _lifeSystem.MaxHealth);
+            int purple = ResolveMaxPurple();
+            UpdateHearts(current, max, purple);
+        }
     }
 
-    public void ConnectToLifeSystem(MonsterLife lifeSystem)
+    public void ConnectToLifeSystem(IHealthSystem lifeSystem)
     {
-        // Manually connect to specific MonsterLife instance
+        // Manually connect to specific life system (MonsterLife or GhostMonsterLife)
         DisconnectFromCurrentLifeSystem();
-        EstablishNewConnection(lifeSystem);
+        EstablishLifeConnection(lifeSystem);
     }
 
     private void DisconnectFromCurrentLifeSystem()
     {
         // Clean up previous connection to prevent duplicate events
-        if (_lifeSystem != null)
-            _lifeSystem.LifeChanged -= OnLifeChanged;
+        if (_monsterLife != null)
+        {
+            try { _monsterLife.LifeChanged -= OnLifeChanged; } catch { }
+            _monsterLife = null;
+        }
+        if (_ghostLife != null)
+        {
+            try { _ghostLife.LifeChanged -= OnLifeChanged; } catch { }
+            _ghostLife = null;
+        }
+        _lifeSystem = null;
     }
-
     private void EstablishNewConnection(MonsterLife lifeSystem)
     {
-        // Establish new connection and update display
+        // Backwards-compatible helper - wire a MonsterLife typed instance
+        DisconnectFromCurrentLifeSystem();
         _lifeSystem = lifeSystem;
-
-        if (_lifeSystem != null)
+        _monsterLife = lifeSystem;
+        if (_monsterLife != null)
         {
-            _lifeSystem.LifeChanged += OnLifeChanged;
-            OnLifeChanged(_lifeSystem.CurrentLife, _lifeSystem.MaxLife, _lifeSystem.PurpleHearts);
-            // Defer finding the monster node so caller code can reparent _lifeSystem
-            // before we attempt to resolve its parent. This prevents stale references
-            // when callers move the MonsterLife in the scene tree (see GhostMonster.ReconnectLifeBar).
+            _monsterLife.LifeChanged += OnLifeChanged;
+            int purple = ResolveMaxPurple();
+            OnLifeChanged(_monsterLife.CurrentLife, _monsterLife.MaxLife, purple);
             CallDeferred(nameof(FindMonsterNode));
         }
+    }
+
+    private int ResolveMaxPurple()
+    {
+        // If we have a ghost life typed instance, use it
+        if (_ghostLife != null) return _ghostLife.MaxPurple;
+
+        // For monsters, purple hearts are handled by paired ghosts
+        // No more life pool system - return 0 for monsters
+        return 0;
     }
 
     // Allow external callers to force Monster discovery after scene-tree changes
@@ -542,11 +605,9 @@ public partial class MonsterLifeBar : Control
     #region Cleanup
     public override void _ExitTree()
     {
-        // Clean up reality manager connection
-        if (RealityManager.IsInstanceAvailable)
-        {
-            RealityManager.Instance.RealityChanged -= OnRealityChanged;
-        }
+        // Centralized cleanup of subscriptions registered via helper
+        _subscription_helper.UnsubscribeAll();
+
         // Clean up life system connection
         DisconnectFromCurrentLifeSystem();
     }

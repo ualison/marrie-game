@@ -31,6 +31,8 @@ public partial class RealityManager : Node
 
     #region Events
     [Signal] public delegate void RealityChangedEventHandler(Reality newReality);
+    // C# event for direct subscribers to receive typed Reality values without Variant conversion
+    public event System.Action<Reality> RealityChangedEvent;
     #endregion
 
     #region State
@@ -90,10 +92,13 @@ public partial class RealityManager : Node
     
     private void LogInstanceStatus()
     {
-        Log.System($"RealityManager.Instance is now available: {Instance != null}", "RealityManager");
-        if (Instance != null)
+        if (MarrieGame.Core.Logging.GameLogger.Instance?.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.System) ?? false)
         {
-            Log.System($"RealityManager ready for reality changes. Current Reality: {Instance.CurrentReality}", "RealityManager");
+            Log.System($"RealityManager.Instance is now available: {Instance != null}", "RealityManager");
+            if (Instance != null)
+            {
+                Log.System($"RealityManager ready for reality changes. Current Reality: {Instance.CurrentReality}", "RealityManager");
+            }
         }
     }
 
@@ -123,7 +128,8 @@ public partial class RealityManager : Node
         _isInReplay = true;
         
         Log.System($"=== REALITY CHANGE === From {previousReality} to {_currentReality} (replay started)", "RealityManager");
-        EmitSignal(SignalName.RealityChanged, (int)_currentReality);
+    EmitSignal(SignalName.RealityChanged, (int)_currentReality);
+    RealityChangedEvent?.Invoke(_currentReality);
         Log.System($"RealityChanged signal emitted with value: {(int)_currentReality}", "RealityManager");
     }
 
@@ -143,7 +149,8 @@ public partial class RealityManager : Node
         _isInReplay = false;
         
         Log.System($"=== REALITY CHANGE === From {previousReality} to {_currentReality} (replay ended)", "RealityManager");
-        EmitSignal(SignalName.RealityChanged, (int)_currentReality);
+    EmitSignal(SignalName.RealityChanged, (int)_currentReality);
+    RealityChangedEvent?.Invoke(_currentReality);
         Log.System($"RealityChanged signal emitted with value: {(int)_currentReality}", "RealityManager");
     }
 
@@ -163,7 +170,8 @@ public partial class RealityManager : Node
         _isInReplay = (newReality == Reality.PastReality);
         
         Log.System($"=== REALITY CHANGE === From {previousReality} to {_currentReality} (force set)", "RealityManager");
-        EmitSignal(SignalName.RealityChanged, (int)_currentReality);
+    EmitSignal(SignalName.RealityChanged, (int)_currentReality);
+    RealityChangedEvent?.Invoke(_currentReality);
         Log.System($"RealityChanged signal emitted with value: {(int)_currentReality}", "RealityManager");
     }
 
@@ -177,7 +185,8 @@ public partial class RealityManager : Node
         _isInReplay = false;
         
         Log.System($"=== REALITY CHANGE === From {previousReality} to {_currentReality} (reset)", "RealityManager");
-        EmitSignal(SignalName.RealityChanged, (int)_currentReality);
+    EmitSignal(SignalName.RealityChanged, (int)_currentReality);
+    RealityChangedEvent?.Invoke(_currentReality);
         Log.System($"RealityChanged signal emitted with value: {(int)_currentReality}", "RealityManager");
     }
     #endregion

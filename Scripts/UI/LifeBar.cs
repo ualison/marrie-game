@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Utils;
 
 // Player health display with flexible heart representation and automatic PlayerLife connection
 public partial class LifeBar : Control
@@ -24,7 +25,7 @@ public partial class LifeBar : Control
     private void InitializeContainer()
     {
         // Ensure hearts container exists in scene structure
-        _heartsContainer = GetNodeOrNull<HBoxContainer>("HeartsContainer");
+    _heartsContainer = NodeHelpers.GetNodeOrNull<HBoxContainer>(this, null, "HeartsContainer");
 
         if (_heartsContainer == null)
         {
@@ -61,16 +62,16 @@ public partial class LifeBar : Control
     private PlayerLife FindLifeSystemViaPlayer()
     {
         // Strategy 1: Group-based search (most reliable)
-        var player = GetTree().GetFirstNodeInGroup("player") as Player;
-        return player?.GetNodeOrNull<PlayerLife>("PlayerLife");
+    var player = GetTree().GetFirstNodeInGroup("player") as Player;
+    return player != null ? NodeHelpers.GetNodeOrNull<PlayerLife>(player, null, "PlayerLife") : null;
     }
 
     private PlayerLife FindLifeSystemViaPath()
     {
         // Strategy 2: Safe node path search with type checking
-        var playerNode = GetNodeOrNull("../../Characters/Player");
+        var playerNode = NodeHelpers.GetNodeOrNull<Node>(this, new NodePath("../../Characters/Player"), "");
         if (playerNode is Player playerDirect)
-            return playerDirect.GetNodeOrNull<PlayerLife>("PlayerLife");
+            return NodeHelpers.GetNodeOrNull<PlayerLife>(playerDirect, null, "PlayerLife");
         
         return null;
     }
@@ -78,7 +79,7 @@ public partial class LifeBar : Control
     private PlayerLife FindLifeSystemViaGroup()
     {
         // Strategy 3: Search by group membership
-        return GetTree().GetFirstNodeInGroup("life_system") as PlayerLife;
+    return GetTree().GetFirstNodeInGroup("life_system") as PlayerLife;
     }
 
     private void ConnectToLifeSystem()

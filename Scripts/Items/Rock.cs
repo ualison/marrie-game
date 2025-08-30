@@ -1,11 +1,12 @@
 using Godot;
+using MarrieGame.Core.Utils;
 
 /// <summary>
 /// Rock item that can be collected by the player when static, or thrown as a projectile
 /// - Static mode: Collectible item that adds to player's rock inventory
 /// - Thrown mode: Projectile that follows trajectory and can hit objects like apples
 /// </summary>
-public partial class Rock : Node2D
+public partial class Rock : Node2D, IPoolable
 {
     #region Exported Properties
     [Export] public Texture2D RockTexture { get; set; }
@@ -30,6 +31,38 @@ public partial class Rock : Node2D
     private float _travelProgress = 0.0f;
     private bool _isMoving = false;
     #endregion
+
+    // Pooling support
+    public bool IsFromPool { get; set; } = false;
+
+    public void ResetForReuse()
+    {
+        // Reset runtime state
+        _isThrown = false;
+        _playerNearby = false;
+        _trajectoryPoints = null;
+        _currentPointIndex = 0;
+        _travelProgress = 0f;
+        Visible = true;
+        Show();
+    // Reattach signals and ensure group membership for reused instances
+    try { if (_detectionArea != null) { _detectionArea.BodyEntered -= OnPlayerEntered; _detectionArea.BodyExited -= OnPlayerExited; _detectionArea.BodyEntered += OnPlayerEntered; _detectionArea.BodyExited += OnPlayerExited; } } catch { }
+    try { if (_collisionArea != null) { _collisionArea.AreaEntered -= OnRockHitArea; _collisionArea.BodyEntered -= OnRockHitBody; _collisionArea.AreaEntered += OnRockHitArea; _collisionArea.BodyEntered += OnRockHitBody; } } catch { }
+    try { if (!IsInGroup("rocks")) AddToGroup("rocks"); } catch { }
+    }
+
+    public void OnReleasedToPool()
+    {
+        // Called when returned to pool - stop any tweens or signals
+        _isMoving = false;
+    try { if (_detectionArea != null) _detectionArea.BodyEntered -= OnPlayerEntered; } catch { }
+    try { if (_detectionArea != null) _detectionArea.BodyExited -= OnPlayerExited; } catch { }
+    try { if (_collisionArea != null) _collisionArea.AreaEntered -= OnRockHitArea; } catch { }
+    try { if (_collisionArea != null) _collisionArea.BodyEntered -= OnRockHitBody; } catch { }
+    }
+
+    // Shared rock texture to reduce repeated resource loads
+    private static Texture2D _sharedRockTexture;
 
     #region Rock Modes
     public enum RockMode
@@ -61,12 +94,12 @@ public partial class Rock : Node2D
     private void InitializeComponents()
     {
         // Try to get nodes from scene file, but handle programmatic creation gracefully
-        _detectionArea = GetNodeOrNull<Area2D>("DetectionArea");
-        _rockSprite = GetNodeOrNull<Sprite2D>("RockSprite");
-        _promptLabel = GetNodeOrNull<Label>("PromptLabel");
+    _detectionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "DetectionArea");
+    _rockSprite = NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "RockSprite");
+    _promptLabel = NodeHelpers.GetNodeOrNull<Label>(this, null, "PromptLabel");
         
-        // Try to get the thrown collision area if it exists in the scene
-        _collisionArea = GetNodeOrNull<Area2D>("ThrownCollisionArea");
+    // Try to get the thrown collision area if it exists in the scene
+    _collisionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "ThrownCollisionArea");
         
         // If this is programmatic creation (no scene nodes), create sprite
         if (_rockSprite == null)
@@ -82,7 +115,9 @@ public partial class Rock : Node2D
         // Load rock texture if not set
         if (RockTexture == null)
         {
-            RockTexture = GD.Load<Texture2D>("res://Art/Rock.png");
+            if (_sharedRockTexture == null)
+                _sharedRockTexture = GD.Load<Texture2D>("res://Art/Rock.png");
+            RockTexture = _sharedRockTexture;
         }
         
         if (RockTexture != null && _rockSprite != null)
@@ -438,7 +473,13 @@ public partial class Rock : Node2D
         // Simple visual feedback - could be expanded later
         var tween = CreateTween();
         tween.TweenProperty(_rockSprite, "modulate", new Color(1, 1, 1, 0), 0.3f);
-        tween.TweenCallback(Callable.From(() => QueueFree()));
+        tween.TweenCallback(Callable.From(() =>
+        {
+            if (IsFromPool)
+                PoolManager.Release(this);
+            else
+                QueueFree();
+        }));
     }
     #endregion
 

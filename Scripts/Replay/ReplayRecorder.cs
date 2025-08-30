@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Utils;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -19,6 +20,7 @@ public partial class ReplayRecorder : Node
     #endregion
 
     #region State
+    private bool _lastMonsterRecordingState = false;
     public bool IsRecording { get; private set; }
     public bool IsPausedForReplay { get; private set; }
     // Include the small prebuffer in the recorded-data check to avoid losing fast deaths
@@ -54,10 +56,10 @@ public partial class ReplayRecorder : Node
     #region Lifecycle
     public override void _Ready()
     {
-    Instance = this;
-    ProcessMode = ProcessModeEnum.Always;
+        Instance = this;
+        ProcessMode = ProcessModeEnum.Always;
         AddToGroup("replay_recorder");
-        
+
         CallDeferred(nameof(Initialize));
     }
 
@@ -82,10 +84,32 @@ public partial class ReplayRecorder : Node
     #endregion
 
     #region Initialization (Simplified)
+
+    // NEW METHOD: Called by EnemyManager when monster visibility changes
+    public void OnMonsterVisibilityChanged(Monster monster, bool isVisible)
+    {
+        if (_cachedMonster != monster) return;
+
+        bool currentRecordingState = ShouldRecordMonster();
+
+        if (_lastMonsterRecordingState != currentRecordingState)
+        {
+            if (currentRecordingState)
+            {
+                Log.Debug($"Monster {monster.Name} became recordable - resuming monster frame recording", "ReplayRecorder");
+            }
+            else
+            {
+                Log.Debug($"Monster {monster.Name} became hidden - pausing monster frame recording", "ReplayRecorder");
+            }
+
+            _lastMonsterRecordingState = currentRecordingState;
+        }
+    }
     private void Initialize()
     {
         RefreshCharacterCache();
-        
+
         if (_cachedPlayer != null)
         {
             StartRecording();
@@ -93,7 +117,8 @@ public partial class ReplayRecorder : Node
         }
         else
         {
-            GetTree().CreateTimer(0.1f).Timeout += () => {
+            GetTree().CreateTimer(0.1f).Timeout += () =>
+            {
                 RefreshCharacterCache();
                 if (_cachedPlayer != null)
                 {
@@ -111,7 +136,7 @@ public partial class ReplayRecorder : Node
     public void RefreshCharacterCache()
     {
         _cachedPlayer = GetTree().GetFirstNodeInGroup("player") as Player;
-        
+
         var enemies = GetTree().GetNodesInGroup("enemies").OfType<Monster>();
         _cachedMonster = enemies.FirstOrDefault(m => m.EnableFollowerBehavior) ?? enemies.FirstOrDefault();
 
@@ -119,7 +144,7 @@ public partial class ReplayRecorder : Node
         {
             _playerSprite = FindSpriteInCharacter(_cachedPlayer);
             _playerVisual = _playerSprite ?? FindVisualInCharacter(_cachedPlayer);
-            
+
             if (_playerSprite == null && _playerVisual == null)
             {
                 Log.Warning($"No visual component (AnimatedSprite2D or Sprite2D) found for player {_cachedPlayer.Name}", "ReplayRecorder");
@@ -130,7 +155,7 @@ public partial class ReplayRecorder : Node
         {
             _monsterSprite = FindSpriteInCharacter(_cachedMonster);
             _monsterVisual = _monsterSprite ?? FindVisualInCharacter(_cachedMonster);
-            
+
             if (_monsterSprite == null && _monsterVisual == null)
             {
                 Log.Warning($"No visual component (AnimatedSprite2D or Sprite2D) found for monster {_cachedMonster.Name}", "ReplayRecorder");
@@ -140,41 +165,65 @@ public partial class ReplayRecorder : Node
 
     private AnimatedSprite2D FindSpriteInCharacter(Node2D character)
     {
-        var sprite = character.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D") ??
-                    character.GetNodeOrNull<AnimatedSprite2D>("MarrieSprite") ??
-                    character.GetNodeOrNull<AnimatedSprite2D>("GhostMarrieSprite") ??
-                    character.FindChild("AnimatedSprite2D", recursive: false) as AnimatedSprite2D ??
-                    character.FindChild("MarrieSprite", recursive: false) as AnimatedSprite2D;
-        
-        return sprite;
+        var node = NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(character, null, "AnimatedSprite2D")
+               ?? NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(character, null, "MarrieSprite")
+               ?? NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(character, null, "GhostMarrieSprite");
+
+        if (node != null) return node;
+
+        // Fallback: search direct children for a sprite-like node
+        var found = NodeHelpers.FindChildOfType<AnimatedSprite2D>(character);
+        return found;
     }
 
     private Node2D FindVisualInCharacter(Node2D character)
     {
-        var visual = character.GetNodeOrNull<Sprite2D>("Sprite2D") ??
-                    character.GetNodeOrNull<Sprite2D>("MonsterSprite") ??
-                    character.GetNodeOrNull<Sprite2D>("MarrieSprite") ??
-                    character.GetNodeOrNull<Sprite2D>("GhostMarrieSprite") ??
-                    character.FindChild("Sprite2D", recursive: false) as Node2D ??
-                    character.FindChild("MonsterSprite", recursive: false) as Node2D;
-        
-        return visual;
+        var node = NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "Sprite2D")
+               ?? NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "MonsterSprite")
+               ?? NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "MarrieSprite")
+               ?? NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "GhostMarrieSprite");
+
+        if (node != null) return node as Node2D;
+
+        // Fallback: find first Sprite2D child
+        var found = NodeHelpers.FindChildOfType<Sprite2D>(character);
+        return found as Node2D;
     }
     #endregion
 
     #region Recording Control
+    // UPDATED METHOD: Initialize monster recording state
     public void StartRecording()
     {
         ClearRecording();
         IsRecording = true;
         _recordTimer = 0f;
         _elapsedTime = 0f;
-        
+
         if (_cachedPlayer != null) _lastPlayerPos = _cachedPlayer.GlobalPosition;
-        if (_cachedMonster != null) _lastMonsterPos = _cachedMonster.GlobalPosition;
+        if (_cachedMonster != null)
+        {
+            _lastMonsterPos = _cachedMonster.GlobalPosition;
+            _lastMonsterRecordingState = ShouldRecordMonster();
+        }
         _skipCounter = 0;
+
+        Log.Debug($"Recording started - Monster recording state: {_lastMonsterRecordingState}", "ReplayRecorder");
     }
 
+    // NEW METHOD: Force refresh monster cache and recording state
+    public void RefreshMonsterRecordingState()
+    {
+        if (_cachedMonster != null)
+        {
+            bool newState = ShouldRecordMonster();
+            if (_lastMonsterRecordingState != newState)
+            {
+                Log.Debug($"Monster recording state changed: {_lastMonsterRecordingState} -> {newState}", "ReplayRecorder");
+                _lastMonsterRecordingState = newState;
+            }
+        }
+    }
     public void StopRecording()
     {
         IsRecording = false;
@@ -233,7 +282,8 @@ public partial class ReplayRecorder : Node
             _lastPlayerPos = _cachedPlayer.GlobalPosition;
         }
 
-        if (_cachedMonster != null)
+        // BUG FIX: Only record monster frames when monster is not hidden
+        if (_cachedMonster != null && ShouldRecordMonster())
         {
             var frame = CreateMonsterFrame();
             _monsterFrames.Add(frame);
@@ -241,15 +291,77 @@ public partial class ReplayRecorder : Node
         }
     }
 
+    // NEW METHOD: Check if monster should be recorded based on visibility state
+    private bool ShouldRecordMonster()
+    {
+        if (_cachedMonster == null) return false;
+
+        // Check if monster is hidden by EnemyManager (global or local hiding)
+        if (EnemyManager.Instance != null)
+        {
+            bool isHiddenByPair = EnemyManager.Instance.IsMonsterHiddenByPair(_cachedMonster);
+            if (isHiddenByPair)
+            {
+                if (EnableDebugLogging)
+                {
+                    Log.Debug($"Skipping monster frame recording - monster {_cachedMonster.Name} is hidden by EnemyManager", "ReplayRecorder");
+                }
+                return false;
+            }
+        }
+
+        // Check if monster is currently visible (for follower behavior monsters)
+        if (_cachedMonster.EnableFollowerBehavior)
+        {
+            bool isCurrentlyVisible = _cachedMonster.IsCurrentlyVisible;
+            if (!isCurrentlyVisible)
+            {
+                if (EnableDebugLogging)
+                {
+                    Log.Debug($"Skipping monster frame recording - follower monster {_cachedMonster.Name} is not currently visible", "ReplayRecorder");
+                }
+                return false;
+            }
+        }
+
+        // Check if monster is disabled for replay
+        if (_cachedMonster.IsDisabledForReplay)
+        {
+            if (EnableDebugLogging)
+            {
+                Log.Debug($"Skipping monster frame recording - monster {_cachedMonster.Name} is disabled for replay", "ReplayRecorder");
+            }
+            return false;
+        }
+
+        // Check if monster has valid health (don't record dead monsters)
+        if (_cachedMonster.LifeSystem?.IsDead == true)
+        {
+            if (EnableDebugLogging)
+            {
+                Log.Debug($"Skipping monster frame recording - monster {_cachedMonster.Name} is dead", "ReplayRecorder");
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    // UPDATED METHOD: Include monster recording status in skip logic
     private bool ShouldSkipFrame()
     {
         if (_skipCounter >= MAX_SKIP_FRAMES) return false;
 
-        bool playerMoved = _cachedPlayer == null || 
+        bool playerMoved = _cachedPlayer == null ||
                           _cachedPlayer.GlobalPosition.DistanceTo(_lastPlayerPos) >= MIN_MOVEMENT;
-        
-        bool monsterMoved = _cachedMonster == null || 
-                           _cachedMonster.GlobalPosition.DistanceTo(_lastMonsterPos) >= MIN_MOVEMENT;
+
+        bool monsterMoved = false;
+        bool shouldRecordMonster = ShouldRecordMonster();
+
+        if (shouldRecordMonster && _cachedMonster != null)
+        {
+            monsterMoved = _cachedMonster.GlobalPosition.DistanceTo(_lastMonsterPos) >= MIN_MOVEMENT;
+        }
 
         return !playerMoved && !monsterMoved;
     }
@@ -258,25 +370,28 @@ public partial class ReplayRecorder : Node
     {
         var pos = _cachedPlayer.GlobalPosition;
         var rot = _cachedPlayer.GlobalRotation;
-        var anim = GetAnimationName(_playerSprite);
+        var animName = GetAnimationName(_playerSprite);
+        var animId = ReplayStringRegistry.GetOrRegisterAnimation(animName);
         var flip = GetSpriteFlip(_playerSprite, _playerVisual);
         var (visible, alpha) = GetVisibility(_playerVisual);
 
-        return new ReplayFrame(_elapsedTime, pos, rot, anim, flip, visible, alpha);
+        return new ReplayFrame(_elapsedTime, pos, rot, animId, flip, visible, alpha);
     }
 
     private ReplayFrame CreateMonsterFrame()
     {
         var pos = _cachedMonster.GlobalPosition;
         var rot = _cachedMonster.GlobalRotation;
-        var anim = GetAnimationName(_monsterSprite);
+        var animName = GetAnimationName(_monsterSprite);
+        var animId = ReplayStringRegistry.GetOrRegisterAnimation(animName);
         var flip = GetMonsterSpriteFlip(_monsterSprite, _monsterVisual);
         var (visible, alpha) = GetVisibility(_monsterVisual);
-        
-        var state = _cachedMonster.EnableFollowerBehavior ? _cachedMonster.GetState().ToString() : "";
+
+        var stateName = _cachedMonster.EnableFollowerBehavior ? _cachedMonster.GetState().ToString() : "";
+        var stateId = ReplayStringRegistry.GetOrRegisterMonsterState(stateName);
         var fullyVisible = _cachedMonster.EnableFollowerBehavior ? _cachedMonster.IsFullyVisible() : true;
 
-        return new ReplayFrame(_elapsedTime, pos, rot, anim, flip, visible, alpha, state, fullyVisible);
+        return new ReplayFrame(_elapsedTime, pos, rot, animId, flip, visible, alpha, stateId, fullyVisible);
     }
     #endregion
 
@@ -296,12 +411,12 @@ public partial class ReplayRecorder : Node
                 bool flipH = animSprite.FlipH;
                 bool scaleFlip = animSprite.Scale.X < 0;
                 bool isFlipped = flipH || scaleFlip;
-                
+
                 if (EnableDebugLogging)
                 {
                     Log.Debug($"Player flip detected: FlipH={flipH}, ScaleFlip={scaleFlip}, Final={isFlipped}, Scale.X={animSprite.Scale.X:F3}", "ReplayRecorder");
                 }
-                
+
                 return isFlipped;
             }
             catch (System.Exception ex)
@@ -309,8 +424,8 @@ public partial class ReplayRecorder : Node
                 Log.Warning($"Error accessing animated sprite properties: {ex.Message}", "ReplayRecorder");
             }
         }
-        
-        if (visual?.IsInsideTree() == true) 
+
+        if (visual?.IsInsideTree() == true)
         {
             try
             {
@@ -322,7 +437,7 @@ public partial class ReplayRecorder : Node
                 Log.Warning($"Error accessing visual properties: {ex.Message}", "ReplayRecorder");
             }
         }
-        
+
         Log.Warning("No valid sprite or visual found for flip detection", "ReplayRecorder");
         return false;
     }
@@ -337,12 +452,12 @@ public partial class ReplayRecorder : Node
                 bool flipH = animSprite.FlipH;
                 bool scaleFlip = animSprite.Scale.X < 0;
                 bool isFlipped = flipH || scaleFlip;
-                
+
                 if (EnableDebugLogging)
                 {
                     Log.Debug($"Monster flip detected: FlipH={flipH}, ScaleFlip={scaleFlip}, Final={isFlipped}, Scale.X={animSprite.Scale.X:F3}", "ReplayRecorder");
                 }
-                
+
                 return isFlipped;
             }
             catch (System.Exception ex)
@@ -350,18 +465,18 @@ public partial class ReplayRecorder : Node
                 Log.Warning($"Error accessing monster animated sprite properties: {ex.Message}", "ReplayRecorder");
             }
         }
-        
-        if (visual?.IsInsideTree() == true) 
+
+        if (visual?.IsInsideTree() == true)
         {
             try
             {
                 bool scaleFlip = visual.Scale.X < 0;
-                
+
                 if (EnableDebugLogging)
                 {
                     Log.Debug($"Monster visual flip detected: ScaleFlip={scaleFlip}, Scale.X={visual.Scale.X:F3}", "ReplayRecorder");
                 }
-                
+
                 return scaleFlip;
             }
             catch (System.Exception ex)
@@ -369,7 +484,7 @@ public partial class ReplayRecorder : Node
                 Log.Warning($"Error accessing monster visual properties: {ex.Message}", "ReplayRecorder");
             }
         }
-        
+
         Log.Warning("No valid monster sprite or visual found for flip detection", "ReplayRecorder");
         return false;
     }
@@ -377,7 +492,7 @@ public partial class ReplayRecorder : Node
     private (bool visible, float alpha) GetVisibility(Node2D visual)
     {
         if (visual == null) return (true, 1f);
-        
+
         var modulate = visual.Modulate;
         return (visual.Visible && modulate.A > 0f, modulate.A);
     }
@@ -386,7 +501,7 @@ public partial class ReplayRecorder : Node
     #region Data Access
     public List<ReplayFrame> GetPlayerFrames() => new(_playerFrames);
     public List<ReplayFrame> GetMonsterFrames() => new(_monsterFrames);
-    
+
     public (int playerFrames, int monsterFrames, float duration) GetStats()
     {
         return (_playerFrames.Count, _monsterFrames.Count, _elapsedTime);

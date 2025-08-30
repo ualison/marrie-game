@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Utils;
 
 /// <summary>
 /// Reusable UI component for displaying temporary gameplay messages
@@ -39,9 +40,9 @@ public partial class GameMessage : Control
 
     private void InitializeComponents()
     {
-        // Get UI components with error handling
-    _messageBackground = GetNodeOrNull<NinePatchRect>("MessageBackground");
-    _messageLabel = GetNodeOrNull<Label>("MessageBackground/MessageLabel");
+        // Get UI components with error handling via NodeHelpers
+    _messageBackground = NodeHelpers.GetNodeOrNull<NinePatchRect>(this, null, "MessageBackground");
+    _messageLabel = NodeHelpers.GetNodeOrNull<Label>(this, null, "MessageBackground/MessageLabel");
         
         if (_messageBackground == null)
         {

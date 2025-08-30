@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Utils;
 
 // Player mana display with flexible heart representation and automatic PlayerMana connection
 public partial class ManaBar : Control
@@ -24,7 +25,7 @@ public partial class ManaBar : Control
     private void InitializeContainer()
     {
         // Ensure mana container exists in scene structure
-        _manaContainer = GetNodeOrNull<HBoxContainer>("ManaContainer");
+    _manaContainer = NodeHelpers.GetNodeOrNull<HBoxContainer>(this, null, "ManaContainer");
 
         if (_manaContainer == null)
         {
@@ -61,16 +62,16 @@ public partial class ManaBar : Control
     private PlayerMana FindManaSystemViaPlayer()
     {
         // Strategy 1: Group-based search (most reliable)
-        var player = GetTree().GetFirstNodeInGroup("player") as Player;
-        return player?.GetNodeOrNull<PlayerMana>("PlayerMana");
+    var player = GetTree().GetFirstNodeInGroup("player") as Player;
+    return player != null ? NodeHelpers.GetNodeOrNull<PlayerMana>(player, null, "PlayerMana") : null;
     }
 
     private PlayerMana FindManaSystemViaPath()
     {
         // Strategy 2: Safe node path search with type checking
-        var playerNode = GetNodeOrNull("../../Characters/Player");
+        var playerNode = NodeHelpers.GetNodeOrNull<Node>(this, new NodePath("../../Characters/Player"), "");
         if (playerNode is Player playerDirect)
-            return playerDirect.GetNodeOrNull<PlayerMana>("PlayerMana");
+            return NodeHelpers.GetNodeOrNull<PlayerMana>(playerDirect, null, "PlayerMana");
         
         return null;
     }
