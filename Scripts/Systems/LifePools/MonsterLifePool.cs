@@ -29,8 +29,7 @@ namespace MarrieGame.Systems.LifePools
             MaxMonsterRed = monsterLife.MaxLife;
             MonsterRedHearts = monsterLife.CurrentRedHearts;
 
-            // Ensure monster never has purple hearts configured or visible
-            monsterLife.PurpleHearts = 0;
+            // Sync monster to current red hearts (monster no longer tracks purple hearts)
             monsterLife.SetHearts(MonsterRedHearts, 0);
 
             monsterLife.LifeChanged += OnMonsterLifeChanged;

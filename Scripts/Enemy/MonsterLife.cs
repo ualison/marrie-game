@@ -12,8 +12,6 @@ public partial class MonsterLife : Node, IHealthSystem
     #region Exported
     [Export] public int MaxLife { get; set; } = 5;
     [Export] public int StartingLife { get; set; } = 5;
-    // Purple hearts are now handled by GhostMonsterLife. Keep API for compatibility.
-    [Export] public int PurpleHearts { get; set; } = 0;
     [Export] public float InvulnerabilityTime { get; set; } = 1.0f;
     #endregion
 
@@ -32,20 +30,20 @@ public partial class MonsterLife : Node, IHealthSystem
     public int CurrentHealth => CurrentLife;
     public int MaxHealth => MaxLife;
 
-    public int RedHearts => Mathf.Max(0, MaxLife - PurpleHearts);
+    // Red hearts are the monster's max life (purple hearts handled by ghosts)
+    public int RedHearts => Mathf.Max(0, MaxLife);
     public int CurrentRedHearts => _currentRedHearts;
-    // Compatibility: monsters no longer maintain purple hearts locally
+    // Compatibility: monsters do not maintain purple hearts locally
     public int CurrentPurpleHearts => 0;
     #endregion
 
     public override void _Ready()
     {
-    // Ensure configured values are sane. Purple hearts are not used by MonsterLife.
-    PurpleHearts = Mathf.Max(0, PurpleHearts);
-    MaxLife = Mathf.Max(PurpleHearts, MaxLife);
+    // Ensure configured values are sane.
+    MaxLife = Mathf.Max(1, MaxLife);
 
-    int maxRed = MaxLife - PurpleHearts;
-    int startRed = Mathf.Clamp(Mathf.Min(StartingLife, maxRed), 0, maxRed);
+    int maxRed = MaxLife;
+    int startRed = Mathf.Clamp(StartingLife, 0, maxRed);
     _currentRedHearts = startRed;
 
         _invulnerabilityTimer = new Timer { WaitTime = InvulnerabilityTime, OneShot = true };
@@ -103,7 +101,7 @@ public partial class MonsterLife : Node, IHealthSystem
         if (IsDead) return;
 
         int remaining = amount;
-    // Fill red hearts up to RedHearts (monsters no longer manage purple hearts)
+    // Fill red hearts up to RedHearts
     int redMax = RedHearts;
         if (remaining > 0 && _currentRedHearts < redMax)
         {
@@ -118,8 +116,8 @@ public partial class MonsterLife : Node, IHealthSystem
 
     public void Reset()
     {
-    int maxRed = MaxLife - PurpleHearts;
-    int startRed = Mathf.Clamp(Mathf.Min(StartingLife, maxRed), 0, maxRed);
+    int maxRed = MaxLife;
+    int startRed = Mathf.Clamp(StartingLife, 0, maxRed);
     _currentRedHearts = startRed;
         IsInvulnerable = false;
         NotifyLifeChanged();
@@ -152,9 +150,9 @@ public partial class MonsterLife : Node, IHealthSystem
     // Sets heart values directly - used by EnemyManager for synchronization
     public void SetHearts(int redHearts, int purpleHearts)
     {
-        // Clamp values to valid ranges
-        int redMax = MaxLife - PurpleHearts;
-        int newRed = Mathf.Clamp(redHearts, 0, redMax);
+    // Clamp values to valid ranges; ignore purpleHearts parameter - ghosts manage purple separately
+    int redMax = MaxLife;
+    int newRed = Mathf.Clamp(redHearts, 0, redMax);
 
         // If nothing changed, avoid emitting signals
         if (newRed == _currentRedHearts)

@@ -23,7 +23,33 @@ namespace MarrieGame.Systems.LifePools
         {
             if (!IsInstanceValid(_ghost)) return;
 
-            var ghostLife = _ghost.LifeSystem;
+            // Try to locate a GhostMonsterLife component directly on the ghost node.
+            // This avoids depending on GhostMonster exposing it via a LifeSystem property.
+            GhostMonsterLife ghostLife = null;
+            try
+            {
+                // Prefer direct child named node
+                ghostLife = _ghost.GetNodeOrNull<GhostMonsterLife>("GhostMonsterLife");
+            }
+            catch { }
+
+            // If not found by name, scan children for the correct type
+            if (ghostLife == null)
+            {
+                try
+                {
+                    foreach (Node child in _ghost.GetChildren())
+                    {
+                        if (child is GhostMonsterLife gml)
+                        {
+                            ghostLife = gml;
+                            break;
+                        }
+                    }
+                }
+                catch { }
+            }
+
             if (ghostLife == null) return;
 
             MaxGhostPurple = ghostLife.PurpleHearts;
@@ -75,7 +101,20 @@ namespace MarrieGame.Systems.LifePools
         private void SyncToGhost()
         {
             if (!IsInstanceValid(_ghost)) return;
-            var ghostLife = _ghost.LifeSystem;
+            GhostMonsterLife ghostLife = null;
+            try { ghostLife = _ghost.GetNodeOrNull<GhostMonsterLife>("GhostMonsterLife"); } catch { }
+            if (ghostLife == null)
+            {
+                try
+                {
+                    foreach (Node child in _ghost.GetChildren())
+                    {
+                        if (child is GhostMonsterLife gml) { ghostLife = gml; break; }
+                    }
+                }
+                catch { }
+            }
+
             if (ghostLife == null) return;
 
             _syncInProgress = true;

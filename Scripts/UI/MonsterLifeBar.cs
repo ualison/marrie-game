@@ -194,7 +194,8 @@ public partial class MonsterLifeBar : Control
         if (_monsterLife != null)
         {
             _monsterLife.LifeChanged += OnLifeChanged;
-            OnLifeChanged(_monsterLife.CurrentLife, _monsterLife.MaxLife, _monsterLife.PurpleHearts);
+            int purple = ResolveMaxPurple();
+            OnLifeChanged(_monsterLife.CurrentLife, _monsterLife.MaxLife, purple);
             return;
         }
 
@@ -232,7 +233,7 @@ public partial class MonsterLifeBar : Control
             {
                 int current = _monsterLife != null ? _monsterLife.CurrentLife : (_ghostLife != null ? _ghostLife.CurrentLife : _lifeSystem.CurrentHealth);
                 int max = _monsterLife != null ? _monsterLife.MaxLife : (_ghostLife != null ? _ghostLife.MaxPurple : _lifeSystem.MaxHealth);
-                int purple = _monsterLife != null ? _monsterLife.PurpleHearts : (_ghostLife != null ? _ghostLife.MaxPurple : 0);
+                int purple = ResolveMaxPurple();
                 UpdateHearts(current, max, purple);
             }
         }
@@ -515,7 +516,7 @@ public partial class MonsterLifeBar : Control
         {
             int current = _monsterLife != null ? _monsterLife.CurrentLife : (_ghostLife != null ? _ghostLife.CurrentLife : _lifeSystem.CurrentHealth);
             int max = _monsterLife != null ? _monsterLife.MaxLife : (_ghostLife != null ? _ghostLife.MaxPurple : _lifeSystem.MaxHealth);
-            int purple = _monsterLife != null ? _monsterLife.PurpleHearts : (_ghostLife != null ? _ghostLife.MaxPurple : 0);
+            int purple = ResolveMaxPurple();
             UpdateHearts(current, max, purple);
         }
     }
@@ -551,9 +552,29 @@ public partial class MonsterLifeBar : Control
         if (_monsterLife != null)
         {
             _monsterLife.LifeChanged += OnLifeChanged;
-            OnLifeChanged(_monsterLife.CurrentLife, _monsterLife.MaxLife, _monsterLife.PurpleHearts);
+            int purple = ResolveMaxPurple();
+            OnLifeChanged(_monsterLife.CurrentLife, _monsterLife.MaxLife, purple);
             CallDeferred(nameof(FindMonsterNode));
         }
+    }
+
+    private int ResolveMaxPurple()
+    {
+        // If we have a ghost life typed instance, use it
+        if (_ghostLife != null) return _ghostLife.MaxPurple;
+
+        // If we are attached to a monster, try querying EnemyManager's pool for its ghost purple count
+        if (_monster != null && EnemyManager.Instance != null)
+        {
+            var monster = _monster as Monster;
+            if (monster != null)
+            {
+                var pool = EnemyManager.Instance.GetLifePoolForMonster(monster);
+                if (pool != null) return pool.GhostPurpleHearts;
+            }
+        }
+
+        return 0;
     }
 
     // Allow external callers to force Monster discovery after scene-tree changes

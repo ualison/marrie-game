@@ -902,7 +902,16 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
 
             case Reality.PastReality:
                 // Rocks only damage purple hearts in past reality for ghosts
-                localDamaged = _monsterLife.TakeRockDamageInPastReality(damage);
+                // Prefer ghost-specific life component for purple damage, fall back to legacy MonsterLife
+                if (_ghostLife != null)
+                {
+                    localDamaged = _ghostLife.TakeRockDamageInPastReality(damage);
+                }
+                else if (_monsterLife != null)
+                {
+                    localDamaged = _monsterLife.TakeRockDamageInPastReality(damage);
+                }
+
                 if (localDamaged)
                 {
                     PlayDamageEffect(Colors.Purple);
@@ -1021,7 +1030,7 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
             return damaged;
         }
         
-        // Fallback to local system
+        // Fallback to local system - physical damage targets red hearts; prefer MonsterLife for that
         if (_monsterLife == null) return false;
 
         Log.Debug($"GhostMonster TakePhysicalDamage - CurrentRedHearts: {_monsterLife.CurrentRedHearts}", "GhostMonster");
@@ -1061,25 +1070,41 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
             return damaged;
         }
         
-        // Fallback to local system
-        if (_monsterLife == null) return false;
-
-        Log.Debug($"GhostMonster TakeMagicalDamage - CurrentLife: {_monsterLife.CurrentLife}", "GhostMonster");
-        bool localDamaged = _monsterLife.TakeMagicalDamage(damage);
-
-        if (localDamaged)
+        // Fallback to local system - prefer ghost-specific life component for magical damage
+        if (_ghostLife != null)
         {
-            PlayDamageEffect(Colors.Purple);
-            Log.Debug($"GhostMonster took {damage} magical damage locally", "GhostMonster");
-
-            // Check for death
-            if (_monsterLife.IsDead)
+            Log.Debug($"GhostMonster TakeMagicalDamage - CurrentLife: {_ghostLife.CurrentLife}", "GhostMonster");
+            bool localDamagedGhost = _ghostLife.TakeMagicalDamage(damage);
+            if (localDamagedGhost)
             {
-                OnGhostDeath();
+                PlayDamageEffect(Colors.Purple);
+                Log.Debug($"GhostMonster took {damage} magical damage on GhostMonsterLife", "GhostMonster");
+                if (_ghostLife.IsDead)
+                {
+                    OnGhostDeath();
+                }
             }
+            return localDamagedGhost;
         }
 
-        return localDamaged;
+        // Legacy fallback: use MonsterLife if present
+        if (_monsterLife != null)
+        {
+            Log.Debug($"GhostMonster TakeMagicalDamage (legacy) - CurrentLife: {_monsterLife.CurrentLife}", "GhostMonster");
+            bool localDamaged = _monsterLife.TakeMagicalDamage(damage);
+            if (localDamaged)
+            {
+                PlayDamageEffect(Colors.Purple);
+                Log.Debug($"GhostMonster took {damage} magical damage locally (legacy)", "GhostMonster");
+                if (_monsterLife.IsDead)
+                {
+                    OnGhostDeath();
+                }
+            }
+            return localDamaged;
+        }
+
+        return false;
     }
     #endregion
 }

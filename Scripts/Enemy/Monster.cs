@@ -921,7 +921,8 @@ public partial class Monster : CharacterBody2D, IPoolable
         if (lifePool != null)
         {
             var reality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
-            bool damaged = lifePool.HandleMonsterDamage(damage, reality);
+            // Magical damage affects ghost/purple hearts (past reality). Use ghost handler.
+            bool damaged = lifePool.HandleGhostDamage(damage, reality);
 
             if (damaged)
             {
@@ -932,7 +933,7 @@ public partial class Monster : CharacterBody2D, IPoolable
             return damaged;
         }
 
-        // Fallback
+        // Fallback (legacy): MonsterLife may handle magical damage; keep for compatibility
         if (_monsterLife == null) return false;
         bool localDamaged = _monsterLife.TakeMagicalDamage(damage);
         if (localDamaged)
