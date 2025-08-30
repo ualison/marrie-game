@@ -136,8 +136,7 @@ script = ExtResource("13_r6l07")
 
 [node name="EnemyManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("7_r6l07")
-DebugShowAggregatedPools = true
-DebugToggleHotkey = "F2"
+DeathHideTime = 120.0
 
 [node name="ReplaySystemManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("14_r6l07")

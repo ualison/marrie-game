@@ -4,91 +4,69 @@ using MarrieGame.Core.Enums;
 public partial class Monster : CharacterBody2D
 {
     #region Visual and Audio Effects (moved for readability)
-    private void FadeIn()
+  private void FadeIn()
+{
+    if (_spriteNode == null) return;
+
+    _currentTween?.Kill();
+
+    _spriteNode.Visible = true;
+    _spriteNode.Modulate = new Color(1, 1, 1, 0);
+
+    _currentTween = CreateTween();
+    _currentTween.TweenProperty(_spriteNode, "modulate:a", 1.0f, 0.5f);
+    _currentTween.TweenCallback(Callable.From(() =>
     {
-        if (_spriteNode == null) return;
+        _isFullyVisible = true;
+        _isTransitioning = false;
+        SetCollisionMask(1u);
+        SetCollisionLayer(1u);
 
-        _currentTween?.Kill();
-
-        _spriteNode.Visible = true;
-        _spriteNode.Modulate = new Color(1, 1, 1, 0);
-
-        _currentTween = CreateTween();
-        _currentTween.TweenProperty(_spriteNode, "modulate:a", 1.0f, 0.5f);
-        _currentTween.TweenCallback(Callable.From(() =>
+        // Enable damage area
+        try
         {
-            // Now that fade-in finished, allow player interactions again
-            _isFullyVisible = true;
-            _isTransitioning = false; // No longer transitioning
-            SetCollisionMask(1u);
-            SetCollisionLayer(1u);
-
-            // If the damage area exists, ensure it's monitoring and check for any
-            // overlapping players that might already be inside the area. Godot
-            // does not emit BodyEntered when an area's collision mask/layer is
-            // changed while another body is already overlapping, so we must
-            // manually check and process overlaps here to avoid requiring the
-            // player to exit/re-enter.
-            try
+            if (_damageArea != null)
             {
-                if (_damageArea != null)
+                var playerNode = GetTree().GetFirstNodeInGroup("player") as PhysicsBody2D;
+                if (playerNode != null)
                 {
-                    // Ensure the damage area is configured to detect players when we
-                    // enable it during fade-in. Area2D must be placed on a collision
-                    // layer that the player belongs to; otherwise GetOverlappingBodies
-                    // will return empty even if the bodies are overlapping.
-                    // Configure the area's collision mask to detect the player's
-                    // collision layer. Don't hardcode layer ids — read the player's
-                    // CollisionLayer at runtime if possible.
-                    try
-                    {
-                        var playerNode = GetTree().GetFirstNodeInGroup("player") as PhysicsBody2D;
-                        if (playerNode != null)
-                        {
-                            _damageArea.CollisionMask = playerNode.CollisionLayer;
-                        }
-                        else
-                        {
-                            // Fallback to existing mask if present, otherwise common player layer 2
-                            _damageArea.CollisionMask = _damageArea.CollisionMask != 0 ? _damageArea.CollisionMask : 2;
-                        }
-
-                        // Keep the area's collision layer consistent with the monster's
-                        // collision layer so other systems that depend on layers behave
-                        // correctly.
-                        _damageArea.CollisionLayer = GetCollisionLayer();
-                        // Use deferred set to avoid calling into Godot core during signal handling
-                        try { _damageArea.SetDeferred("monitoring", true); } catch { _damageArea.Monitoring = true; }
-                        try { _damageArea.SetDeferred("monitorable", true); } catch { _damageArea.Monitorable = true; }
-                    }
-                    catch { }
-
-                    // Defer the overlap check until after monitoring has been
-                    // applied. SetDeferred schedules the monitoring change for the
-                    // end of the frame; CallDeferred will run our overlap check
-                    // after that so GetOverlappingBodies() will work reliably.
-                    CallDeferred(nameof(HandleDamageAreaEnable));
+                    _damageArea.CollisionMask = playerNode.CollisionLayer;
                 }
-            }
-            catch {
-                // Swallow any errors to avoid breaking fade-in flow; logging already
-                // happens elsewhere and this is defensive for editor/runtime differences.
-            }
+                else
+                {
+                    _damageArea.CollisionMask = _damageArea.CollisionMask != 0 ? _damageArea.CollisionMask : 2;
+                }
 
-            // Delay showing life bar slightly to ensure position is correct
+                _damageArea.CollisionLayer = GetCollisionLayer();
+                try { _damageArea.SetDeferred("monitoring", true); } catch { _damageArea.Monitoring = true; }
+                try { _damageArea.SetDeferred("monitorable", true); } catch { _damageArea.Monitorable = true; }
+            }
+        }
+        catch { }
+
+        CallDeferred(nameof(HandleDamageAreaEnable));
+
+        // Show life bar after fade-in completes if in current reality
+        var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+        if (currentReality == Reality.CurrentReality && _monsterLifeBar != null && _monsterLife?.CurrentRedHearts > 0)
+        {
+            // Delay showing to ensure position is correct
             GetTree().CreateTimer(0.1f).Timeout += () =>
             {
-                if (_monsterLifeBar != null)
+                if (_monsterLifeBar != null && _isVisible)
                 {
-                    // Update position right before showing the life bar
-                    DoUpdateLifeBarPositionForced(); // Force position update even when hidden
+                    DoUpdateLifeBarPositionForced();
                     _monsterLifeBar.Show();
+                    _monsterLifeBar.SetFollowMonster(true);
+                    _monsterLifeBar.SetMonsterReference(this);
+                    Log.Debug("Monster life bar shown after fade-in", "Monster");
                 }
             };
+        }
 
-            Log.Debug("Monster fade in complete - fully visible", "Monster");
-        }));
-    }
+        Log.Debug("Monster fade in complete - fully visible", "Monster");
+    }));
+}
 
     private void FadeOut()
     {
