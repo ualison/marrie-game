@@ -187,9 +187,27 @@ public partial class EnemyManager : Node
             }
         }
 
+        // Only hide the monster immediately if we're currently in CurrentReality.
+        // If we're in PastReality (e.g. ghost died during replay), keep the monster's
+        // hide state as the source-of-truth and defer any additional hide calls until
+        // reality returns to CurrentReality. This ensures the global respawn timer
+        // is the authoritative timing for when the monster should be unavailable.
         if (IsInstanceValid(pair.Monster))
         {
-            HideMonster(pair.Monster);
+            var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+            if (currentReality == Reality.CurrentReality)
+            {
+                HideMonster(pair.Monster);
+            }
+            else
+            {
+                Log.Debug($"Ghost died in PastReality - deferring immediate hide for monster {pair.Monster.Name}, will remain hidden by respawn timer", "EnemyManager");
+                // Ensure ReplayRecorder knows the monster is considered hidden by pair state
+                if (ReplayRecorder.Instance != null)
+                {
+                    ReplayRecorder.Instance.OnMonsterVisibilityChanged(pair.Monster, false);
+                }
+            }
         }
 
         pair.IsHidden = true;

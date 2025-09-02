@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -99,6 +100,28 @@ public partial class RespawnDebug : Control
         // Get the actual active timer values from EnemyManager
         float activeGlobalLeft = EnemyManager.Instance.GlobalRespawnTimeLeft;
         float activeLocalLeft = EnemyManager.Instance.LocalRespawnTimeLeft;
+
+        // FALLBACK: Sometimes the aggregated GlobalRespawnTimeLeft may report -1
+        // even when a FullPair timer exists (edge cases during reality switches).
+        // As a safety net, compute the smallest per-pair FullPair timer left and use it.
+        if (activeGlobalLeft <= 0)
+        {
+            var pairs = EnemyManager.Instance.GetAllPairsSnapshot();
+            float fallbackMin = float.PositiveInfinity;
+            foreach (var p in pairs)
+            {
+                var type = EnemyManager.Instance.GetRespawnType(p);
+                if (type == "FullPair")
+                {
+                    var tleft = EnemyManager.Instance.GetRespawnTimeLeft(p);
+                    if (tleft > 0)
+                        fallbackMin = Math.Min(fallbackMin, tleft);
+                }
+            }
+
+            if (!float.IsPositiveInfinity(fallbackMin))
+                activeGlobalLeft = fallbackMin;
+        }
 
         // FIXED: When global timer is active (> 0), it means it has overridden any local timers
         // So we should show the global timer and indicate that local is overridden

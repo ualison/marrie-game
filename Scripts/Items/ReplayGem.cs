@@ -435,10 +435,17 @@ public partial class ReplayGem : Node2D
     #region Floating Animation
     private void StartFloatingAnimation()
     {
-        if (_floatingTween == null || _gemSprite == null) return;
+        // Don't start if there's no sprite to animate
+        if (_gemSprite == null) return;
 
-        // Stop any existing animation
-        _floatingTween.Kill();
+        // If an existing tween is running, stop and clear it
+        if (_floatingTween != null)
+        {
+            _floatingTween.Kill();
+            _floatingTween = null;
+        }
+
+        // Create a new tween for the floating animation
         _floatingTween = CreateTween();
         _floatingTween.SetLoops(); // Loop infinitely
 
@@ -459,6 +466,7 @@ public partial class ReplayGem : Node2D
         if (_floatingTween != null)
         {
             _floatingTween.Kill();
+            _floatingTween = null;
         }
 
         // Reset gem to original position
