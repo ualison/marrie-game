@@ -75,6 +75,7 @@ z_index = -5
 position = Vector2(6, 294)
 
 [node name="AppleTree1" parent="Environment" instance=ExtResource("8_2e0hl")]
+z_index = -2
 position = Vector2(83, -367)
 
 [node name="Decorations" type="Node2D" parent="Environment"]

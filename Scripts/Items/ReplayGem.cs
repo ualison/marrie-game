@@ -8,6 +8,7 @@ public partial class ReplayGem : Node2D
     #region UI Components
     private Area2D _detectionArea;
     private Sprite2D _gemSprite;
+    private Tween _brightnessTween;
     private Label _promptLabel;
     private Tween _floatingTween;
     #endregion
@@ -15,6 +16,9 @@ public partial class ReplayGem : Node2D
     #region Export Variables
     [Export] public float FloatingDistance { get; set; } = 8.0f; // How far up and down to float
     [Export] public float FloatingDuration { get; set; } = 2.0f; // How long one cycle takes
+    [Export] public bool BrightEffectEnabled { get; set; } = true; // Enable pulsing bright effect
+    [Export] public float BrightnessFactor { get; set; } = 1.6f; // How bright the pulse gets (1 = normal)
+    [Export] public float BrightPulseDuration { get; set; } = 1.0f; // Full pulse cycle duration
     #endregion
 
     #region State
@@ -103,6 +107,10 @@ public partial class ReplayGem : Node2D
         if (_gemSprite != null)
             _originalGemPosition = _gemSprite.Position;
 
+        // Ensure default modulate is normal white so brightness tweens start from a known value
+        if (_gemSprite != null)
+            _gemSprite.Modulate = Colors.White;
+
         // Create tween for floating animation when needed
         _floatingTween = null;
     }
@@ -126,7 +134,11 @@ public partial class ReplayGem : Node2D
         // Start hidden until shown by GameManager
         _detectionArea.SetDeferred("monitoring", false);
         _promptLabel.Hide();
-        _gemSprite.Hide();
+        if (_gemSprite != null)
+        {
+            _gemSprite.Modulate = Colors.White;
+            _gemSprite.Hide();
+        }
     }
 
     private void EnableInputProcessing()
@@ -241,7 +253,11 @@ public partial class ReplayGem : Node2D
         {
             _promptLabel.Hide();
         }
-        _gemSprite?.Hide();
+        if (_gemSprite != null)
+        {
+            _gemSprite.Modulate = Colors.White;
+            _gemSprite.Hide();
+        }
     }
     #endregion
 
@@ -365,6 +381,7 @@ public partial class ReplayGem : Node2D
 
         if (_gemSprite != null)
         {
+            _gemSprite.Modulate = Colors.White;
             _gemSprite.Hide();
             _gemSprite.Visible = false;
         }
@@ -459,6 +476,27 @@ public partial class ReplayGem : Node2D
         _floatingTween.TweenProperty(_gemSprite, "position", upPosition, FloatingDuration / 2.0f);
         _floatingTween.TweenProperty(_gemSprite, "position", downPosition, FloatingDuration);
         _floatingTween.TweenProperty(_gemSprite, "position", _originalGemPosition, FloatingDuration / 2.0f);
+
+        // Brightness pulsing effect (separate tween)
+        if (BrightEffectEnabled)
+        {
+            // Ensure any existing brightness tween is stopped
+            if (_brightnessTween != null)
+            {
+                _brightnessTween.Kill();
+                _brightnessTween = null;
+            }
+
+            _brightnessTween = CreateTween();
+            _brightnessTween.SetLoops();
+
+            var normal = Colors.White;
+            var bright = new Color(BrightnessFactor, BrightnessFactor, BrightnessFactor, 1.0f);
+
+            // Pulse: normal -> bright -> normal
+            _brightnessTween.TweenProperty(_gemSprite, "modulate", bright, BrightPulseDuration / 2.0f);
+            _brightnessTween.TweenProperty(_gemSprite, "modulate", normal, BrightPulseDuration / 2.0f);
+        }
     }
 
     private void StopFloatingAnimation()
@@ -469,9 +507,17 @@ public partial class ReplayGem : Node2D
             _floatingTween = null;
         }
 
+        if (_brightnessTween != null)
+        {
+            _brightnessTween.Kill();
+            _brightnessTween = null;
+        }
+
         // Reset gem to original position
         if (_gemSprite != null)
         {
+            // Reset visual tint to normal
+            _gemSprite.Modulate = Colors.White;
             _gemSprite.Position = _originalGemPosition;
         }
     }
