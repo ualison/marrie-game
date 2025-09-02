@@ -252,10 +252,10 @@ public partial class EnemyManager : Node
     {
         // Always cancel existing timer first
         CancelRespawn(pair);
-    var timer = new Timer { OneShot = true, WaitTime = seconds };
-    // Ensure respawn timers continue to run even when the SceneTree is paused
-    // (e.g. during player-death pause). This prevents "slow" or frozen countdowns.
-    timer.ProcessMode = ProcessModeEnum.Always;
+        var timer = new Timer { OneShot = true, WaitTime = seconds };
+        // Ensure respawn timers continue to run even when the SceneTree is paused
+        // (e.g. during player-death pause). This prevents "slow" or frozen countdowns.
+        timer.ProcessMode = ProcessModeEnum.Always;
         AddChild(timer);
         _respawnTimers[pair] = timer;
         _respawnTypes[pair] = type;
@@ -500,22 +500,25 @@ public partial class EnemyManager : Node
 
     public List<EnemyPair> GetAllPairsSnapshot() => new List<EnemyPair>(_pairs);
 
-    // Public helpers for UI/debugging: return the currently configured global/local hide times
-    // and the remaining time on any scheduled respawn timers.
+    // IMPROVED: These properties now better handle the case where global timer overrides local
     public float GlobalRespawnTimeLeft
     {
         get
         {
             // If any pair has a FullPair timer, return the smallest time left (next global event)
             float min = float.PositiveInfinity;
+            bool hasGlobalTimer = false;
+
             foreach (var kvp in _respawnTimers)
             {
                 if (_respawnTypes.TryGetValue(kvp.Key, out var t) && t == RespawnType.FullPair)
                 {
+                    hasGlobalTimer = true;
                     try { min = Math.Min(min, (float)kvp.Value.TimeLeft); } catch { }
                 }
             }
-            return float.IsPositiveInfinity(min) ? -1f : min;
+
+            return hasGlobalTimer && !float.IsPositiveInfinity(min) ? min : -1f;
         }
     }
 
@@ -523,16 +526,25 @@ public partial class EnemyManager : Node
     {
         get
         {
+            // IMPORTANT: If there's any global timer active, local timers are effectively overridden
+            // So we should return -1 to indicate no active local timer
+            if (GlobalRespawnTimeLeft > 0)
+                return -1f;
+
             // If any pair has a MonsterOnly timer, return the smallest time left (next local event)
             float min = float.PositiveInfinity;
+            bool hasLocalTimer = false;
+
             foreach (var kvp in _respawnTimers)
             {
                 if (_respawnTypes.TryGetValue(kvp.Key, out var t) && t == RespawnType.MonsterOnly)
                 {
+                    hasLocalTimer = true;
                     try { min = Math.Min(min, (float)kvp.Value.TimeLeft); } catch { }
                 }
             }
-            return float.IsPositiveInfinity(min) ? -1f : min;
+
+            return hasLocalTimer && !float.IsPositiveInfinity(min) ? min : -1f;
         }
     }
     #endregion
