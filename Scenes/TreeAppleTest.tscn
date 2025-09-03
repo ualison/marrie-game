@@ -1,9 +1,10 @@
-[gd_scene load_steps=14 format=3 uid="uid://54o6xy0qaoae"]
+[gd_scene load_steps=15 format=3 uid="uid://54o6xy0qaoae"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="2_bcr4f"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
+[ext_resource type="Script" uid="uid://o04haht8ruox" path="res://Scripts/Trees/OrganicFractalTree.cs" id="7_mqr8g"]
 [ext_resource type="PackedScene" uid="uid://dbt3v1ee4f7fr" path="res://Prefabs/AppleTree.tscn" id="8_2e0hl"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
 [ext_resource type="AudioStream" uid="uid://c5xm6p8ayswcj" path="res://Sounds/Background3.wav" id="11_1pt5x"]
@@ -79,6 +80,26 @@ z_index = -2
 position = Vector2(83, -367)
 
 [node name="Decorations" type="Node2D" parent="Environment"]
+
+[node name="OrganicFractalTree" type="Node2D" parent="Environment"]
+position = Vector2(-198.865, 199.425)
+script = ExtResource("7_mqr8g")
+initialLength = 190.0
+branchAngle = 30.0
+angleVariation = 20.0
+asymmetry = 0.4
+drawLeaves = false
+leafSize = 4.0
+
+[node name="OrganicFractalTree2" type="Node2D" parent="Environment"]
+position = Vector2(334.785, 199.425)
+script = ExtResource("7_mqr8g")
+initialLength = 190.0
+branchAngle = 30.0
+angleVariation = 20.0
+asymmetry = 0.4
+drawLeaves = false
+leafSize = 4.0
 
 [node name="GameEntities" type="Node2D" parent="."]
 
