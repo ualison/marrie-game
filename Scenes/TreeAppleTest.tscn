@@ -78,7 +78,7 @@ position = Vector2(6, 294)
 [node name="OrganicFractalTree" type="Node2D" parent="Environment"]
 position = Vector2(-198.865, 199.425)
 script = ExtResource("7_mqr8g")
-initialLength = 180.0
+initialLength = 200.0
 branchAngle = 30.0
 angleVariation = 20.0
 minBranches = 3
@@ -89,7 +89,9 @@ drawLeaves = false
 leafSize = 3.0
 leafDensity = 4
 hasApples = true
-appleQuantity = 5
+appleQuantity = 6
+appleMinDistance = 30.0
+applePlacementHeight = 0.7
 applePrefab = ExtResource("8_y8jgj")
 
 [node name="GameEntities" type="Node2D" parent="."]

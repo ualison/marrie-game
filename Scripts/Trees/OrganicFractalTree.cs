@@ -64,6 +64,10 @@ public partial class OrganicFractalTree : Node2D
     [ExportGroup("Apples")]
     [Export(PropertyHint.Range, "1,50")] private int appleQuantity = 15; // Number of apples to place
     [ExportGroup("Apples")]
+    [Export(PropertyHint.Range, "1,200")] private float appleMinDistance = 20.0f; // Minimum distance (px) between apples
+    [ExportGroup("Apples")]
+    [Export(PropertyHint.Range, "0,1")] private float applePlacementHeight = 0.6f; // Preferred placement height fraction along branch (0..1)
+    [ExportGroup("Apples")]
     [Export] private PackedScene applePrefab; // Apple scene to instantiate
     
     private Random random;
@@ -439,46 +443,162 @@ public partial class OrganicFractalTree : Node2D
             return;
         }
 
-        // Place apples
-        for (int i = 0; i < appleQuantity && i < suitableBranches.Count * 2; i++)
+        // Build candidate positions from suitable branches
+        var candidates = new List<(Vector2 pos, Vector2 normal, float frac, BranchData branch)>();
+
+        foreach (var branch in suitableBranches)
         {
-            var selectedBranch = suitableBranches[random.Next(suitableBranches.Count)];
+            int len = branch.Points.Length;
+            if (len < 2) continue;
 
-            // Prefer outer portion of the branch for placement
-            int minIndex = Math.Max(1, selectedBranch.Points.Length / 3);
-            int pointIndex = random.Next(minIndex, selectedBranch.Points.Length);
-            Vector2 applePosition = selectedBranch.Points[pointIndex];
+            // sample a few points along the outer portion of the branch (near tip)
+            int start = Math.Max(1, (int)(len * 0.3f));
+            for (int s = 0; s < 3; s++) // up to 3 samples per branch
+            {
+                float fracJitter = ((float)s - 1) * 0.08f; // -0.08, 0, +0.08
+                float frac = Mathf.Clamp(applePlacementHeight + fracJitter + ((float)random.NextDouble() - 0.5f) * 0.06f, 0f, 1f);
+                int idx = start + (int)(frac * (len - start - 1));
+                idx = Mathf.Clamp(idx, 1, len - 1);
 
-            // Compute local tangent and normal so we offset apples toward the branch surface
-            Vector2 tangent;
-            if (pointIndex >= selectedBranch.Points.Length - 1)
-                tangent = selectedBranch.Points[pointIndex] - selectedBranch.Points[pointIndex - 1];
+                Vector2 applePosition = branch.Points[idx];
+
+                Vector2 tangent;
+                if (idx >= len - 1)
+                    tangent = branch.Points[idx] - branch.Points[idx - 1];
+                else
+                    tangent = branch.Points[idx + 1] - branch.Points[idx];
+
+                if (tangent.Length() <= 0.0001f)
+                    tangent = branch.EndDirection;
+
+                Vector2 normal = new Vector2(-tangent.Y, tangent.X).Normalized();
+                float baseInset = Mathf.Max(0f, branch.Thickness * 0.4f);
+                float jitterInset = (float)(random.NextDouble() * branch.Thickness * 0.2f);
+                Vector2 offset = -normal * (baseInset + jitterInset);
+                float alongJitter = (float)(random.NextDouble() * (branch.Thickness * 0.1f) - branch.Thickness * 0.05f);
+                offset += tangent.Normalized() * alongJitter;
+
+                Vector2 finalPos = applePosition + offset;
+
+                candidates.Add((finalPos, normal, frac, branch));
+            }
+        }
+
+        int target = Math.Min(appleQuantity, suitableBranches.Count * 2);
+        var chosen = new List<(Vector2 pos, Vector2 normal, float frac, BranchData branch)>();
+
+        // Helper: compute min distance from pos to already chosen
+        float MinDistToChosen(Vector2 p)
+        {
+            float md = float.MaxValue;
+            foreach (var c in chosen)
+            {
+                float d = c.pos.DistanceTo(p);
+                if (d < md) md = d;
+            }
+            return chosen.Count == 0 ? float.MaxValue : md;
+        }
+
+        // Score candidate prefering closeness to applePlacementHeight and distance from others
+        float ScoreCandidate((Vector2 pos, Vector2 normal, float frac, BranchData branch) c)
+        {
+            float prefScore = 1.0f - Math.Abs(c.frac - applePlacementHeight); // closer fraction higher
+            // add minor preference for thicker branches
+            float thicknessScore = c.branch.Thickness / (initialThickness + 0.0001f);
+            return prefScore * 0.7f + thicknessScore * 0.3f;
+        }
+
+        // Greedy selection: prefer pairs when possible for even counts
+        while (chosen.Count < target && candidates.Count > 0)
+        {
+            int need = target - chosen.Count;
+
+            if (need >= 2)
+            {
+                // try to find best pair (opposite-ish normals and similar frac)
+                float bestPairScore = float.MinValue;
+                int bestA = -1, bestB = -1;
+
+                for (int a = 0; a < candidates.Count; a++)
+                {
+                    var ca = candidates[a];
+                    for (int b = a + 1; b < candidates.Count; b++)
+                    {
+                        var cb = candidates[b];
+                        // avoid same branch exact same index roughly
+                        if (ca.branch == cb.branch && Math.Abs(ca.frac - cb.frac) < 0.02f) continue;
+
+                        float normalDot = ca.normal.Dot(cb.normal);
+                        // prefer roughly opposite sides or at least different directions
+                        if (normalDot > 0.7f) continue;
+
+                        float pairScore = ScoreCandidate(ca) + ScoreCandidate(cb);
+                        // prefer pairs that are well separated
+                        float sep = ca.pos.DistanceTo(cb.pos);
+                        pairScore += Math.Min(sep / (appleMinDistance + 0.0001f), 2.0f);
+
+                        if (pairScore > bestPairScore)
+                        {
+                            bestPairScore = pairScore;
+                            bestA = a; bestB = b;
+                        }
+                    }
+                }
+
+                if (bestA != -1 && bestB != -1)
+                {
+                    // ensure they don't violate min distance with already chosen
+                    var ca = candidates[bestA];
+                    var cb = candidates[bestB];
+                    if (MinDistToChosen(ca.pos) >= appleMinDistance && MinDistToChosen(cb.pos) >= appleMinDistance && ca.pos.DistanceTo(cb.pos) >= appleMinDistance)
+                    {
+                        chosen.Add(ca);
+                        chosen.Add(cb);
+                        // remove higher index first
+                        if (bestA > bestB) { candidates.RemoveAt(bestA); candidates.RemoveAt(bestB); }
+                        else { candidates.RemoveAt(bestB); candidates.RemoveAt(bestA); }
+                        continue;
+                    }
+                }
+            }
+
+            // otherwise pick single best candidate that respects min distance
+            float bestScore = float.MinValue;
+            int bestIdx = -1;
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var c = candidates[i];
+                float md = MinDistToChosen(c.pos);
+                if (md < appleMinDistance) continue; // too close to chosen
+
+                float score = ScoreCandidate(c) + (md == float.MaxValue ? 2.0f : Math.Min(md / (appleMinDistance + 0.0001f), 2.0f));
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestIdx = i;
+                }
+            }
+
+            if (bestIdx != -1)
+            {
+                chosen.Add(candidates[bestIdx]);
+                candidates.RemoveAt(bestIdx);
+            }
             else
-                tangent = selectedBranch.Points[pointIndex + 1] - selectedBranch.Points[pointIndex];
+            {
+                // no more viable candidates
+                break;
+            }
+        }
 
-            if (tangent.Length() <= 0.0001f)
-                tangent = selectedBranch.EndDirection;
-
-            Vector2 normal = new Vector2(-tangent.Y, tangent.X).Normalized();
-
-            // Push the apple toward the branch (inward) so it sits on/against the branch instead of floating away.
-            float baseInset = Mathf.Max(0f, selectedBranch.Thickness * 0.4f);
-            float jitter = (float)(random.NextDouble() * selectedBranch.Thickness * 0.2f);
-            Vector2 offset = -normal * (baseInset + jitter);
-
-            // Small along-tangent jitter so apples don't all overlap exactly on the line
-            float alongJitter = (float)(random.NextDouble() * (selectedBranch.Thickness * 0.1f) - selectedBranch.Thickness * 0.05f);
-            offset += tangent.Normalized() * alongJitter;
-
-            // Create apple instance
+        // Instantiate chosen apples
+        foreach (var c in chosen)
+        {
             var apple = applePrefab.Instantiate<Node2D>();
-            apple.Position = applePosition + offset;
+            apple.Position = c.pos;
             apple.Rotation = (float)(random.NextDouble() * 0.4 - 0.2);
-
-            // Scale based on branch thickness
-            float scale = 0.7f + (selectedBranch.Thickness / initialThickness) * 0.5f;
+            float scale = 0.7f + (c.branch.Thickness / initialThickness) * 0.5f;
             apple.Scale = Vector2.One * scale;
-
             AddChild(apple);
             appleInstances.Add(apple);
         }
