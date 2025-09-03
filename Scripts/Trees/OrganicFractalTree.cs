@@ -22,8 +22,24 @@ public partial class OrganicFractalTree : Node2D
     [Export] private bool drawLeaves = true;
     [Export(PropertyHint.Range, "1,10")] private float leafSize = 3.0f;
     
+    [ExportGroup("Apples")]
+    [Export] private bool hasApples = false;
+    [Export(PropertyHint.Range, "1,50")] private int appleQuantity = 10;
+    [Export] private PackedScene applePrefab;
+    
     private Random random;
     private List<Vector2> leafPositions = new List<Vector2>();
+    private List<BranchData> branches = new List<BranchData>();
+    private List<Node2D> appleInstances = new List<Node2D>();
+    
+    // Store branch data for apple placement
+    private class BranchData
+    {
+        public Line2D Line { get; set; }
+        public int Depth { get; set; }
+        public Vector2[] Points { get; set; }
+        public float Thickness { get; set; }
+    }
     
     public override void _Ready()
     {
@@ -66,12 +82,14 @@ public partial class OrganicFractalTree : Node2D
     {
         GD.Print("Generating tree...");
         
-        // Clear any existing children
+        // Clear any existing children and lists
         foreach (Node child in GetChildren())
         {
             child.QueueFree();
         }
         leafPositions.Clear();
+        branches.Clear();
+        appleInstances.Clear();
         
         // Initialize random generator
         random = new Random(seed);
@@ -83,10 +101,24 @@ public partial class OrganicFractalTree : Node2D
         // Create the tree structure
         GrowBranch(startPos, startDir, initialLength, initialThickness, 0, 0);
         
+        // Place apples if enabled
+        if (hasApples && applePrefab != null && branches.Count > 0)
+        {
+            PlaceApples();
+        }
+        else if (hasApples && applePrefab == null)
+        {
+            GD.PrintErr("OrganicFractalTree: Apple prefab not set!");
+        }
+        
         // Request redraw for leaves
         QueueRedraw();
         
-        GD.Print($"Tree generated with {GetChildCount()} branches and {leafPositions.Count} leaf positions");
+        GD.Print($"Tree generated with {branches.Count} branches and {leafPositions.Count} leaf positions");
+        if (hasApples)
+        {
+            GD.Print($"Placed {appleInstances.Count} apples");
+        }
     }
     
     private void GrowBranch(Vector2 startPos, Vector2 direction, float length, float thickness, int depth, float parentAngle)
@@ -136,6 +168,16 @@ public partial class OrganicFractalTree : Node2D
         
         // Apply points to the branch
         branch.Points = points.ToArray();
+        
+        // Store branch data for apple placement
+        var branchData = new BranchData
+        {
+            Line = branch,
+            Depth = depth,
+            Points = points.ToArray(),
+            Thickness = thickness
+        };
+        branches.Add(branchData);
         
         // Add subtle gradient effect
         var gradient = new Gradient();
@@ -188,6 +230,60 @@ public partial class OrganicFractalTree : Node2D
             
             // Recursively grow child branch
             GrowBranch(endPos, newDir, newLength, newThickness, depth + 1, angle);
+        }
+    }
+    
+    // Place apples on branches
+    private void PlaceApples()
+    {
+        // Filter suitable branches (not too deep, not the trunk)
+        var suitableBranches = new List<BranchData>();
+        foreach (var branch in branches)
+        {
+            // Skip trunk (depth 0) and very thin branches
+            if (branch.Depth > 0 && branch.Depth < maxDepth - 1 && branch.Thickness > 2.0f)
+            {
+                suitableBranches.Add(branch);
+            }
+        }
+        
+        if (suitableBranches.Count == 0)
+        {
+            GD.PrintErr("No suitable branches for apples!");
+            return;
+        }
+        
+        // Place apples
+        for (int i = 0; i < appleQuantity; i++)
+        {
+            // Select a random suitable branch
+            var selectedBranch = suitableBranches[random.Next(suitableBranches.Count)];
+            
+            // Select a random point along the branch (avoid the very base)
+            int pointIndex = random.Next(1, selectedBranch.Points.Length);
+            Vector2 applePosition = selectedBranch.Points[pointIndex];
+            
+            // Add slight offset from branch center
+            float offsetAngle = (float)(random.NextDouble() * Math.PI * 2);
+            float offsetDistance = selectedBranch.Thickness * 0.5f + 5.0f; // Slightly outside branch
+            Vector2 offset = new Vector2(
+                Mathf.Cos(offsetAngle) * offsetDistance,
+                Mathf.Sin(offsetAngle) * offsetDistance
+            );
+            
+            // Instantiate apple
+            var apple = applePrefab.Instantiate<Node2D>();
+            apple.Position = applePosition + offset;
+            
+            // Random slight rotation for variety
+            apple.Rotation = (float)(random.NextDouble() * 0.3 - 0.15);
+            
+            // Optionally scale based on branch thickness
+            float scale = 0.8f + (selectedBranch.Thickness / initialThickness) * 0.4f;
+            apple.Scale = Vector2.One * scale;
+            
+            AddChild(apple);
+            appleInstances.Add(apple);
         }
     }
     
