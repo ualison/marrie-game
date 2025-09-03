@@ -78,10 +78,10 @@ position = Vector2(6, 294)
 [node name="OrganicFractalTree" type="Node2D" parent="Environment"]
 position = Vector2(-198.865, 199.425)
 script = ExtResource("7_mqr8g")
-initialLength = 200.0
-branchAngle = 30.0
-angleVariation = 20.0
-minBranches = 3
+initialLength = 180.0
+branchAngle = 25.0
+angleVariation = 15.0
+minBranches = 4
 branchProbability = 1.0
 trunkColor = Color(1, 1, 1, 1)
 leafColor = Color(0.494768, 0.613424, 1, 1)
