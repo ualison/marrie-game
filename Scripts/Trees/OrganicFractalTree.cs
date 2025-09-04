@@ -54,6 +54,8 @@ public partial class OrganicFractalTree : Node2D
     [ExportGroup("Visual")]
     [Export(PropertyHint.Range, "1,15")] private float leafSize = 4.0f; // Size of individual leaves
     [ExportGroup("Visual")]
+    [Export(PropertyHint.Range, "0.1,2.0")] private float leafScale = 0.6f; // Multiplier to scale leaves smaller/larger in editor
+    [ExportGroup("Visual")]
     [Export(PropertyHint.Range, "1,20")] private int leafDensity = 8; // How many leaf clusters per branch tip
     [ExportGroup("Visual")]
     [Export] private bool useGradient = true; // Apply color gradient from trunk to branches
@@ -83,6 +85,9 @@ public partial class OrganicFractalTree : Node2D
     private LeafTemplate cachedLeafTemplate;
     private bool leafTemplateCached = false;
     private List<OptimizedLeafCluster> optimizedLeafClusters = new List<OptimizedLeafCluster>();
+
+    // Effective leaf size combining base leafSize and editor multiplier
+    private float EffectiveLeafSize => leafSize * leafScale;
 
     // Store branch data for apple placement and visual effects
     private class BranchData
@@ -130,6 +135,10 @@ public partial class OrganicFractalTree : Node2D
         public Color Tint = new Color(1f, 1f, 1f, 1f);
     }
 
+    // Cached rendered texture for a single leaf cluster (rasterized once and reused)
+    private ImageTexture cachedLeafTexture = null;
+    private bool leafTextureCachedRaster = false;
+
     public override void _Ready()
     {
         // Set up random seed
@@ -168,33 +177,65 @@ public partial class OrganicFractalTree : Node2D
             }
         }
 
-        // Draw optimized leaf clusters using cached template
+        // Draw optimized leaf clusters using cached template. Prefer a rasterized texture
+        // to avoid many DrawCircle calls. Fall back to fragment drawing if raster texture
+        // isn't available.
         if (drawLeaves && optimizedLeafClusters.Count > 0 && leafTemplateCached)
         {
-            Color baseLeafColor = leafColor;
-
-            for (int i = 0; i < optimizedLeafClusters.Count; i++)
+            // Ensure raster texture exists for the current template
+            if (!leafTextureCachedRaster)
             {
-                var cluster = optimizedLeafClusters[i];
-                float cosRot = Mathf.Cos(cluster.Rotation);
-                float sinRot = Mathf.Sin(cluster.Rotation);
+                CreateLeafTexture();
+            }
 
-                // Draw all fragments from the cached template
-                for (int f = 0; f < cachedLeafTemplate.BaseFragments.Count; f++)
+            Color baseLeafColor = leafColor;
+            if (leafTextureCachedRaster && cachedLeafTexture != null)
+            {
+                // Use DrawSetTransform to place, rotate and scale the cached texture per cluster
+                Vector2 texSize = cachedLeafTexture.GetSize();
+                Vector2 texCenter = texSize * 0.5f;
+
+                for (int i = 0; i < optimizedLeafClusters.Count; i++)
                 {
-                    var templateFrag = cachedLeafTemplate.BaseFragments[f];
+                    var cluster = optimizedLeafClusters[i];
 
-                    // Transform the template offset by rotation and scale
-                    Vector2 rotatedOffset = new Vector2(
-                        templateFrag.Offset.X * cosRot - templateFrag.Offset.Y * sinRot,
-                        templateFrag.Offset.X * sinRot + templateFrag.Offset.Y * cosRot
-                    ) * cluster.Scale * leafSize;
+                    // Set transform so the subsequent draw is positioned/rotated/scaled
+                    DrawSetTransform(cluster.Position, cluster.Rotation, Vector2.One * cluster.Scale);
 
-                    Vector2 finalPos = cluster.Position + rotatedOffset;
-                    float finalSize = templateFrag.Size * cluster.Scale * leafSize;
-                    Color finalColor = (baseLeafColor * cluster.Tint * templateFrag.Color);
+                    // Draw texture centered at origin (transform handles world position)
+                    DrawTexture(cachedLeafTexture, -texCenter, baseLeafColor * cluster.Tint);
 
-                    DrawCircle(finalPos, finalSize, finalColor);
+                    // Reset transform for next draw
+                    DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
+                }
+            }
+            else
+            {
+                // Fallback: draw using the template fragments (older method)
+
+                for (int i = 0; i < optimizedLeafClusters.Count; i++)
+                {
+                    var cluster = optimizedLeafClusters[i];
+                    float cosRot = Mathf.Cos(cluster.Rotation);
+                    float sinRot = Mathf.Sin(cluster.Rotation);
+
+                    // Draw all fragments from the cached template
+                    for (int f = 0; f < cachedLeafTemplate.BaseFragments.Count; f++)
+                    {
+                        var templateFrag = cachedLeafTemplate.BaseFragments[f];
+
+                        // Transform the template offset by rotation and scale
+                        Vector2 rotatedOffset = new Vector2(
+                            templateFrag.Offset.X * cosRot - templateFrag.Offset.Y * sinRot,
+                            templateFrag.Offset.X * sinRot + templateFrag.Offset.Y * cosRot
+                        ) * cluster.Scale * EffectiveLeafSize;
+
+                        Vector2 finalPos = cluster.Position + rotatedOffset;
+                        float finalSize = templateFrag.Size * cluster.Scale * EffectiveLeafSize;
+                        Color finalColor = (leafColor * cluster.Tint * templateFrag.Color);
+
+                        DrawCircle(finalPos, finalSize, finalColor);
+                    }
                 }
             }
         }
@@ -299,6 +340,8 @@ public partial class OrganicFractalTree : Node2D
 
         // Create the leaf template first
         CreateLeafTemplate();
+    // Rasterize cached leaf texture now to avoid doing it inside _Draw
+    CreateLeafTexture();
 
         // Start growing from the base
         Vector2 startPos = Vector2.Zero;
@@ -340,8 +383,8 @@ public partial class OrganicFractalTree : Node2D
                 for (int i = 0; i < 1; i++)
                 {
                     Vector2 leafOffset = new Vector2(
-                        (float)(random.NextDouble() - 0.5) * leafSize * 2,
-                        (float)(random.NextDouble() - 0.5) * leafSize * 2
+                        (float)(random.NextDouble() - 0.5) * EffectiveLeafSize * 2,
+                        (float)(random.NextDouble() - 0.5) * EffectiveLeafSize * 2
                     );
                     AddOptimizedLeafCluster(startPos + leafOffset);
                 }
@@ -727,7 +770,109 @@ public partial class OrganicFractalTree : Node2D
     public void InvalidateLeafTemplate()
     {
         leafTemplateCached = false;
+        // Also invalidate the rasterized texture cache
+        leafTextureCachedRaster = false;
+        if (cachedLeafTexture != null)
+        {
+            cachedLeafTexture.Dispose();
+            cachedLeafTexture = null;
+        }
+
         Log.System("Leaf template invalidated - will regenerate on next tree creation", "OrganicFractalTree");
+    }
+
+    // Create a rasterized ImageTexture from the cached leaf template.
+    // This produces a small texture with white fragments (alpha) that will be tinted
+    // at draw time by multiplying with leafColor and cluster.Tint.
+    private void CreateLeafTexture()
+    {
+    if (!leafTemplateCached || cachedLeafTemplate == null)
+            return;
+
+        // Parameters for rasterization
+        int pixelsPerUnit = 14; // controls resolution of the rasterized template
+    float radiusUnits = Math.Max(0.5f, cachedLeafTemplate.TemplateRadius * EffectiveLeafSize);
+    int texRadiusPx = (int)Math.Ceiling(radiusUnits * pixelsPerUnit) + 2;
+        int width = texRadiusPx * 2;
+        int height = width;
+
+    // Create image via static factory (Godot C# Image.Create returns an Image)
+    var img = Image.CreateEmpty(width, height, false, Image.Format.Rgba8);
+
+        // Clear to transparent
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                img.SetPixel(x, y, new Color(0, 0, 0, 0));
+            }
+        }
+
+        Vector2 center = new Vector2(width / 2f, height / 2f);
+
+        // Draw each fragment as a soft circle into the image (simple alpha blend)
+        for (int f = 0; f < cachedLeafTemplate.BaseFragments.Count; f++)
+        {
+            var frag = cachedLeafTemplate.BaseFragments[f];
+
+            // Fragment center in pixels
+            Vector2 fragCenter = center + frag.Offset * EffectiveLeafSize * pixelsPerUnit;
+            float fragRadius = Math.Max(1f, frag.Size * EffectiveLeafSize * pixelsPerUnit);
+            int minX = (int)Math.Max(0, Math.Floor(fragCenter.X - fragRadius));
+            int maxX = (int)Math.Min(width - 1, Math.Ceiling(fragCenter.X + fragRadius));
+            int minY = (int)Math.Max(0, Math.Floor(fragCenter.Y - fragRadius));
+            int maxY = (int)Math.Min(height - 1, Math.Ceiling(fragCenter.Y + fragRadius));
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    float dx = x + 0.5f - fragCenter.X;
+                    float dy = y + 0.5f - fragCenter.Y;
+                    float distSq = dx * dx + dy * dy;
+                    if (distSq > fragRadius * fragRadius) continue;
+
+                    float dist = Mathf.Sqrt(distSq);
+                    float t = Mathf.Clamp(1f - dist / fragRadius, 0f, 1f); // 1 at center -> 0 at edge
+                    // fragment's own alpha modulated by falloff
+                    float srcA = frag.Color.A * t;
+
+                    var existing = img.GetPixel(x, y);
+
+                    // Alpha blend: outA = srcA + dstA*(1-srcA)
+                    float outA = srcA + existing.A * (1f - srcA);
+
+                    // Colors are white in template; store premultiplied-like blend
+                    float outR = (1f * srcA + existing.R * existing.A * (1f - srcA));
+                    float outG = (1f * srcA + existing.G * existing.A * (1f - srcA));
+                    float outB = (1f * srcA + existing.B * existing.A * (1f - srcA));
+
+                    // Convert back to non-premultiplied for SetPixel by dividing by alpha when possible
+                    if (outA > 0f)
+                    {
+                        outR /= outA;
+                        outG /= outA;
+                        outB /= outA;
+                    }
+
+                    img.SetPixel(x, y, new Color(outR, outG, outB, outA));
+                }
+            }
+        }
+
+        // No explicit lock/unlock needed in this binding
+
+        // Create texture
+        if (cachedLeafTexture != null)
+        {
+            cachedLeafTexture.Dispose();
+            cachedLeafTexture = null;
+        }
+
+        cachedLeafTexture = ImageTexture.CreateFromImage(img);
+        leafTextureCachedRaster = true;
+
+        Log.System($"Rasterized leaf texture created ({width}x{height})", "OrganicFractalTree");
     }
 
     // Method to get performance statistics
