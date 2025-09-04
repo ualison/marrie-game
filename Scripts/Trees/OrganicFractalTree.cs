@@ -11,7 +11,7 @@ public partial class OrganicFractalTree : Node2D
     [Export] private bool randomizeOnLoad = true; // Use random seed each time instead of fixed seed
     [ExportGroup("Generation")]
     [Export] private int maxDepth = 10; // Maximum branch generations - higher = more detail but slower
-    
+
     // === TRUNK AND BRANCH DIMENSIONS ===
     [ExportGroup("Trunk & Branch Dimensions")]
     [Export] private float initialLength = 120.0f; // Main trunk length in pixels
@@ -21,7 +21,7 @@ public partial class OrganicFractalTree : Node2D
     [Export(PropertyHint.Range, "0.1,20.0")] private float initialThickness = 12.0f; // Starting trunk thickness
     [ExportGroup("Trunk & Branch Dimensions")]
     [Export(PropertyHint.Range, "0.4,0.9")] private float thicknessReduction = 0.68f; // How much branch thickness shrinks each generation
-    
+
     // === BRANCHING BEHAVIOR ===
     [ExportGroup("Branching")]
     [Export(PropertyHint.Range, "10,90")] private float branchAngle = 28.0f; // Base angle between branches in degrees
@@ -36,14 +36,14 @@ public partial class OrganicFractalTree : Node2D
     [ExportGroup("Branching")]
     [Export(PropertyHint.Range, "0,1")] private float asymmetry = 0.4f; // How uneven branch angles can be
     [ExportGroup("Branching")]
-    [Export(PropertyHint.Range, "0,1")] private float branchProbability = 0.85f; // Chance a branch will split (creates more natural gaps)
-    
+    [Export(PropertyHint.Range, "0,1")] private float branchProbability = 0.55f; // Chance a branch will split (creates more natural gaps)
+
     // === TRUNK SHAPE ===
     [ExportGroup("Trunk Shape")]
     [Export(PropertyHint.Range, "0,1")] private float trunkTaper = 0.3f; // How much the trunk narrows as it goes up
     [ExportGroup("Trunk Shape")]
     [Export(PropertyHint.Range, "0,30")] private float trunkCurve = 8.0f; // How much the main trunk can curve
-    
+
     // === VISUAL APPEARANCE ===
     [ExportGroup("Visual")]
     [Export] private Color trunkColor = new Color(0.4f, 0.3f, 0.2f); // Main trunk/branch color (brown)
@@ -57,7 +57,7 @@ public partial class OrganicFractalTree : Node2D
     [Export(PropertyHint.Range, "1,20")] private int leafDensity = 8; // How many leaf clusters per branch tip
     [ExportGroup("Visual")]
     [Export] private bool useGradient = true; // Apply color gradient from trunk to branches
-    
+
     // === APPLE SETTINGS ===
     [ExportGroup("Apples")]
     [Export] private bool hasApples = false; // Whether to place apples on the tree
@@ -69,23 +69,30 @@ public partial class OrganicFractalTree : Node2D
     [Export(PropertyHint.Range, "0,1")] private float applePlacementHeight = 0.6f; // Preferred placement height fraction along branch (0..1)
     [ExportGroup("Apples")]
     [Export] private PackedScene applePrefab; // Apple scene to instantiate
-    
+
     private Random random;
-    // Precomputed leaf clusters (so _Draw() does minimal work)
-    private List<LeafCluster> leafClusters = new List<LeafCluster>();
     private List<BranchData> branches = new List<BranchData>();
     private List<Node2D> appleInstances = new List<Node2D>();
     // Cache gradients per depth to avoid allocating many Gradient objects
     private Dictionary<int, Gradient> gradientCache = new Dictionary<int, Gradient>();
-    
+    // When true, _Draw should perform the full batch draw; afterwards it will be cleared
+    // to avoid re-executing expensive draw code every frame.
+    private bool needFullRedraw = true;
+
+    // === OPTIMIZED LEAF SYSTEM ===
+    private LeafTemplate cachedLeafTemplate;
+    private bool leafTemplateCached = false;
+    private List<OptimizedLeafCluster> optimizedLeafClusters = new List<OptimizedLeafCluster>();
+
     // Store branch data for apple placement and visual effects
     private class BranchData
     {
-        public Line2D Line { get; set; }
         public int Depth { get; set; }
         public Vector2[] Points { get; set; }
         public float Thickness { get; set; }
         public Vector2 EndDirection { get; set; } // Direction the branch is growing
+        public Color Color { get; set; } = new Color(0, 0, 0, 1);
+        public float Alpha { get; set; } = 1.0f; // Used for simple growth animation
     }
 
     // Helper to detect whether the current scene contains a node of a given type T
@@ -100,7 +107,7 @@ public partial class OrganicFractalTree : Node2D
         return false;
     }
 
-    // Small types to hold precomputed leaf drawing data so _Draw() is cheap
+    // Cached leaf template system
     private class LeafFragment
     {
         public Vector2 Offset;
@@ -108,114 +115,198 @@ public partial class OrganicFractalTree : Node2D
         public Color Color;
     }
 
-    private class LeafCluster
+    private class LeafTemplate
+    {
+        public List<LeafFragment> BaseFragments { get; set; } = new List<LeafFragment>();
+        public float TemplateRadius { get; set; } // Used for scaling bounds
+    }
+
+    // Optimized leaf cluster that references the cached template
+    private class OptimizedLeafCluster
     {
         public Vector2 Position;
-        public List<LeafFragment> Fragments = new List<LeafFragment>();
+        public float Scale = 1.0f;
+        public float Rotation = 0.0f;
+        public Color Tint = new Color(1f, 1f, 1f, 1f);
     }
-    
+
     public override void _Ready()
     {
         // Set up random seed
         if (randomizeOnLoad)
         {
             seed = (int)GD.RandRange(0, 999999);
-            GD.Print($"OrganicFractalTree: Using random seed: {seed}");
+            Log.System($"Using random seed: {seed}", "OrganicFractalTree");
         }
         else
         {
-            GD.Print($"OrganicFractalTree: Using fixed seed: {seed}");
+            Log.System($"Using fixed seed: {seed}", "OrganicFractalTree");
         }
-        
+
         GenerateTree();
     }
-    
+
     public override void _Draw()
     {
-        // Draw precomputed leaf clusters. This avoids doing random math per-frame.
-        if (drawLeaves && leafClusters.Count > 0)
-        {
-            for (int i = 0; i < leafClusters.Count; i++)
-            {
-                var cluster = leafClusters[i];
+        // Avoid redoing the heavy batch draw if nothing changed since last draw.
+        if (!needFullRedraw)
+            return;
 
-                // Draw all fragments precomputed for this cluster
-                for (int f = 0; f < cluster.Fragments.Count; f++)
+        // Batch-draw branches to reduce node count and draw calls.
+        if (branches.Count > 0)
+        {
+            for (int b = 0; b < branches.Count; b++)
+            {
+                var br = branches[b];
+                if (br.Points == null || br.Points.Length < 2) continue;
+                Color c = br.Color * new Color(1f, 1f, 1f, br.Alpha);
+
+                for (int i = 0; i < br.Points.Length - 1; i++)
                 {
-                    var frag = cluster.Fragments[f];
-                    DrawCircle(cluster.Position + frag.Offset, frag.Size, frag.Color);
+                    DrawLine(br.Points[i], br.Points[i + 1], c, br.Thickness);
                 }
             }
         }
+
+        // Draw optimized leaf clusters using cached template
+        if (drawLeaves && optimizedLeafClusters.Count > 0 && leafTemplateCached)
+        {
+            Color baseLeafColor = leafColor;
+
+            for (int i = 0; i < optimizedLeafClusters.Count; i++)
+            {
+                var cluster = optimizedLeafClusters[i];
+                float cosRot = Mathf.Cos(cluster.Rotation);
+                float sinRot = Mathf.Sin(cluster.Rotation);
+
+                // Draw all fragments from the cached template
+                for (int f = 0; f < cachedLeafTemplate.BaseFragments.Count; f++)
+                {
+                    var templateFrag = cachedLeafTemplate.BaseFragments[f];
+
+                    // Transform the template offset by rotation and scale
+                    Vector2 rotatedOffset = new Vector2(
+                        templateFrag.Offset.X * cosRot - templateFrag.Offset.Y * sinRot,
+                        templateFrag.Offset.X * sinRot + templateFrag.Offset.Y * cosRot
+                    ) * cluster.Scale * leafSize;
+
+                    Vector2 finalPos = cluster.Position + rotatedOffset;
+                    float finalSize = templateFrag.Size * cluster.Scale * leafSize;
+                    Color finalColor = (baseLeafColor * cluster.Tint * templateFrag.Color);
+
+                    DrawCircle(finalPos, finalSize, finalColor);
+                }
+            }
+        }
+
+        // We've completed the full draw; avoid doing it again until tree changes or we re-enable (e.g. during animation).
+        needFullRedraw = false;
     }
 
-    // Create and store a leaf cluster with precomputed fragments for fast drawing.
-    private void AddLeafCluster(Vector2 position)
+    // Method to create and cache the leaf template (called once per tree generation)
+    private void CreateLeafTemplate()
     {
+        if (leafTemplateCached) return;
+
         if (random == null)
             random = new Random(seed);
 
-        var cluster = new LeafCluster();
-        cluster.Position = position;
+        cachedLeafTemplate = new LeafTemplate();
 
-        // Main leaf fragment
-        cluster.Fragments.Add(new LeafFragment
+        // Create main leaf fragment at center
+        cachedLeafTemplate.BaseFragments.Add(new LeafFragment
         {
             Offset = Vector2.Zero,
-            Size = leafSize,
-            Color = leafColor
+            Size = 1.0f, // Normalized size - will be scaled later
+            Color = new Color(1f, 1f, 1f, 1f) // Use white for tinting
         });
 
-        int actualLeafDensity = Math.Min(leafDensity, 6);
+        int actualLeafDensity = Math.Min(leafDensity, 8); // Slightly higher cap for template
+        float maxRadius = 0f;
 
         // Add smaller fragments around the main cluster
         for (int j = 0; j < actualLeafDensity; j++)
         {
             float angle = (float)(random.NextDouble() * (Mathf.Pi * 2f));
-            float distance = (leafSize * 0.5f) + (float)random.NextDouble() * (leafSize * 0.5f);
+            float distance = 0.5f + (float)random.NextDouble() * 0.5f; // Normalized distance
             Vector2 offset = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distance;
 
-            float smallLeafSize = leafSize * (0.3f + (float)random.NextDouble() * 0.3f);
+            maxRadius = Math.Max(maxRadius, distance + 0.3f); // Account for fragment size
 
-            float colorVariation = 0.8f + (float)random.NextDouble() * 0.4f;
+            float smallLeafSize = 0.3f + (float)random.NextDouble() * 0.3f; // Normalized size
             float alpha = 0.5f + (float)random.NextDouble() * 0.4f;
-            Color leafVariation = leafColor * new Color(colorVariation, colorVariation, colorVariation, alpha);
 
-            cluster.Fragments.Add(new LeafFragment
+            cachedLeafTemplate.BaseFragments.Add(new LeafFragment
             {
                 Offset = offset,
                 Size = smallLeafSize,
-                Color = leafVariation
+                Color = new Color(1f, 1f, 1f, alpha) // White with varied alpha for tinting
             });
         }
 
-        leafClusters.Add(cluster);
+        cachedLeafTemplate.TemplateRadius = maxRadius;
+        leafTemplateCached = true;
+
+        Log.System($"Leaf template cached with {cachedLeafTemplate.BaseFragments.Count} fragments", "OrganicFractalTree");
     }
-    
+
+    // Optimized method to add leaf clusters using the cached template
+    private void AddOptimizedLeafCluster(Vector2 position)
+    {
+        if (!leafTemplateCached)
+            CreateLeafTemplate();
+
+        if (random == null)
+            random = new Random(seed);
+
+        var cluster = new OptimizedLeafCluster
+        {
+            Position = position,
+            Scale = 0.8f + (float)random.NextDouble() * 0.4f, // Vary scale slightly
+            Rotation = (float)(random.NextDouble() * Mathf.Pi * 2), // Random rotation
+            Tint = new Color(
+                0.8f + (float)random.NextDouble() * 0.4f, // Slight color variation
+                0.9f + (float)random.NextDouble() * 0.2f,
+                0.7f + (float)random.NextDouble() * 0.3f,
+                0.9f + (float)random.NextDouble() * 0.1f
+            )
+        };
+
+        optimizedLeafClusters.Add(cluster);
+    }
+
     private void GenerateTree()
     {
-        GD.Print("Generating tree...");
-        
+        Log.System("Generating tree...", "OrganicFractalTree");
+
         // Clear existing tree
         foreach (Node child in GetChildren())
         {
             child.QueueFree();
         }
-        leafClusters.Clear();
+
+        // Clear optimized leaf clusters instead of old ones
+        optimizedLeafClusters.Clear();
         branches.Clear();
         appleInstances.Clear();
         gradientCache.Clear();
-        
+
+        // Reset leaf template cache if needed
+        leafTemplateCached = false;
+
         // Initialize random generator
         random = new Random(seed);
-        
-    // Start growing from the base
+
+        // Create the leaf template first
+        CreateLeafTemplate();
+
+        // Start growing from the base
         Vector2 startPos = Vector2.Zero;
         Vector2 startDir = Vector2.Up; // Points upward
-        
+
         // Create the tree structure
         GrowBranch(startPos, startDir, initialLength, initialThickness, 0, 0, true);
-        
+
         // Place apples if enabled
         if (hasApples && applePrefab != null && branches.Count > 0)
         {
@@ -223,19 +314,20 @@ public partial class OrganicFractalTree : Node2D
         }
         else if (hasApples && applePrefab == null)
         {
-            GD.PrintErr("OrganicFractalTree: Apple prefab not set!");
+            Log.Error("Apple prefab not set!", "OrganicFractalTree");
         }
-        
+
         // Request redraw for leaves
+        needFullRedraw = true;
         QueueRedraw();
-        
-    GD.Print($"Tree generated with {branches.Count} branches and {leafClusters.Count} leaf clusters");
+
+        Log.Info($"Tree generated with {branches.Count} branches and {optimizedLeafClusters.Count} leaf clusters", "OrganicFractalTree");
         if (hasApples)
         {
-            GD.Print($"Placed {appleInstances.Count} apples");
+            Log.Info($"Placed {appleInstances.Count} apples", "OrganicFractalTree");
         }
     }
-    
+
     private void GrowBranch(Vector2 startPos, Vector2 direction, float length, float thickness, int depth, float parentAngle, bool isTrunk = false)
     {
         // Stop growing if we've reached limits
@@ -244,140 +336,102 @@ public partial class OrganicFractalTree : Node2D
             // Add multiple leaf positions at branch tips for fuller canopy
             if (drawLeaves)
             {
-                // Create a few small clusters around the tip to simulate fullness. We precompute
-                // the leaf fragments here so _Draw() doesn't run heavy random math every frame.
-                for (int i = 0; i < 3; i++)
+                // Create a few small clusters around the tip using optimized system
+                for (int i = 0; i < 1; i++)
                 {
                     Vector2 leafOffset = new Vector2(
                         (float)(random.NextDouble() - 0.5) * leafSize * 2,
                         (float)(random.NextDouble() - 0.5) * leafSize * 2
                     );
-                    AddLeafCluster(startPos + leafOffset);
+                    AddOptimizedLeafCluster(startPos + leafOffset);
                 }
             }
             return;
         }
-        
-        // Create branch visual
-        Line2D branch = new Line2D();
-        AddChild(branch);
-        
-        // Configure branch appearance
-        branch.Width = thickness;
-        branch.JointMode = Line2D.LineJointMode.Round;
-        branch.Antialiased = true;
-        
+
         // Generate organic curved path
         var points = new List<Vector2>();
         Vector2 currentPos = startPos;
         Vector2 currentDir = direction.Normalized();
-        
+
         // More segments for smoother curves
-        int segments = Math.Max(4, (int)(length / 8));
+        int segments = Math.Max(3, (int)(length / 12));
         float segmentLength = length / segments;
-        
+
         points.Add(currentPos);
-        
+
         // Create curved path with trunk tapering
         for (int i = 0; i < segments; i++)
         {
             float progress = (float)i / segments;
-            
+
             // Apply trunk curve for main trunk
             if (isTrunk && trunkCurve > 0)
             {
                 float trunkCurveAmount = Mathf.DegToRad(trunkCurve) * (float)(random.NextDouble() - 0.5) * 0.3f;
                 currentDir = currentDir.Rotated(trunkCurveAmount);
             }
-            
+
             // Add natural curvature
             float curveAmount = (float)(random.NextDouble() - 0.5) * curvature;
             currentDir = currentDir.Rotated(curveAmount);
             currentDir = currentDir.Normalized();
-            
-            // Apply trunk tapering
-            if (isTrunk && trunkTaper > 0)
-            {
-                float taperFactor = 1.0f - (progress * trunkTaper);
-                branch.Width = thickness * taperFactor;
-            }
-            
+
             // Move to next point
             currentPos += currentDir * segmentLength;
             points.Add(currentPos);
         }
-        
-        // Apply points to branch
-        branch.Points = points.ToArray();
-        
-        // Set branch color with gradient. Cache gradients per depth to reduce allocations.
-        if (useGradient)
-        {
-            Gradient gradient;
-            int key = depth;
-            if (!gradientCache.TryGetValue(key, out gradient))
-            {
-                gradient = new Gradient();
-                float depthFactor = 1.0f - (depth / (float)maxDepth) * 0.4f;
-                Color baseColor = trunkColor;
 
-                // Gradually shift to green for smaller branches
-                if (depth > maxDepth * 0.6f)
-                {
-                    float greenBlend = (depth - maxDepth * 0.6f) / (maxDepth * 0.4f);
-                    baseColor = trunkColor.Lerp(leafColor * 0.7f, greenBlend * 0.5f);
-                }
-
-                gradient.SetColor(0, baseColor * new Color(depthFactor, depthFactor, depthFactor));
-                gradient.SetColor(1, baseColor * new Color(depthFactor * 0.8f, depthFactor * 0.8f, depthFactor * 0.8f));
-                gradientCache[key] = gradient;
-            }
-            branch.Gradient = gradient;
-        }
-        else
+        // Compute a single representative color for the branch
+        float depthFactor = 1.0f - (depth / (float)maxDepth) * 0.4f;
+        Color baseColor = trunkColor;
+        if (depth > maxDepth * 0.6f)
         {
-            branch.DefaultColor = trunkColor;
+            float greenBlend = (depth - maxDepth * 0.6f) / (maxDepth * 0.4f);
+            baseColor = trunkColor.Lerp(leafColor * 0.7f, greenBlend * 0.5f);
         }
-        
+        Color branchColor = baseColor * new Color(depthFactor, depthFactor, depthFactor, 1.0f);
+
         // Store branch data
         var branchData = new BranchData
         {
-            Line = branch,
             Depth = depth,
             Points = points.ToArray(),
             Thickness = thickness,
-            EndDirection = currentDir
+            EndDirection = currentDir,
+            Color = branchColor,
+            Alpha = 1.0f
         };
         branches.Add(branchData);
-        
+
         Vector2 endPos = currentPos;
-        
+
         // Check if this branch should split (adds natural variation)
         if (random.NextDouble() > branchProbability)
         {
             // This branch doesn't split - just add a leaf cluster at the tip
             if (drawLeaves)
             {
-                AddLeafCluster(endPos);
+                AddOptimizedLeafCluster(endPos);
             }
             return;
         }
-        
+
         // Determine number of child branches
         int branchCount = random.Next(minBranches, maxBranches + 1);
-        
+
         // Reduce branching at higher depths for performance and realism
         if (depth > maxDepth * 0.7f)
         {
             branchCount = Math.Min(2, branchCount);
         }
-        
+
         // Increase branching chance for main trunk to create fuller tree
         if (isTrunk)
         {
             branchCount = Math.Max(branchCount, 3);
         }
-        
+
         // Create child branches
         for (int i = 0; i < branchCount; i++)
         {
@@ -385,7 +439,7 @@ public partial class OrganicFractalTree : Node2D
             float baseAngle = Mathf.DegToRad(branchAngle);
             float variation = Mathf.DegToRad(angleVariation) * (float)(random.NextDouble() - 0.5) * 2;
             float asymmetryFactor = (float)(random.NextDouble() - 0.5) * asymmetry;
-            
+
             float angle;
             if (branchCount == 2)
             {
@@ -396,18 +450,18 @@ public partial class OrganicFractalTree : Node2D
             {
                 // Multiple branches - better distribution
                 float angleRange = baseAngle * 1.8f; // Slightly wider spread
-                angle = -angleRange/2 + (angleRange / (branchCount - 1)) * i + variation;
+                angle = -angleRange / 2 + (angleRange / (branchCount - 1)) * i + variation;
             }
-            
+
             // Add slight influence from parent angle for natural flow
             angle += parentAngle * 0.15f;
-            
+
             // Calculate new branch properties with more variation
             Vector2 newDir = currentDir.Rotated(angle);
             float lengthVariation = 0.7f + (float)random.NextDouble() * 0.5f; // More length variation
             float newLength = length * lengthReduction * lengthVariation;
             float newThickness = thickness * thicknessReduction;
-            
+
             // Add slight random delay to create more organic growth
             if (random.NextDouble() > 0.1f) // 90% chance to grow
             {
@@ -415,7 +469,7 @@ public partial class OrganicFractalTree : Node2D
             }
         }
     }
-    
+
     // Place apples on suitable branches
     private void PlaceApples()
     {
@@ -423,7 +477,7 @@ public partial class OrganicFractalTree : Node2D
         // don't procedurally place apples here to avoid duplicate apples.
         if (GetTree().CurrentScene != null && SceneContainsNodeOfType<AppleTree>(GetTree().CurrentScene))
         {
-            GD.Print("OrganicFractalTree: AppleTree manager found in scene; skipping procedural apple placement.");
+            Log.System("AppleTree manager found in scene; skipping procedural apple placement.", "OrganicFractalTree");
             return;
         }
 
@@ -439,7 +493,7 @@ public partial class OrganicFractalTree : Node2D
 
         if (suitableBranches.Count == 0)
         {
-            GD.PrintErr("No suitable branches for apples!");
+            Log.Error("No suitable branches for apples!", "OrganicFractalTree");
             return;
         }
 
@@ -603,53 +657,226 @@ public partial class OrganicFractalTree : Node2D
             appleInstances.Add(apple);
         }
     }
-    
+
     // === PUBLIC METHODS FOR RUNTIME CONTROL ===
-    
+
     // Regenerate the tree with current settings
     public void Regenerate()
     {
         GenerateTree();
     }
-    
+
     // Change seed and regenerate
     public void SetSeedAndRegenerate(int newSeed)
     {
         seed = newSeed;
         GenerateTree();
     }
-    
+
     // Use random seed and regenerate
     public void RandomizeAndRegenerate()
     {
         seed = (int)GD.RandRange(0, 999999);
         GenerateTree();
     }
-    
+
     // Animate tree growth (call this to watch it grow)
     public async void AnimateGrowth()
     {
-        // Hide all branches initially
+        // Ensure we perform full draw while animating
+        needFullRedraw = true;
+
+        // Hide all branches initially by setting alpha to zero
         foreach (var branchData in branches)
         {
-            branchData.Line.Modulate = new Color(1, 1, 1, 0);
+            branchData.Alpha = 0f;
         }
-        
-        // Gradually show branches by depth
+
+        // Gradually show branches by depth (animate alpha)
         for (int depth = 0; depth <= maxDepth; depth++)
         {
             foreach (var branchData in branches)
             {
                 if (branchData.Depth == depth)
                 {
-                    var tween = CreateTween();
-                    tween.TweenProperty(branchData.Line, "modulate:a", 1.0f, 0.3f);
+                    // simple linear tween via timer loop to avoid creating per-branch Tweens
+                    float elapsed = 0f;
+                    float duration = 0.3f;
+                    while (elapsed < duration)
+                    {
+                        await ToSignal(GetTree().CreateTimer(0.03f), SceneTreeTimer.SignalName.Timeout);
+                        elapsed += 0.03f;
+                        branchData.Alpha = Mathf.Clamp(elapsed / duration, 0f, 1f);
+                        needFullRedraw = true;
+                        QueueRedraw();
+                    }
+                    branchData.Alpha = 1f;
                 }
             }
             await ToSignal(GetTree().CreateTimer(0.2f), SceneTreeTimer.SignalName.Timeout);
         }
-        
+
         // Finally show leaves
+        needFullRedraw = true;
+        QueueRedraw();
+    }
+
+    // === ADDITIONAL OPTIMIZATION METHODS ===
+
+    // Method to invalidate leaf template (call if leafDensity or leafSize changes significantly)
+    public void InvalidateLeafTemplate()
+    {
+        leafTemplateCached = false;
+        Log.System("Leaf template invalidated - will regenerate on next tree creation", "OrganicFractalTree");
+    }
+
+    // Method to get performance statistics
+    public Dictionary<string, object> GetPerformanceStats()
+    {
+        return new Dictionary<string, object>
+        {
+            {"BranchCount", branches.Count},
+            {"LeafClusterCount", optimizedLeafClusters.Count},
+            {"LeafTemplateFragments", leafTemplateCached ? cachedLeafTemplate.BaseFragments.Count : 0},
+            {"AppleCount", appleInstances.Count},
+            {"MemoryEstimate", GetEstimatedMemoryUsage()}
+        };
+    }
+
+    // Estimate memory usage of the tree (in bytes)
+    private long GetEstimatedMemoryUsage()
+    {
+        long total = 0;
+
+        // Branch data
+        total += branches.Count * (sizeof(int) + sizeof(float) * 3 + 16 * 4 + 16); // Rough estimate per branch
+        foreach (var branch in branches)
+        {
+            if (branch.Points != null)
+                total += branch.Points.Length * 8; // Vector2 = 8 bytes
+        }
+
+        // Optimized leaf clusters (much smaller than old system)
+        total += optimizedLeafClusters.Count * (8 + sizeof(float) * 2 + 16); // Position + scale + rotation + tint
+
+        // Leaf template (shared)
+        if (leafTemplateCached)
+        {
+            total += cachedLeafTemplate.BaseFragments.Count * (8 + sizeof(float) + 16); // Offset + size + color
+        }
+
+        return total;
+    }
+
+    // Method to force a redraw (useful for debugging or external changes)
+    public void ForceRedraw()
+    {
+        needFullRedraw = true;
+        QueueRedraw();
+    }
+
+    // Method to get leaf cluster positions (useful for effects like wind animation)
+    public Vector2[] GetLeafClusterPositions()
+    {
+        var positions = new Vector2[optimizedLeafClusters.Count];
+        for (int i = 0; i < optimizedLeafClusters.Count; i++)
+        {
+            positions[i] = optimizedLeafClusters[i].Position;
+        }
+        return positions;
+    }
+
+    // Method to apply wind effect to leaves (modifies rotation and scale slightly)
+    public void ApplyWindEffect(float windStrength, Vector2 windDirection)
+    {
+        if (!leafTemplateCached || optimizedLeafClusters.Count == 0)
+            return;
+
+        windDirection = windDirection.Normalized();
+        float time = (float)Time.GetTicksMsec() / 1000.0f;
+
+        for (int i = 0; i < optimizedLeafClusters.Count; i++)
+        {
+            var cluster = optimizedLeafClusters[i];
+
+            // Apply wind-based rotation oscillation
+            float windEffect = Mathf.Sin(time * 2.0f + cluster.Position.X * 0.01f) * windStrength;
+            cluster.Rotation += windEffect * 0.1f;
+
+            // Apply slight scale variation based on wind
+            float scaleVariation = 1.0f + Mathf.Sin(time * 1.5f + cluster.Position.Y * 0.01f) * windStrength * 0.05f;
+            cluster.Scale = Mathf.Clamp(cluster.Scale * scaleVariation, 0.5f, 1.5f);
+        }
+
+        needFullRedraw = true;
+        QueueRedraw();
+    }
+
+    // Method to change leaf colors (e.g., for seasonal effects)
+    public void SetSeasonalLeafColors(Color newLeafColor, float variation = 0.2f)
+    {
+        leafColor = newLeafColor;
+
+        // Update existing leaf cluster tints
+        if (random == null) random = new Random(seed);
+
+        for (int i = 0; i < optimizedLeafClusters.Count; i++)
+        {
+            var cluster = optimizedLeafClusters[i];
+            cluster.Tint = new Color(
+                1.0f - (float)random.NextDouble() * variation,
+                1.0f - (float)random.NextDouble() * variation,
+                1.0f - (float)random.NextDouble() * variation,
+                0.9f + (float)random.NextDouble() * 0.1f
+            );
+        }
+
+        needFullRedraw = true;
+        QueueRedraw();
+    }
+
+    // Method to animate leaf appearance (useful for spring growth)
+    public async void AnimateLeafGrowth(float duration = 2.0f)
+    {
+        if (optimizedLeafClusters.Count == 0)
+            return;
+
+        // Store original scales
+        var originalScales = new float[optimizedLeafClusters.Count];
+        for (int i = 0; i < optimizedLeafClusters.Count; i++)
+        {
+            originalScales[i] = optimizedLeafClusters[i].Scale;
+            optimizedLeafClusters[i].Scale = 0f; // Start with no leaves
+        }
+
+        needFullRedraw = true;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            await ToSignal(GetTree().CreateTimer(0.03f), SceneTreeTimer.SignalName.Timeout);
+            elapsed += 0.03f;
+            float progress = elapsed / duration;
+
+            // Grow leaves with a nice easing curve
+            float easedProgress = 1f - Mathf.Pow(1f - progress, 3f); // Ease-out cubic
+
+            for (int i = 0; i < optimizedLeafClusters.Count; i++)
+            {
+                optimizedLeafClusters[i].Scale = originalScales[i] * easedProgress;
+            }
+
+            needFullRedraw = true;
+            QueueRedraw();
+        }
+
+        // Ensure final state
+        for (int i = 0; i < optimizedLeafClusters.Count; i++)
+        {
+            optimizedLeafClusters[i].Scale = originalScales[i];
+        }
+
+        needFullRedraw = true;
         QueueRedraw();
     }
 }

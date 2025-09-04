@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://54o6xy0qaoae"]
+[gd_scene load_steps=13 format=3 uid="uid://54o6xy0qaoae"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="2_bcr4f"]
@@ -7,12 +7,10 @@
 [ext_resource type="Script" uid="uid://o04haht8ruox" path="res://Scripts/Trees/OrganicFractalTree.cs" id="7_mqr8g"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
 [ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="8_y8jgj"]
-[ext_resource type="AudioStream" uid="uid://c5xm6p8ayswcj" path="res://Sounds/Background3.wav" id="11_1pt5x"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
 [ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="12_r6l07"]
 [ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="13_bcr4f"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
-[ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
 [ext_resource type="PackedScene" uid="uid://dxvamghbt08mr" path="res://Prefabs/UI/ScreenElements.tscn" id="16_screen"]
 
 [node name="TreeAppleTestScene" type="Node2D"]
@@ -80,16 +78,16 @@ position = Vector2(-198.865, 199.425)
 script = ExtResource("7_mqr8g")
 initialLength = 180.0
 branchAngle = 25.0
-angleVariation = 15.0
+angleVariation = 10.0
 minBranches = 4
 branchProbability = 1.0
 trunkColor = Color(1, 1, 1, 1)
 leafColor = Color(0.494768, 0.613424, 1, 1)
 drawLeaves = false
-leafSize = 3.0
-leafDensity = 4
+leafSize = 1.5
+leafDensity = 2
 hasApples = true
-appleQuantity = 6
+appleQuantity = 4
 appleMinDistance = 30.0
 applePlacementHeight = 0.7
 applePrefab = ExtResource("8_y8jgj")
@@ -113,12 +111,6 @@ script = ExtResource("12_r6l07")
 script = ExtResource("13_r6l07")
 
 [node name="AudioSystem" type="Node" parent="GameSystems"]
-
-[node name="AudioManager" type="AudioStreamPlayer2D" parent="GameSystems/AudioSystem"]
-stream = ExtResource("11_1pt5x")
-volume_db = 6.038
-autoplay = true
-script = ExtResource("15_r6l07")
 
 [node name="Rock" parent="GameSystems/AudioSystem" instance=ExtResource("13_bcr4f")]
 position = Vector2(-156, 246)
