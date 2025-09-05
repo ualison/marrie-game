@@ -247,48 +247,25 @@ public partial class OrganicFractalTree : Node2D
     // Method to create and cache the leaf template (called once per tree generation)
     private void CreateLeafTemplate()
     {
+        // Switch to a deterministic snowflake template for high-fidelity leaves.
+        // The rasterizer will draw a crisp, symmetric snowflake into the texture.
         if (leafTemplateCached) return;
-
-        if (random == null)
-            random = new Random(seed);
 
         cachedLeafTemplate = new LeafTemplate();
 
-        // Create main leaf fragment at center
+        // Keep a single central fragment for compatibility with the fallback renderer.
         cachedLeafTemplate.BaseFragments.Add(new LeafFragment
         {
             Offset = Vector2.Zero,
-            Size = 1.0f, // Normalized size - will be scaled later
-            Color = new Color(1f, 1f, 1f, 1f) // Use white for tinting
+            Size = 1.0f,
+            Color = new Color(1f, 1f, 1f, 1f)
         });
 
-        int actualLeafDensity = Math.Min(leafDensity, 8); // Slightly higher cap for template
-        float maxRadius = 0f;
-
-        // Add smaller fragments around the main cluster
-        for (int j = 0; j < actualLeafDensity; j++)
-        {
-            float angle = (float)(random.NextDouble() * (Mathf.Pi * 2f));
-            float distance = 0.5f + (float)random.NextDouble() * 0.5f; // Normalized distance
-            Vector2 offset = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distance;
-
-            maxRadius = Math.Max(maxRadius, distance + 0.3f); // Account for fragment size
-
-            float smallLeafSize = 0.3f + (float)random.NextDouble() * 0.3f; // Normalized size
-            float alpha = 0.5f + (float)random.NextDouble() * 0.4f;
-
-            cachedLeafTemplate.BaseFragments.Add(new LeafFragment
-            {
-                Offset = offset,
-                Size = smallLeafSize,
-                Color = new Color(1f, 1f, 1f, alpha) // White with varied alpha for tinting
-            });
-        }
-
-        cachedLeafTemplate.TemplateRadius = maxRadius;
+        // Use a unit radius as the normalized template radius; rasterizer will scale by EffectiveLeafSize.
+        cachedLeafTemplate.TemplateRadius = 1.0f;
         leafTemplateCached = true;
 
-        Log.System($"Leaf template cached with {cachedLeafTemplate.BaseFragments.Count} fragments", "OrganicFractalTree");
+        Log.System($"Snowflake leaf template cached", "OrganicFractalTree");
     }
 
     // Optimized method to add leaf clusters using the cached template
@@ -810,53 +787,77 @@ public partial class OrganicFractalTree : Node2D
 
         Vector2 center = new Vector2(width / 2f, height / 2f);
 
-        // Draw each fragment as a soft circle into the image (simple alpha blend)
-        for (int f = 0; f < cachedLeafTemplate.BaseFragments.Count; f++)
+        // Rasterize a symmetric snowflake centered at `center` with crisp/solid alpha (no soft fade).
+        // We'll draw multiple radial arms and small branch details for fidelity.
+
+        // Snowflake parameters (in normalized template units)
+        int arms = 6; // 6-fold symmetry
+        float armLength = cachedLeafTemplate.TemplateRadius * EffectiveLeafSize * pixelsPerUnit; // pixels
+        float armWidth = Math.Max(1f, pixelsPerUnit * 0.12f * EffectiveLeafSize); // pixels (thickness)
+
+        // Helper to set pixel to white with alpha=1 (opaque) — preserve existing alpha if already opaque
+        void SetOpaquePixel(int px, int py)
         {
-            var frag = cachedLeafTemplate.BaseFragments[f];
+            if (px < 0 || px >= width || py < 0 || py >= height) return;
+            img.SetPixel(px, py, new Color(1f, 1f, 1f, 1f));
+        }
 
-            // Fragment center in pixels
-            Vector2 fragCenter = center + frag.Offset * EffectiveLeafSize * pixelsPerUnit;
-            float fragRadius = Math.Max(1f, frag.Size * EffectiveLeafSize * pixelsPerUnit);
-            int minX = (int)Math.Max(0, Math.Floor(fragCenter.X - fragRadius));
-            int maxX = (int)Math.Min(width - 1, Math.Ceiling(fragCenter.X + fragRadius));
-            int minY = (int)Math.Max(0, Math.Floor(fragCenter.Y - fragRadius));
-            int maxY = (int)Math.Min(height - 1, Math.Ceiling(fragCenter.Y + fragRadius));
+        // Draw each arm by stepping along the arm and stamping a small solid disk for thickness
+        for (int a = 0; a < arms; a++)
+        {
+            float angle = (Mathf.Pi * 2f / arms) * a;
+            Vector2 dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
 
-            for (int y = minY; y <= maxY; y++)
+            // Main arm
+            for (float r = 0; r <= armLength; r += 0.8f)
             {
-                for (int x = minX; x <= maxX; x++)
+                Vector2 pos = center + dir * r;
+                int cx = (int)Mathf.Floor(pos.X);
+                int cy = (int)Mathf.Floor(pos.Y);
+
+                // Stamp a small square/disk for thickness
+                int t = (int)Math.Ceiling(armWidth);
+                for (int oy = -t; oy <= t; oy++)
                 {
-                    float dx = x + 0.5f - fragCenter.X;
-                    float dy = y + 0.5f - fragCenter.Y;
-                    float distSq = dx * dx + dy * dy;
-                    if (distSq > fragRadius * fragRadius) continue;
-
-                    float dist = Mathf.Sqrt(distSq);
-                    float t = Mathf.Clamp(1f - dist / fragRadius, 0f, 1f); // 1 at center -> 0 at edge
-                    // fragment's own alpha modulated by falloff
-                    float srcA = frag.Color.A * t;
-
-                    var existing = img.GetPixel(x, y);
-
-                    // Alpha blend: outA = srcA + dstA*(1-srcA)
-                    float outA = srcA + existing.A * (1f - srcA);
-
-                    // Colors are white in template; store premultiplied-like blend
-                    float outR = (1f * srcA + existing.R * existing.A * (1f - srcA));
-                    float outG = (1f * srcA + existing.G * existing.A * (1f - srcA));
-                    float outB = (1f * srcA + existing.B * existing.A * (1f - srcA));
-
-                    // Convert back to non-premultiplied for SetPixel by dividing by alpha when possible
-                    if (outA > 0f)
+                    for (int ox = -t; ox <= t; ox++)
                     {
-                        outR /= outA;
-                        outG /= outA;
-                        outB /= outA;
+                        float ddx = (ox + 0.5f);
+                        float ddy = (oy + 0.5f);
+                        if (ddx * ddx + ddy * ddy <= (armWidth + 0.0f) * (armWidth + 0.0f))
+                        {
+                            SetOpaquePixel(cx + ox, cy + oy);
+                        }
                     }
-
-                    img.SetPixel(x, y, new Color(outR, outG, outB, outA));
                 }
+
+                // Add small branch details along the arm for a snowflake look
+                if (r > armLength * 0.15f && r < armLength * 0.9f && ((int)r % 8 == 0))
+                {
+                    // perpendicular branches (both sides)
+                    Vector2 perp = new Vector2(-dir.Y, dir.X);
+                    float branchLen = armLength * 0.12f;
+                    for (int side = -1; side <= 1; side += 2)
+                    {
+                        for (float br = 0; br <= branchLen; br += 0.8f)
+                        {
+                            Vector2 bpos = center + dir * r + perp * (br * side);
+                            int bx = (int)Mathf.Floor(bpos.X);
+                            int by = (int)Mathf.Floor(bpos.Y);
+                            SetOpaquePixel(bx, by);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Optionally draw a small central hexagon/star to add fidelity
+        int centerRadius = Math.Max(1, (int)(pixelsPerUnit * 0.6f * EffectiveLeafSize));
+        for (int y = -centerRadius; y <= centerRadius; y++)
+        {
+            for (int x = -centerRadius; x <= centerRadius; x++)
+            {
+                if (x * x + y * y <= centerRadius * centerRadius)
+                    SetOpaquePixel((int)center.X + x, (int)center.Y + y);
             }
         }
 
