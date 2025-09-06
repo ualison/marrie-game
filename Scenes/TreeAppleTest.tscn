@@ -4,7 +4,7 @@
 [ext_resource type="PackedScene" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="2_bcr4f"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
-[ext_resource type="Script" uid="uid://o04haht8ruox" path="res://Scripts/Trees/OrganicFractalTree.cs" id="7_mqr8g"]
+[ext_resource type="Script" uid="uid://o04haht8ruox" path="res://Scripts/Environment/OrganicFractalTree.cs" id="7_mqr8g"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
 [ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="8_y8jgj"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
@@ -16,6 +16,7 @@
 [node name="TreeAppleTestScene" type="Node2D"]
 
 [node name="Camera" type="Camera2D" parent="."]
+position = Vector2(0, -13)
 
 [node name="UserInterface" type="CanvasLayer" parent="."]
 follow_viewport_enabled = true
@@ -70,45 +71,66 @@ scale = Vector2(0.800781, 0.688233)
 texture = ExtResource("2_8u8ny")
 
 [node name="Ground" parent="Environment" instance=ExtResource("3_r6l07")]
-z_index = -5
+z_index = 2
 position = Vector2(6, 294)
 
 [node name="OrganicFractalTree" type="Node2D" parent="Environment"]
-position = Vector2(-198.865, 199.425)
+position = Vector2(-400, 295)
 script = ExtResource("7_mqr8g")
-initialLength = 180.0
+initialLength = 200.0
+lengthReduction = 0.75
 branchAngle = 25.0
 angleVariation = 10.0
+curvature = 0.0
 minBranches = 3
-maxBranches = 3
 branchProbability = 1.0
-trunkColor = Color(1, 1, 1, 1)
-leafColor = Color(0, 0, 0, 1)
+trunkColor = Color(0, 0, 0, 1)
+leafColor = Color(0.0768358, 0.0768358, 0.0768358, 1)
 leafSize = 1.0
 leafScale = 0.3
 leafDensity = 2
-hasApples = true
+appleQuantity = 4
+appleMinDistance = 30.0
+applePlacementHeight = 0.7
+applePrefab = ExtResource("8_y8jgj")
+
+[node name="OrganicFractalTree3" type="Node2D" parent="Environment"]
+position = Vector2(400, 295)
+script = ExtResource("7_mqr8g")
+initialLength = 200.0
+lengthReduction = 0.75
+branchAngle = 25.0
+angleVariation = 10.0
+curvature = 0.0
+minBranches = 3
+branchProbability = 1.0
+trunkColor = Color(0, 0, 0, 1)
+leafColor = Color(0.0768358, 0.0768358, 0.0768358, 1)
+leafSize = 1.0
+leafScale = 0.3
+leafDensity = 2
 appleQuantity = 4
 appleMinDistance = 30.0
 applePlacementHeight = 0.7
 applePrefab = ExtResource("8_y8jgj")
 
 [node name="OrganicFractalTree2" type="Node2D" parent="Environment"]
-position = Vector2(250, 199.425)
+position = Vector2(0, 295)
 script = ExtResource("7_mqr8g")
-initialLength = 180.0
+initialLength = 200.0
+lengthReduction = 0.75
 branchAngle = 25.0
 angleVariation = 10.0
+curvature = 0.0
 minBranches = 3
-maxBranches = 3
 branchProbability = 1.0
-trunkColor = Color(1, 1, 1, 1)
-leafColor = Color(0, 0, 0, 1)
+trunkColor = Color(0, 0, 0, 1)
+leafColor = Color(0.0768358, 0.0768358, 0.0768358, 1)
 leafSize = 1.0
 leafScale = 0.3
 leafDensity = 2
 hasApples = true
-appleQuantity = 4
+appleQuantity = 5
 appleMinDistance = 30.0
 applePlacementHeight = 0.7
 applePrefab = ExtResource("8_y8jgj")

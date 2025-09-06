@@ -1,7 +1,7 @@
 [gd_scene load_steps=4 format=3 uid="uid://dbt3v1ee4f7fr"]
 
 [ext_resource type="Texture2D" uid="uid://c3wsakw3ln5j3" path="res://Art/Tree2.png" id="1_xf04k"]
-[ext_resource type="Script" uid="uid://bq1nf2xjqwgft" path="res://Scripts/Trees/AppleTree.cs" id="2_appletree"]
+[ext_resource type="Script" uid="uid://bq1nf2xjqwgft" path="res://Scripts/Environment/AppleTree.cs" id="2_appletree"]
 [ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="2_hyao1"]
 
 [node name="Root" type="Node2D"]

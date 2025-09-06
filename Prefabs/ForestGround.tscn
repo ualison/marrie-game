@@ -1,17 +1,30 @@
 [gd_scene load_steps=3 format=3 uid="uid://c2dkq2wcjk8i7"]
 
-[ext_resource type="Texture2D" uid="uid://cdhw7x0dh6rlx" path="res://Art/Ground.png" id="1_rxw4n"]
+[ext_resource type="Script" uid="uid://c7rmh10cc2qsn" path="res://Scripts/Environment/ProceduralGround.cs" id="1_cgf43"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_rxw4n"]
-size = Vector2(1303, 118.194)
+size = Vector2(1303, 86.2685)
 
 [node name="StaticBody2D" type="StaticBody2D"]
 
-[node name="Ground" type="Sprite2D" parent="."]
-position = Vector2(2, -2)
-scale = Vector2(1.3312, 1.18449)
-texture = ExtResource("1_rxw4n")
+[node name="ProceduralGround" type="Node2D" parent="."]
+script = ExtResource("1_cgf43")
+GroundWidth = 1300.0
+GroundHeight = 90.0
+GrassDensity = 450
+GrassHeightMin = 25.0
+GrassHeightMax = 35.0
+GrassWidthMin = 6.0
+GrassCurvature = 0.5
+WindStrength = 0.6
+GroundColor = Color(0, 0, 0, 1)
+GrassColorBase = Color(0, 0, 0, 1)
+GrassColorMid = Color(0.111197, 0.111197, 0.111197, 1)
+GrassColorTip = Color(0, 0, 0, 1)
+SummitCount = 120
+GroundBlendDepth = 35.0
+GroundTextureDensity = 0.5
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(-14.5, 26.1715)
+position = Vector2(-14.5, 42.1342)
 shape = SubResource("RectangleShape2D_rxw4n")
