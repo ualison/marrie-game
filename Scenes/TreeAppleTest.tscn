@@ -1,12 +1,14 @@
-[gd_scene load_steps=13 format=3 uid="uid://54o6xy0qaoae"]
+[gd_scene load_steps=15 format=3 uid="uid://54o6xy0qaoae"]
 
 [ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="2_bcr4f"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
+[ext_resource type="Script" uid="uid://d3lvtjt6ine84" path="res://Scripts/Environment/FractalBush.cs" id="6_bcr4f"]
 [ext_resource type="Script" uid="uid://o04haht8ruox" path="res://Scripts/Environment/OrganicFractalTree.cs" id="7_mqr8g"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
 [ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="8_y8jgj"]
+[ext_resource type="Script" uid="uid://di86avtcgcxm" path="res://Scripts/Environment/OrganicFractalBush.cs" id="9_mqr8g"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
 [ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="12_r6l07"]
 [ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="13_bcr4f"]
@@ -74,6 +76,19 @@ texture = ExtResource("2_8u8ny")
 z_index = 2
 position = Vector2(6, 294)
 
+[node name="FractalBush" type="Node2D" parent="Environment"]
+position = Vector2(-200, 295)
+script = ExtResource("6_bcr4f")
+InitialLength = 80.0
+AngleVariation = 45.0
+MaxDepth = 5
+BranchCount = 8
+MinLength = 2.0
+StartColor = Color(0, 0, 0, 1)
+EndColor = Color(0, 0, 0, 1)
+AnimateGrowth = false
+AnimationSpeed = 1.5
+
 [node name="OrganicFractalTree" type="Node2D" parent="Environment"]
 position = Vector2(-400, 295)
 script = ExtResource("7_mqr8g")
@@ -134,6 +149,12 @@ appleQuantity = 5
 appleMinDistance = 30.0
 applePlacementHeight = 0.7
 applePrefab = ExtResource("8_y8jgj")
+
+[node name="OrganicFractalBush" type="Node2D" parent="Environment"]
+position = Vector2(0, 295)
+script = ExtResource("9_mqr8g")
+AngleAsymmetry = 0.0
+MaxDepth = 15
 
 [node name="GameEntities" type="Node2D" parent="."]
 

@@ -32,7 +32,7 @@ scale = Vector2(0.800781, 0.688233)
 texture = ExtResource("2_8u8ny")
 
 [node name="Ground" parent="Environment" instance=ExtResource("3_r6l07")]
-z_index = -5
+z_index = 2
 position = Vector2(6, 294)
 
 [node name="Decorations" type="Node2D" parent="Environment"]
