@@ -57,8 +57,13 @@ public partial class OrganicFractalTree : Node2D
     [Export(PropertyHint.Range, "0.1,2.0")] private float leafScale = 0.6f; // Multiplier to scale leaves smaller/larger in editor
     [ExportGroup("Visual")]
     [Export(PropertyHint.Range, "1,20")] private int leafDensity = 8; // How many leaf clusters per branch tip
-    [ExportGroup("Visual")]
-    [Export] private bool useGradient = true; // Apply color gradient from trunk to branches
+    // === WIND / DYNAMICS ===
+    [ExportGroup("Wind")]
+    [Export] private bool EnableWind = false;
+    [ExportGroup("Wind")]
+    [Export(PropertyHint.Range, "0,2")] private float WindStrength = 0.5f;
+    // Internal time accumulator for wind animation
+    private float _windTime = 0f;
 
     // === APPLE SETTINGS ===
     [ExportGroup("Apples")]
@@ -75,8 +80,7 @@ public partial class OrganicFractalTree : Node2D
     private Random random;
     private List<BranchData> branches = new List<BranchData>();
     private List<Node2D> appleInstances = new List<Node2D>();
-    // Cache gradients per depth to avoid allocating many Gradient objects
-    private Dictionary<int, Gradient> gradientCache = new Dictionary<int, Gradient>();
+    // (Gradients removed for performance; branches use opaque trunk color)
     // When true, _Draw should perform the full batch draw; afterwards it will be cleared
     // to avoid re-executing expensive draw code every frame.
     private bool needFullRedraw = true;
@@ -130,6 +134,8 @@ public partial class OrganicFractalTree : Node2D
     private class OptimizedLeafCluster
     {
         public Vector2 Position;
+    // store the base position so wind offsets can be applied without accumulation
+    public Vector2 OriginalPosition;
         public float Scale = 1.0f;
         public float Rotation = 0.0f;
         public Color Tint = new Color(1f, 1f, 1f, 1f);
@@ -161,6 +167,16 @@ public partial class OrganicFractalTree : Node2D
         if (!needFullRedraw)
             return;
 
+        // Compute global wind offset if enabled
+        Vector2 windOffset = Vector2.Zero;
+        if (EnableWind)
+        {
+            windOffset = new Vector2(
+                Mathf.Sin(_windTime * 2f) * WindStrength,
+                Mathf.Sin(_windTime * 1.5f) * WindStrength * 0.5f
+            );
+        }
+
         // Batch-draw branches to reduce node count and draw calls.
         if (branches.Count > 0)
         {
@@ -168,11 +184,18 @@ public partial class OrganicFractalTree : Node2D
             {
                 var br = branches[b];
                 if (br.Points == null || br.Points.Length < 2) continue;
-                Color c = br.Color * new Color(1f, 1f, 1f, br.Alpha);
+                Color c = br.Color * new Color(1f, 1f, br.Alpha);
+
+                // Compute a simple wind multiplier so outer branches/tips move more.
+                // Use distance from origin (trunk base) relative to initialLength.
+                float branchDistance = br.Points[br.Points.Length - 1].DistanceTo(Vector2.Zero);
+                float windMultiplier = Mathf.Clamp(branchDistance / (initialLength + 0.0001f), 0f, 1.5f);
 
                 for (int i = 0; i < br.Points.Length - 1; i++)
                 {
-                    DrawLine(br.Points[i], br.Points[i + 1], c, br.Thickness);
+                    Vector2 p0 = br.Points[i] + windOffset * windMultiplier * (i / (float)br.Points.Length);
+                    Vector2 p1 = br.Points[i + 1] + windOffset * windMultiplier * ((i + 1) / (float)br.Points.Length);
+                    DrawLine(p0, p1, c, br.Thickness);
                 }
             }
         }
@@ -244,6 +267,19 @@ public partial class OrganicFractalTree : Node2D
         needFullRedraw = false;
     }
 
+    public override void _Process(double delta)
+    {
+        if (EnableWind)
+        {
+            _windTime += (float)delta;
+            // Redraw each frame while wind is active
+            needFullRedraw = true;
+            // Apply wind to leaves as well using a rightward bias by default
+            ApplyWindEffect(WindStrength, Vector2.Right);
+            QueueRedraw();
+        }
+    }
+
     // Method to create and cache the leaf template (called once per tree generation)
     private void CreateLeafTemplate()
     {
@@ -280,6 +316,7 @@ public partial class OrganicFractalTree : Node2D
         var cluster = new OptimizedLeafCluster
         {
             Position = position,
+            OriginalPosition = position,
             Scale = 0.8f + (float)random.NextDouble() * 0.4f, // Vary scale slightly
             Rotation = (float)(random.NextDouble() * Mathf.Pi * 2), // Random rotation
             Tint = new Color(
@@ -304,10 +341,9 @@ public partial class OrganicFractalTree : Node2D
         }
 
         // Clear optimized leaf clusters instead of old ones
-        optimizedLeafClusters.Clear();
-        branches.Clear();
-        appleInstances.Clear();
-        gradientCache.Clear();
+    optimizedLeafClusters.Clear();
+    branches.Clear();
+    appleInstances.Clear();
 
         // Reset leaf template cache if needed
         leafTemplateCached = false;
@@ -404,13 +440,8 @@ public partial class OrganicFractalTree : Node2D
 
         // Compute a single representative color for the branch
         float depthFactor = 1.0f - (depth / (float)maxDepth) * 0.4f;
-        Color baseColor = trunkColor;
-        if (depth > maxDepth * 0.6f)
-        {
-            float greenBlend = (depth - maxDepth * 0.6f) / (maxDepth * 0.4f);
-            baseColor = trunkColor.Lerp(leafColor * 0.7f, greenBlend * 0.5f);
-        }
-        Color branchColor = baseColor * new Color(depthFactor, depthFactor, depthFactor, 1.0f);
+    // Use opaque trunk color and darken slightly with depth for performance (no gradients)
+    Color branchColor = trunkColor * new Color(depthFactor, depthFactor, depthFactor, 1.0f);
 
         // Store branch data
         var branchData = new BranchData
@@ -939,19 +970,35 @@ public partial class OrganicFractalTree : Node2D
             return;
 
         windDirection = windDirection.Normalized();
+        Vector2 perp = new Vector2(-windDirection.Y, windDirection.X);
         float time = (float)Time.GetTicksMsec() / 1000.0f;
+
+        // base magnitude in pixels for leaf displacement (tunable)
+        float baseLeafDisplacement = 6.0f;
 
         for (int i = 0; i < optimizedLeafClusters.Count; i++)
         {
             var cluster = optimizedLeafClusters[i];
 
-            // Apply wind-based rotation oscillation
-            float windEffect = Mathf.Sin(time * 2.0f + cluster.Position.X * 0.01f) * windStrength;
+            // Use OriginalPosition for deterministic phase offsets
+            Vector2 origin = cluster.OriginalPosition != Vector2.Zero ? cluster.OriginalPosition : cluster.Position;
+
+            // Positional offset along wind direction (primary) and perpendicular (secondary)
+            float along = Mathf.Sin(time * 2.0f + origin.X * 0.01f) * windStrength;
+            float across = Mathf.Sin(time * 1.5f + origin.Y * 0.01f) * windStrength * 0.5f;
+
+            Vector2 displacement = windDirection * (along * baseLeafDisplacement * cluster.Scale)
+                                 + perp * (across * baseLeafDisplacement * 0.5f * cluster.Scale);
+
+            // Apply rotation and scale jitter as before (use origin for deterministic behavior)
+            float windEffect = Mathf.Sin(time * 2.0f + origin.X * 0.01f) * windStrength;
             cluster.Rotation += windEffect * 0.1f;
 
-            // Apply slight scale variation based on wind
-            float scaleVariation = 1.0f + Mathf.Sin(time * 1.5f + cluster.Position.Y * 0.01f) * windStrength * 0.05f;
+            float scaleVariation = 1.0f + Mathf.Sin(time * 1.5f + origin.Y * 0.01f) * windStrength * 0.05f;
             cluster.Scale = Mathf.Clamp(cluster.Scale * scaleVariation, 0.5f, 1.5f);
+
+            // Update world position (don't accumulate; always base on OriginalPosition)
+            cluster.Position = origin + displacement;
         }
 
         needFullRedraw = true;
