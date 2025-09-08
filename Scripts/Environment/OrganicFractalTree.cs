@@ -57,6 +57,8 @@ public partial class OrganicFractalTree : Node2D
     [Export(PropertyHint.Range, "0.1,2.0")] private float leafScale = 0.6f; // Multiplier to scale leaves smaller/larger in editor
     [ExportGroup("Visual")]
     [Export(PropertyHint.Range, "1,20")] private int leafDensity = 8; // How many leaf clusters per branch tip
+    [ExportGroup("Visual")]
+    [Export(PropertyHint.Range, "0,6")] private int leafSnowflakeDepth = 2; // Fractal depth for Koch snowflake leaf template
     // === WIND / DYNAMICS ===
     [ExportGroup("Wind")]
     [Export] private bool EnableWind = false;
@@ -138,7 +140,7 @@ public partial class OrganicFractalTree : Node2D
     public Vector2 OriginalPosition;
         public float Scale = 1.0f;
         public float Rotation = 0.0f;
-        public Color Tint = new Color(1f, 1f, 1f, 1f);
+    // Tint removed: leaves use the single opaque `leafColor` now.
     }
 
     // Cached rendered texture for a single leaf cluster (rasterized once and reused)
@@ -226,7 +228,8 @@ public partial class OrganicFractalTree : Node2D
                     DrawSetTransform(cluster.Position, cluster.Rotation, Vector2.One * cluster.Scale);
 
                     // Draw texture centered at origin (transform handles world position)
-                    DrawTexture(cachedLeafTexture, -texCenter, baseLeafColor * cluster.Tint);
+                    // Use only base leafColor (opaque) — no per-cluster tinting.
+                    DrawTexture(cachedLeafTexture, -texCenter, baseLeafColor);
 
                     // Reset transform for next draw
                     DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
@@ -255,7 +258,8 @@ public partial class OrganicFractalTree : Node2D
 
                         Vector2 finalPos = cluster.Position + rotatedOffset;
                         float finalSize = templateFrag.Size * cluster.Scale * EffectiveLeafSize;
-                        Color finalColor = (leafColor * cluster.Tint * templateFrag.Color);
+                        // Use only base leafColor (opaque) combined with fragment color.
+                        Color finalColor = (leafColor * templateFrag.Color);
 
                         DrawCircle(finalPos, finalSize, finalColor);
                     }
@@ -319,12 +323,7 @@ public partial class OrganicFractalTree : Node2D
             OriginalPosition = position,
             Scale = 0.8f + (float)random.NextDouble() * 0.4f, // Vary scale slightly
             Rotation = (float)(random.NextDouble() * Mathf.Pi * 2), // Random rotation
-            Tint = new Color(
-                0.8f + (float)random.NextDouble() * 0.4f, // Slight color variation
-                0.9f + (float)random.NextDouble() * 0.2f,
-                0.7f + (float)random.NextDouble() * 0.3f,
-                0.9f + (float)random.NextDouble() * 0.1f
-            )
+            // No per-cluster tint: leaves use the global `leafColor`.
         };
 
         optimizedLeafClusters.Add(cluster);
@@ -821,60 +820,95 @@ public partial class OrganicFractalTree : Node2D
         // Rasterize a symmetric snowflake centered at `center` with crisp/solid alpha (no soft fade).
         // We'll draw multiple radial arms and small branch details for fidelity.
 
-        // Snowflake parameters (in normalized template units)
-        int arms = 6; // 6-fold symmetry
-        float armLength = cachedLeafTemplate.TemplateRadius * EffectiveLeafSize * pixelsPerUnit; // pixels
-        float armWidth = Math.Max(1f, pixelsPerUnit * 0.12f * EffectiveLeafSize); // pixels (thickness)
+        // Koch snowflake rasterization
+        float radiusPixels = cachedLeafTemplate.TemplateRadius * EffectiveLeafSize * pixelsPerUnit;
+        float armWidth = Math.Max(1f, pixelsPerUnit * 0.12f * EffectiveLeafSize); // thickness in pixels
 
-        // Helper to set pixel to white with alpha=1 (opaque) — preserve existing alpha if already opaque
+        // Helper to set pixel to white with alpha=1 (opaque)
         void SetOpaquePixel(int px, int py)
         {
             if (px < 0 || px >= width || py < 0 || py >= height) return;
             img.SetPixel(px, py, new Color(1f, 1f, 1f, 1f));
         }
 
-        // Draw each arm by stepping along the arm and stamping a small solid disk for thickness
-        for (int a = 0; a < arms; a++)
+        // Generate Koch snowflake polygon points (centered)
+        List<Vector2> GenerateKochSnowflake(Vector2 c, float radius, int depth)
         {
-            float angle = (Mathf.Pi * 2f / arms) * a;
-            Vector2 dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
-
-            // Main arm
-            for (float r = 0; r <= armLength; r += 0.8f)
+            // Start from an equilateral triangle
+            var pts = new List<Vector2>();
+            for (int i = 0; i < 3; i++)
             {
-                Vector2 pos = center + dir * r;
+                float ang = Mathf.Pi * 2f * (i / 3.0f) - Mathf.Pi / 2f; // point upward
+                pts.Add(c + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * radius);
+            }
+
+            // Local function to subdivide one segment
+            List<Vector2> Subdivide(List<Vector2> poly)
+            {
+                var next = new List<Vector2>();
+                for (int i = 0; i < poly.Count; i++)
+                {
+                    Vector2 a = poly[i];
+                    Vector2 b = poly[(i + 1) % poly.Count];
+                    Vector2 v = b - a;
+                    Vector2 p1 = a + v * (1.0f / 3.0f);
+                    Vector2 p2 = a + v * (2.0f / 3.0f);
+
+                    // peak point (rotate by -60 degrees to go outward)
+                    float ang = -Mathf.Pi / 3.0f; // -60 degrees
+                    Vector2 dir = p2 - p1;
+                    Vector2 peak = p1 + new Vector2(
+                        dir.X * Mathf.Cos(ang) - dir.Y * Mathf.Sin(ang),
+                        dir.X * Mathf.Sin(ang) + dir.Y * Mathf.Cos(ang)
+                    );
+
+                    next.Add(a);
+                    next.Add(p1);
+                    next.Add(peak);
+                    next.Add(p2);
+                }
+                return next;
+            }
+
+            var current = pts;
+            for (int d = 0; d < Math.Max(0, depth); d++)
+            {
+                current = Subdivide(current);
+            }
+
+            return current;
+        }
+
+        var snowPts = GenerateKochSnowflake(center, radiusPixels, leafSnowflakeDepth);
+
+        // Rasterize by stamping along each segment with thickness to approximate a filled shape
+        for (int i = 0; i < snowPts.Count; i++)
+        {
+            Vector2 a = snowPts[i];
+            Vector2 b = snowPts[(i + 1) % snowPts.Count];
+            Vector2 seg = b - a;
+            float segLen = seg.Length();
+            if (segLen <= 0.001f) continue;
+            Vector2 dir = seg / segLen;
+
+            // step along segment
+            float step = 0.6f; // pixel step
+            for (float t = 0; t <= segLen; t += step)
+            {
+                Vector2 pos = a + dir * t;
                 int cx = (int)Mathf.Floor(pos.X);
                 int cy = (int)Mathf.Floor(pos.Y);
 
-                // Stamp a small square/disk for thickness
-                int t = (int)Math.Ceiling(armWidth);
-                for (int oy = -t; oy <= t; oy++)
+                int r = (int)Math.Ceiling(armWidth);
+                for (int oy = -r; oy <= r; oy++)
                 {
-                    for (int ox = -t; ox <= t; ox++)
+                    for (int ox = -r; ox <= r; ox++)
                     {
                         float ddx = (ox + 0.5f);
                         float ddy = (oy + 0.5f);
                         if (ddx * ddx + ddy * ddy <= (armWidth + 0.0f) * (armWidth + 0.0f))
                         {
                             SetOpaquePixel(cx + ox, cy + oy);
-                        }
-                    }
-                }
-
-                // Add small branch details along the arm for a snowflake look
-                if (r > armLength * 0.15f && r < armLength * 0.9f && ((int)r % 8 == 0))
-                {
-                    // perpendicular branches (both sides)
-                    Vector2 perp = new Vector2(-dir.Y, dir.X);
-                    float branchLen = armLength * 0.12f;
-                    for (int side = -1; side <= 1; side += 2)
-                    {
-                        for (float br = 0; br <= branchLen; br += 0.8f)
-                        {
-                            Vector2 bpos = center + dir * r + perp * (br * side);
-                            int bx = (int)Mathf.Floor(bpos.X);
-                            int by = (int)Mathf.Floor(bpos.Y);
-                            SetOpaquePixel(bx, by);
                         }
                     }
                 }
@@ -1005,71 +1039,5 @@ public partial class OrganicFractalTree : Node2D
         QueueRedraw();
     }
 
-    // Method to change leaf colors (e.g., for seasonal effects)
-    public void SetSeasonalLeafColors(Color newLeafColor, float variation = 0.2f)
-    {
-        leafColor = newLeafColor;
-
-        // Update existing leaf cluster tints
-        if (random == null) random = new Random(seed);
-
-        for (int i = 0; i < optimizedLeafClusters.Count; i++)
-        {
-            var cluster = optimizedLeafClusters[i];
-            cluster.Tint = new Color(
-                1.0f - (float)random.NextDouble() * variation,
-                1.0f - (float)random.NextDouble() * variation,
-                1.0f - (float)random.NextDouble() * variation,
-                0.9f + (float)random.NextDouble() * 0.1f
-            );
-        }
-
-        needFullRedraw = true;
-        QueueRedraw();
-    }
-
-    // Method to animate leaf appearance (useful for spring growth)
-    public async void AnimateLeafGrowth(float duration = 2.0f)
-    {
-        if (optimizedLeafClusters.Count == 0)
-            return;
-
-        // Store original scales
-        var originalScales = new float[optimizedLeafClusters.Count];
-        for (int i = 0; i < optimizedLeafClusters.Count; i++)
-        {
-            originalScales[i] = optimizedLeafClusters[i].Scale;
-            optimizedLeafClusters[i].Scale = 0f; // Start with no leaves
-        }
-
-        needFullRedraw = true;
-
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            await ToSignal(GetTree().CreateTimer(0.03f), SceneTreeTimer.SignalName.Timeout);
-            elapsed += 0.03f;
-            float progress = elapsed / duration;
-
-            // Grow leaves with a nice easing curve
-            float easedProgress = 1f - Mathf.Pow(1f - progress, 3f); // Ease-out cubic
-
-            for (int i = 0; i < optimizedLeafClusters.Count; i++)
-            {
-                optimizedLeafClusters[i].Scale = originalScales[i] * easedProgress;
-            }
-
-            needFullRedraw = true;
-            QueueRedraw();
-        }
-
-        // Ensure final state
-        for (int i = 0; i < optimizedLeafClusters.Count; i++)
-        {
-            optimizedLeafClusters[i].Scale = originalScales[i];
-        }
-
-        needFullRedraw = true;
-        QueueRedraw();
-    }
+    // NOTE: Seasonal per-cluster leaf coloring and AnimateLeafGrowth removed.
 }
