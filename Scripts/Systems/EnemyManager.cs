@@ -8,8 +8,8 @@ using MarrieGame.Core.Models;
 public partial class EnemyManager : Node
 {
     #region Configuration
-    [Export] public float GlobalHideTime { get; set; } = 80f; // Ghost death -> both respawn
-    [Export] public float LocalHideTime { get; set; } = 15f;  // Monster depleted -> monster respawn
+    [Export] public float GlobalHideTime { get; set; } = 40f; // Ghost death -> both respawn
+    [Export] public float LocalHideTime { get; set; } = 10f;  // Monster depleted -> monster respawn
 
     public static EnemyManager Instance { get; private set; }
     #endregion
@@ -187,9 +187,27 @@ public partial class EnemyManager : Node
             }
         }
 
+        // Only hide the monster immediately if we're currently in CurrentReality.
+        // If we're in PastReality (e.g. ghost died during replay), keep the monster's
+        // hide state as the source-of-truth and defer any additional hide calls until
+        // reality returns to CurrentReality. This ensures the global respawn timer
+        // is the authoritative timing for when the monster should be unavailable.
         if (IsInstanceValid(pair.Monster))
         {
-            HideMonster(pair.Monster);
+            var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
+            if (currentReality == Reality.CurrentReality)
+            {
+                HideMonster(pair.Monster);
+            }
+            else
+            {
+                Log.Debug($"Ghost died in PastReality - deferring immediate hide for monster {pair.Monster.Name}, will remain hidden by respawn timer", "EnemyManager");
+                // Ensure ReplayRecorder knows the monster is considered hidden by pair state
+                if (ReplayRecorder.Instance != null)
+                {
+                    ReplayRecorder.Instance.OnMonsterVisibilityChanged(pair.Monster, false);
+                }
+            }
         }
 
         pair.IsHidden = true;
@@ -252,8 +270,10 @@ public partial class EnemyManager : Node
     {
         // Always cancel existing timer first
         CancelRespawn(pair);
-
         var timer = new Timer { OneShot = true, WaitTime = seconds };
+        // Ensure respawn timers continue to run even when the SceneTree is paused
+        // (e.g. during player-death pause). This prevents "slow" or frozen countdowns.
+        timer.ProcessMode = ProcessModeEnum.Always;
         AddChild(timer);
         _respawnTimers[pair] = timer;
         _respawnTypes[pair] = type;
@@ -427,7 +447,7 @@ public partial class EnemyManager : Node
                 }
             }
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
             Log.Warning($"Failed to get purple hearts for ghost {ghost.Name}: {ex.Message}", "EnemyManager");
         }
@@ -460,11 +480,9 @@ public partial class EnemyManager : Node
 
     public bool IsMonsterHiddenByPair(Monster monster) => GetPair(monster)?.IsHidden ?? false;
 
-    /// <summary>
     /// Returns true if the specified monster is part of a pair that currently has a respawn timer scheduled.
     /// This is used by other systems (like ReplayOrchestrator) to avoid showing monsters that should remain hidden
     /// during a global respawn timeout even when reality returns to current.
-    /// </summary>
     public bool IsMonsterScheduledForRespawn(Monster monster)
     {
         var pair = GetPair(monster);
@@ -499,6 +517,54 @@ public partial class EnemyManager : Node
     }
 
     public List<EnemyPair> GetAllPairsSnapshot() => new List<EnemyPair>(_pairs);
+
+    // IMPROVED: These properties now better handle the case where global timer overrides local
+    public float GlobalRespawnTimeLeft
+    {
+        get
+        {
+            // If any pair has a FullPair timer, return the smallest time left (next global event)
+            float min = float.PositiveInfinity;
+            bool hasGlobalTimer = false;
+
+            foreach (var kvp in _respawnTimers)
+            {
+                if (_respawnTypes.TryGetValue(kvp.Key, out var t) && t == RespawnType.FullPair)
+                {
+                    hasGlobalTimer = true;
+                    try { min = Math.Min(min, (float)kvp.Value.TimeLeft); } catch { }
+                }
+            }
+
+            return hasGlobalTimer && !float.IsPositiveInfinity(min) ? min : -1f;
+        }
+    }
+
+    public float LocalRespawnTimeLeft
+    {
+        get
+        {
+            // IMPORTANT: If there's any global timer active, local timers are effectively overridden
+            // So we should return -1 to indicate no active local timer
+            if (GlobalRespawnTimeLeft > 0)
+                return -1f;
+
+            // If any pair has a MonsterOnly timer, return the smallest time left (next local event)
+            float min = float.PositiveInfinity;
+            bool hasLocalTimer = false;
+
+            foreach (var kvp in _respawnTimers)
+            {
+                if (_respawnTypes.TryGetValue(kvp.Key, out var t) && t == RespawnType.MonsterOnly)
+                {
+                    hasLocalTimer = true;
+                    try { min = Math.Min(min, (float)kvp.Value.TimeLeft); } catch { }
+                }
+            }
+
+            return hasLocalTimer && !float.IsPositiveInfinity(min) ? min : -1f;
+        }
+    }
     #endregion
 
     #region Game Events

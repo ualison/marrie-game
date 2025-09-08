@@ -482,8 +482,9 @@ public partial class Monster : CharacterBody2D, IPoolable
         SetCollisionMask(1u);
         SetCollisionLayer(1u);
 
-        // Reset MonsterLife to full health
-        _monsterLife?.Reset();
+    // IMPORTANT: Do NOT reset MonsterLife when returning from a replay.
+    // The monster's CurrentReality life must remain as it was before the player
+    // watched the replay. Resetting here would incorrectly restore health.
 
         GetTree().CreateTimer(3.0f).Timeout += () =>
         {

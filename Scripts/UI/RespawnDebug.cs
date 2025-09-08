@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -49,12 +50,12 @@ public partial class RespawnDebug : Control
         {
             var container = new VBoxContainer();
             container.CustomMinimumSize = new Vector2(420, 180);
-            
+
             if (_headerLabel.GetParent() == null)
                 container.AddChild(_headerLabel);
             if (_pairsBox.GetParent() == null)
                 container.AddChild(_pairsBox);
-                
+
             AddChild(container);
         }
         else
@@ -95,10 +96,58 @@ public partial class RespawnDebug : Control
     private void UpdateHeader()
     {
         var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
-        var globalTime = EnemyManager.Instance.GlobalHideTime;
-        var localTime = EnemyManager.Instance.LocalHideTime;
 
-        _headerLabel.Text = $"Reality: {currentReality} \n Monster Global Time: {globalTime:F1}s \nMonster Local Time: {localTime:F1}s";
+        // Get the actual active timer values from EnemyManager
+        float activeGlobalLeft = EnemyManager.Instance.GlobalRespawnTimeLeft;
+        float activeLocalLeft = EnemyManager.Instance.LocalRespawnTimeLeft;
+
+        // FALLBACK: Sometimes the aggregated GlobalRespawnTimeLeft may report -1
+        // even when a FullPair timer exists (edge cases during reality switches).
+        // As a safety net, compute the smallest per-pair FullPair timer left and use it.
+        if (activeGlobalLeft <= 0)
+        {
+            var pairs = EnemyManager.Instance.GetAllPairsSnapshot();
+            float fallbackMin = float.PositiveInfinity;
+            foreach (var p in pairs)
+            {
+                var type = EnemyManager.Instance.GetRespawnType(p);
+                if (type == "FullPair")
+                {
+                    var tleft = EnemyManager.Instance.GetRespawnTimeLeft(p);
+                    if (tleft > 0)
+                        fallbackMin = Math.Min(fallbackMin, tleft);
+                }
+            }
+
+            if (!float.IsPositiveInfinity(fallbackMin))
+                activeGlobalLeft = fallbackMin;
+        }
+
+        // FIXED: When global timer is active (> 0), it means it has overridden any local timers
+        // So we should show the global timer and indicate that local is overridden
+        string globalDisplay, localDisplay;
+
+        if (activeGlobalLeft > 0)
+        {
+            // Global timer is active - show it
+            globalDisplay = $"{activeGlobalLeft:F1}s (active)";
+
+            // If there was a local timer, it's been overridden
+            if (activeLocalLeft > 0)
+                localDisplay = $"OVERRIDDEN by Global Timer";
+            else
+                localDisplay = $"{EnemyManager.Instance.LocalHideTime:F1}s (config)";
+        }
+        else
+        {
+            // No global timer active
+            globalDisplay = $"{EnemyManager.Instance.GlobalHideTime:F1}s (config)";
+
+            // Show local timer if active, otherwise show config
+            localDisplay = activeLocalLeft > 0 ? $"{activeLocalLeft:F1}s (active)" : $"{EnemyManager.Instance.LocalHideTime:F1}s (config)";
+        }
+
+        _headerLabel.Text = $"Reality: {currentReality}\nMonster Global Time: {globalDisplay}\nMonster Local Time: {localDisplay}";
     }
 
     private void UpdatePairsList()
@@ -130,13 +179,13 @@ public partial class RespawnDebug : Control
         var redHearts = EnemyManager.Instance.GetMonsterRedHearts(pair.Monster);
         var respawnTimeLeft = EnemyManager.Instance.GetRespawnTimeLeft(pair);
         var respawnType = EnemyManager.Instance.GetRespawnType(pair);
-        
+
         var status = GetHiddenStatus(pair.IsHidden, respawnTimeLeft, respawnType);
         var pairName = GetFriendlyPairName(pair);
-        
+
         var text = $"{pairName} | Red: {redHearts} | {status}";
         var color = pair.IsHidden ? Colors.Orange : Colors.LightGreen;
-        
+
         AddPairLabel(text, color);
     }
 
@@ -147,13 +196,13 @@ public partial class RespawnDebug : Control
         var purpleHearts = EnemyManager.Instance.GetGhostPurpleHearts(pair.Ghost);
         var respawnTimeLeft = EnemyManager.Instance.GetRespawnTimeLeft(pair);
         var respawnType = EnemyManager.Instance.GetRespawnType(pair);
-        
+
         var status = GetHiddenStatus(pair.IsHidden, respawnTimeLeft, respawnType);
         var pairName = GetFriendlyPairName(pair);
-        
+
         var text = $"{pairName} | Purple: {purpleHearts} | {status}";
         var color = pair.IsHidden ? Colors.Orange : Colors.LightBlue;
-        
+
         AddPairLabel(text, color);
     }
 
@@ -161,41 +210,41 @@ public partial class RespawnDebug : Control
     {
         if (!isHidden)
             return "Active";
-            
+
         if (timeLeft > 0)
         {
             var timerType = respawnType == "MonsterOnly" ? "Local" : "Global";
             return $"Hidden ({timerType}: {timeLeft:F1}s)";
         }
-        
+
         return "Hidden (No Timer)";
     }
 
     private string GetFriendlyPairName(EnemyPair pair)
     {
         if (pair == null) return "Unknown";
-        
+
         var monsterName = GetFriendlyNodeName(pair.Monster);
         var ghostName = GetFriendlyNodeName(pair.Ghost);
-        
+
         return ghostName != "None" ? $"{monsterName}+{ghostName}" : monsterName;
     }
 
     private string GetFriendlyNodeName(Node node)
     {
         if (!IsInstanceValid(node)) return "None";
-        
+
         // Use type name if node has generic scene name
         if (node.Name == "CharacterBody2D")
             return node.GetType().Name;
-            
+
         return node.Name;
     }
 
     private void AddPairLabel(string text, Color color)
     {
-        var label = new Label 
-        { 
+        var label = new Label
+        {
             Text = text,
             CustomMinimumSize = new Vector2(380, 20)
         };

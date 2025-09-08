@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://hdkgiqg4id43"]
+
+[ext_resource type="Texture2D" uid="uid://bwafrseps3yl2" path="res://Art/Leaf.png" id="1_des0p"]
+
+[node name="Leaf" type="Sprite2D"]
+position = Vector2(-9.53674e-07, 0.999998)
+scale = Vector2(0.0102539, 0.0112305)
+texture = ExtResource("1_des0p")
