@@ -136,11 +136,11 @@ public partial class OrganicFractalTree : Node2D
     private class OptimizedLeafCluster
     {
         public Vector2 Position;
-    // store the base position so wind offsets can be applied without accumulation
-    public Vector2 OriginalPosition;
+        // store the base position so wind offsets can be applied without accumulation
+        public Vector2 OriginalPosition;
         public float Scale = 1.0f;
         public float Rotation = 0.0f;
-    // Tint removed: leaves use the single opaque `leafColor` now.
+        // Tint removed: leaves use the single opaque `leafColor` now.
     }
 
     // Cached rendered texture for a single leaf cluster (rasterized once and reused)
@@ -228,7 +228,7 @@ public partial class OrganicFractalTree : Node2D
                     DrawSetTransform(cluster.Position, cluster.Rotation, Vector2.One * cluster.Scale);
 
                     // Draw texture centered at origin (transform handles world position)
-                    // Use only base leafColor (opaque) — no per-cluster tinting.
+                    // Use only base leafColor (opaque) â€" no per-cluster tinting.
                     DrawTexture(cachedLeafTexture, -texCenter, baseLeafColor);
 
                     // Reset transform for next draw
@@ -340,9 +340,9 @@ public partial class OrganicFractalTree : Node2D
         }
 
         // Clear optimized leaf clusters instead of old ones
-    optimizedLeafClusters.Clear();
-    branches.Clear();
-    appleInstances.Clear();
+        optimizedLeafClusters.Clear();
+        branches.Clear();
+        appleInstances.Clear();
 
         // Reset leaf template cache if needed
         leafTemplateCached = false;
@@ -352,8 +352,8 @@ public partial class OrganicFractalTree : Node2D
 
         // Create the leaf template first
         CreateLeafTemplate();
-    // Rasterize cached leaf texture now to avoid doing it inside _Draw
-    CreateLeafTexture();
+        // Rasterize cached leaf texture now to avoid doing it inside _Draw
+        CreateLeafTexture();
 
         // Start growing from the base
         Vector2 startPos = Vector2.Zero;
@@ -439,8 +439,8 @@ public partial class OrganicFractalTree : Node2D
 
         // Compute a single representative color for the branch
         float depthFactor = 1.0f - (depth / (float)maxDepth) * 0.4f;
-    // Use opaque trunk color and darken slightly with depth for performance (no gradients)
-    Color branchColor = trunkColor * new Color(depthFactor, depthFactor, depthFactor, 1.0f);
+        // Use opaque trunk color and darken slightly with depth for performance (no gradients)
+        Color branchColor = trunkColor * new Color(depthFactor, depthFactor, depthFactor, 1.0f);
 
         // Store branch data
         var branchData = new BranchData
@@ -793,18 +793,18 @@ public partial class OrganicFractalTree : Node2D
     // at draw time by multiplying with leafColor and cluster.Tint.
     private void CreateLeafTexture()
     {
-    if (!leafTemplateCached || cachedLeafTemplate == null)
+        if (!leafTemplateCached || cachedLeafTemplate == null)
             return;
 
         // Parameters for rasterization
         int pixelsPerUnit = 14; // controls resolution of the rasterized template
-    float radiusUnits = Math.Max(0.5f, cachedLeafTemplate.TemplateRadius * EffectiveLeafSize);
-    int texRadiusPx = (int)Math.Ceiling(radiusUnits * pixelsPerUnit) + 2;
+        float radiusUnits = Math.Max(0.5f, cachedLeafTemplate.TemplateRadius * EffectiveLeafSize);
+        int texRadiusPx = (int)Math.Ceiling(radiusUnits * pixelsPerUnit) + 2;
         int width = texRadiusPx * 2;
         int height = width;
 
-    // Create image via static factory (Godot C# Image.Create returns an Image)
-    var img = Image.CreateEmpty(width, height, false, Image.Format.Rgba8);
+        // Create image via static factory (Godot C# Image.Create returns an Image)
+        var img = Image.CreateEmpty(width, height, false, Image.Format.Rgba8);
 
         // Clear to transparent
         for (int y = 0; y < height; y++)
@@ -817,13 +817,6 @@ public partial class OrganicFractalTree : Node2D
 
         Vector2 center = new Vector2(width / 2f, height / 2f);
 
-        // Rasterize a symmetric snowflake centered at `center` with crisp/solid alpha (no soft fade).
-        // We'll draw multiple radial arms and small branch details for fidelity.
-
-        // Koch snowflake rasterization
-        float radiusPixels = cachedLeafTemplate.TemplateRadius * EffectiveLeafSize * pixelsPerUnit;
-        float armWidth = Math.Max(1f, pixelsPerUnit * 0.12f * EffectiveLeafSize); // thickness in pixels
-
         // Helper to set pixel to white with alpha=1 (opaque)
         void SetOpaquePixel(int px, int py)
         {
@@ -834,85 +827,110 @@ public partial class OrganicFractalTree : Node2D
         // Generate Koch snowflake polygon points (centered)
         List<Vector2> GenerateKochSnowflake(Vector2 c, float radius, int depth)
         {
-            // Start from an equilateral triangle
-            var pts = new List<Vector2>();
+            // Start with an equilateral triangle
+            var points = new List<Vector2>();
+            
+            // Create initial triangle vertices (pointing up)
             for (int i = 0; i < 3; i++)
             {
-                float ang = Mathf.Pi * 2f * (i / 3.0f) - Mathf.Pi / 2f; // point upward
-                pts.Add(c + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * radius);
+                float angle = Mathf.Pi * 2f * i / 3f - Mathf.Pi / 2f; // -90 degrees offset to point up
+                points.Add(c + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius);
             }
-
-            // Local function to subdivide one segment
-            List<Vector2> Subdivide(List<Vector2> poly)
+            
+            // Apply Koch transformation for the specified depth
+            for (int d = 0; d < depth; d++)
             {
-                var next = new List<Vector2>();
-                for (int i = 0; i < poly.Count; i++)
-                {
-                    Vector2 a = poly[i];
-                    Vector2 b = poly[(i + 1) % poly.Count];
-                    Vector2 v = b - a;
-                    Vector2 p1 = a + v * (1.0f / 3.0f);
-                    Vector2 p2 = a + v * (2.0f / 3.0f);
-
-                    // peak point (rotate by -60 degrees to go outward)
-                    float ang = -Mathf.Pi / 3.0f; // -60 degrees
-                    Vector2 dir = p2 - p1;
-                    Vector2 peak = p1 + new Vector2(
-                        dir.X * Mathf.Cos(ang) - dir.Y * Mathf.Sin(ang),
-                        dir.X * Mathf.Sin(ang) + dir.Y * Mathf.Cos(ang)
-                    );
-
-                    next.Add(a);
-                    next.Add(p1);
-                    next.Add(peak);
-                    next.Add(p2);
-                }
-                return next;
+                points = ApplyKochIteration(points);
             }
-
-            var current = pts;
-            for (int d = 0; d < Math.Max(0, depth); d++)
-            {
-                current = Subdivide(current);
-            }
-
-            return current;
+            
+            return points;
         }
 
-        var snowPts = GenerateKochSnowflake(center, radiusPixels, leafSnowflakeDepth);
-
-        // Rasterize by stamping along each segment with thickness to approximate a filled shape
-        for (int i = 0; i < snowPts.Count; i++)
+        // Helper function to apply one iteration of Koch snowflake transformation
+        List<Vector2> ApplyKochIteration(List<Vector2> inputPoints)
         {
-            Vector2 a = snowPts[i];
-            Vector2 b = snowPts[(i + 1) % snowPts.Count];
-            Vector2 seg = b - a;
-            float segLen = seg.Length();
-            if (segLen <= 0.001f) continue;
-            Vector2 dir = seg / segLen;
-
-            // step along segment
-            float step = 0.6f; // pixel step
-            for (float t = 0; t <= segLen; t += step)
+            var newPoints = new List<Vector2>();
+            
+            for (int i = 0; i < inputPoints.Count; i++)
             {
-                Vector2 pos = a + dir * t;
-                int cx = (int)Mathf.Floor(pos.X);
-                int cy = (int)Mathf.Floor(pos.Y);
+                Vector2 a = inputPoints[i];
+                Vector2 b = inputPoints[(i + 1) % inputPoints.Count];
+                
+                // Calculate the four points for this segment
+                Vector2 segment = b - a;
+                float segmentLength = segment.Length();
+                Vector2 direction = segment.Normalized();
+                
+                // Point 1: Start of segment
+                Vector2 p1 = a;
+                
+                // Point 2: One third along the segment
+                Vector2 p2 = a + direction * (segmentLength / 3f);
+                
+                // Point 4: Two thirds along the segment
+                Vector2 p4 = a + direction * (segmentLength * 2f / 3f);
+                
+                // Point 3: The peak of the equilateral triangle
+                Vector2 midpoint = (p2 + p4) * 0.5f;
+                Vector2 perpendicular = new Vector2(-direction.Y, direction.X); // Perpendicular to segment
+                float triangleHeight = (segmentLength / 3f) * Mathf.Sqrt(3f) / 2f; // Height of equilateral triangle
+                Vector2 p3 = midpoint + perpendicular * triangleHeight;
+                
+                // Add the points (p4 will be added as p1 of the next iteration, so we skip it here)
+                newPoints.Add(p1);
+                newPoints.Add(p2);
+                newPoints.Add(p3);
+                newPoints.Add(p4);
+            }
+            
+            return newPoints;
+        }
 
-                int r = (int)Math.Ceiling(armWidth);
-                for (int oy = -r; oy <= r; oy++)
+        // Helper method to draw a line on the image
+        void DrawLineOnImage(Vector2 start, Vector2 end, float thickness)
+        {
+            Vector2 direction = end - start;
+            float length = direction.Length();
+            if (length < 0.001f) return;
+            
+            Vector2 normalizedDir = direction / length;
+            
+            int steps = (int)Math.Ceiling(length) + 1;
+            float stepSize = length / steps;
+            
+            for (int step = 0; step <= steps; step++)
+            {
+                Vector2 point = start + normalizedDir * (step * stepSize);
+                
+                // Draw thickness around this point
+                int halfThickness = (int)Math.Ceiling(thickness / 2f);
+                for (int dx = -halfThickness; dx <= halfThickness; dx++)
                 {
-                    for (int ox = -r; ox <= r; ox++)
+                    for (int dy = -halfThickness; dy <= halfThickness; dy++)
                     {
-                        float ddx = (ox + 0.5f);
-                        float ddy = (oy + 0.5f);
-                        if (ddx * ddx + ddy * ddy <= (armWidth + 0.0f) * (armWidth + 0.0f))
+                        if (dx * dx + dy * dy <= (thickness / 2f) * (thickness / 2f))
                         {
-                            SetOpaquePixel(cx + ox, cy + oy);
+                            int x = (int)Math.Round(point.X) + dx;
+                            int y = (int)Math.Round(point.Y) + dy;
+                            SetOpaquePixel(x, y);
                         }
                     }
                 }
             }
+        }
+
+        // Rasterize a symmetric snowflake centered at `center` with crisp/solid alpha (no soft fade).
+        float radiusPixels = cachedLeafTemplate.TemplateRadius * EffectiveLeafSize * pixelsPerUnit;
+        float armWidth = Math.Max(1f, pixelsPerUnit * 0.12f * EffectiveLeafSize); // thickness in pixels
+
+        var snowPts = GenerateKochSnowflake(center, radiusPixels, leafSnowflakeDepth);
+
+        // Rasterize the Koch snowflake outline
+        for (int i = 0; i < snowPts.Count; i++)
+        {
+            Vector2 a = snowPts[i];
+            Vector2 b = snowPts[(i + 1) % snowPts.Count];
+            DrawLineOnImage(a, b, armWidth);
         }
 
         // Optionally draw a small central hexagon/star to add fidelity
@@ -925,8 +943,6 @@ public partial class OrganicFractalTree : Node2D
                     SetOpaquePixel((int)center.X + x, (int)center.Y + y);
             }
         }
-
-        // No explicit lock/unlock needed in this binding
 
         // Create texture
         if (cachedLeafTexture != null)
