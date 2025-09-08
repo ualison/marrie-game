@@ -28,10 +28,13 @@ public partial class FallingLeafRenderer : Node2D
             for (int i = 0; i < infos.Length; i++)
             {
                 var info = infos[i];
-        // sample current parent leaf color each iteration so dynamic changes are respected
-        Color baseLeafColor = ParentTree.GetLeafColor();
-        DrawSetTransform(info.Position, info.Rotation, Vector2.One * info.Scale);
-        DrawTexture(tex, -texCenter, baseLeafColor);
+                // convert from parent's local (tree) coordinates to this renderer's local coordinates
+                Vector2 globalPos = ParentTree.ToGlobal(info.Position);
+                Vector2 localPos = ToLocal(globalPos);
+                // sample current parent leaf color each iteration so dynamic changes are respected
+                Color baseLeafColor = ParentTree.GetLeafColor();
+                DrawSetTransform(localPos, info.Rotation, Vector2.One * info.Scale);
+                DrawTexture(tex, -texCenter, baseLeafColor);
                 DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
             }
         }
@@ -41,9 +44,11 @@ public partial class FallingLeafRenderer : Node2D
             for (int i = 0; i < infos.Length; i++)
             {
                 var info = infos[i];
-        // sample color here as well to match tree's leafColor
-        Color baseLeafColor = ParentTree.GetLeafColor();
-        DrawCircle(info.Position, eff * 0.7f * info.Scale, baseLeafColor);
+                Vector2 globalPos = ParentTree.ToGlobal(info.Position);
+                Vector2 localPos = ToLocal(globalPos);
+                // sample color here as well to match tree's leafColor
+                Color baseLeafColor = ParentTree.GetLeafColor();
+                DrawCircle(localPos, eff * 0.7f * info.Scale, baseLeafColor);
             }
         }
     }

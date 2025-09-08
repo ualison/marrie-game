@@ -223,10 +223,70 @@ public partial class OrganicFractalTree : Node2D
     // Set this node's Z index so falling leaves render in front/behind player as requested.
     private void SetLeavesZOrder()
     {
-        if (fallingLeafRenderer != null)
+        if (fallingLeafRenderer == null) return;
+
+        if (fallingLeavesInFrontOfPlayer)
         {
-            fallingLeafRenderer.ZIndex = fallingLeavesInFrontOfPlayer ? 100 : -100;
+            // Ensure renderer is a child of this tree so it draws over the tree and can be placed in front
+            var currentParent = fallingLeafRenderer.GetParent();
+            if (currentParent != this)
+            {
+                // preserve global position while reparenting
+                Vector2 globalPos = fallingLeafRenderer.GlobalPosition;
+                currentParent?.RemoveChild(fallingLeafRenderer);
+                AddChild(fallingLeafRenderer);
+                fallingLeafRenderer.GlobalPosition = globalPos;
+            }
+            fallingLeafRenderer.ZIndex = 100;
         }
+        else
+        {
+            // Try to place renderer as a sibling of the player so it renders behind the player.
+            Node sceneRoot = GetTree().CurrentScene;
+            Node2D playerNode = null;
+            if (sceneRoot != null)
+            {
+                // search by name "Player" (common convention) and fallback to first Node2D named "Player"
+                playerNode = FindNodeByName(sceneRoot, "Player");
+            }
+
+            if (playerNode != null && playerNode.GetParent() != null)
+            {
+                var desiredParent = playerNode.GetParent();
+                var currentParent = fallingLeafRenderer.GetParent();
+                if (currentParent != desiredParent)
+                {
+                    Vector2 globalPos = fallingLeafRenderer.GlobalPosition;
+                    currentParent?.RemoveChild(fallingLeafRenderer);
+                    desiredParent.AddChild(fallingLeafRenderer);
+                    fallingLeafRenderer.GlobalPosition = globalPos;
+                }
+
+                // place renderer just behind player using player's ZIndex if available
+                int playerZ = 0;
+                if (playerNode is Node2D p2d)
+                    playerZ = p2d.ZIndex;
+                fallingLeafRenderer.ZIndex = playerZ - 1;
+            }
+            else
+            {
+                // fallback: keep as child but push behind
+                fallingLeafRenderer.ZIndex = -100;
+            }
+        }
+    }
+
+    // Find a Node2D by name in the scene tree (depth-first)
+    private Node2D FindNodeByName(Node root, string name)
+    {
+        if (root == null) return null;
+        if (root is Node2D node2d && root.Name == name) return node2d;
+        foreach (Node child in root.GetChildren())
+        {
+            var found = FindNodeByName(child, name);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     public override void _Draw()
