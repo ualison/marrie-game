@@ -15,6 +15,7 @@
 [node name="UserInterface" parent="." instance=ExtResource("1_bcr4f")]
 
 [node name="CameraFollower" parent="." instance=ExtResource("1_2e0hl")]
+FollowOffset = Vector2(0, -165)
 
 [node name="Environment" parent="." instance=ExtResource("3_2dfbj")]
 
