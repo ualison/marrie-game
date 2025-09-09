@@ -11,8 +11,8 @@
 
 [node name="ForestBackground" type="Sprite2D" parent="."]
 z_index = -5
-position = Vector2(-44.5, -49.0001)
-scale = Vector2(0.465217, 0.26029)
+position = Vector2(-9.49996, -119.5)
+scale = Vector2(0.377681, 0.288986)
 texture = ExtResource("1_lrc6l")
 
 [node name="Ground" parent="." instance=ExtResource("2_opdns")]
