@@ -1,7 +1,7 @@
 [gd_scene load_steps=7 format=3 uid="uid://bqj7y8lk5uq60"]
 
 [ext_resource type="Script" uid="uid://d0e7xcevrndxm" path="res://Scripts/Enemy/GhostMonster.cs" id="1_uqgqf"]
-[ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monster.png" id="2_uqgqf"]
+[ext_resource type="Texture2D" uid="uid://xaif04xg1b71" path="res://Art/MonsterV5.png" id="2_6ib6h"]
 [ext_resource type="Script" uid="uid://dq22yqfge47s5" path="res://Scripts/Enemy/GhostMonsterLife.cs" id="4_6ib6h"]
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
 
@@ -29,9 +29,9 @@ position = Vector2(10, -20)
 shape = SubResource("RectangleShape2D_kyqiw")
 
 [node name="GhostMonsterSprite" type="Sprite2D" parent="CharacterBody2D"]
-position = Vector2(12.5, 9.00002)
-scale = Vector2(0.31543, 0.317708)
-texture = ExtResource("2_uqgqf")
+position = Vector2(9.49993, -36.5)
+scale = Vector2(0.30957, 0.296224)
+texture = ExtResource("2_6ib6h")
 
 [node name="GhostMonsterLifeBar" parent="CharacterBody2D" instance=ExtResource("4_lifebar")]
 offset_left = -53.0

@@ -1,6 +1,6 @@
 [gd_scene load_steps=10 format=3 uid="uid://ckwbdf3jm340m"]
 
-[ext_resource type="Texture2D" uid="uid://dubgbfarwhdd5" path="res://Art/Marrie.png" id="2_b43ah"]
+[ext_resource type="Texture2D" uid="uid://b4h0rpw2o2exe" path="res://Art/MarrieV5.png" id="2_javds"]
 [ext_resource type="Script" uid="uid://dtbbh4gt6l7cr" path="res://Scripts/Player/Player.cs" id="2_kyqiw"]
 [ext_resource type="Script" uid="uid://bfetyy0iofqcj" path="res://Scripts/Player/PlayerLife.cs" id="3_gntrk"]
 [ext_resource type="Script" uid="uid://gp6wfjapkopj" path="res://Scripts/Player/PlayerMana.cs" id="4_mana"]
@@ -38,7 +38,7 @@ shape = SubResource("RectangleShape2D_kyqiw")
 [node name="MarrieSprite" type="Sprite2D" parent="CharacterBody2D"]
 position = Vector2(13, 1.5)
 scale = Vector2(0.216797, 0.211589)
-texture = ExtResource("2_b43ah")
+texture = ExtResource("2_javds")
 
 [node name="PlayerLife" type="Node2D" parent="CharacterBody2D"]
 position = Vector2(0, -4)
