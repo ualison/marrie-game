@@ -1,65 +1,28 @@
-[gd_scene load_steps=19 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=20 format=3 uid="uid://bnv528gs1hngu"]
 
-[ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
-[ext_resource type="PackedScene" uid="uid://dbt3v1ee4f7fr" path="res://Prefabs/AppleTree.tscn" id="4_tnm7e"]
 [ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_wjun0"]
 [ext_resource type="Script" uid="uid://bmh2wdvmm4i7l" path="res://Scripts/Systems/EnemyManager.cs" id="7_r6l07"]
-[ext_resource type="PackedScene" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="7_tnm7e"]
-[ext_resource type="Texture2D" uid="uid://dl1p663jvus6i" path="res://Art/Tree1.png" id="7_wjun0"]
+[ext_resource type="PackedScene" uid="uid://d0spjehyu6cuy" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="7_tnm7e"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
 [ext_resource type="Script" uid="uid://bb2ife872jlja" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
+[ext_resource type="Texture2D" uid="uid://cfddkmjhp734f" path="res://Art/ForestBackground.jpg" id="14_j8t0e"]
 [ext_resource type="Script" uid="uid://cf5q88b7yl5la" path="res://Scripts/Systems/ReplaySystemManager.cs" id="14_r6l07"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
-[ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="18_j8t0e"]
+[ext_resource type="PackedScene" uid="uid://b3hvyadbepo6p" path="res://Prefabs/FractalBushType1.tscn" id="16_08kc0"]
+[ext_resource type="Script" uid="uid://c0hillfxidu7w" path="res://Scripts/Environment/FractalBushType2.cs" id="17_qsy24"]
+[ext_resource type="Script" uid="uid://o04haht8ruox" path="res://Scripts/Environment/OrganicFractalTree.cs" id="18_2ifor"]
 [ext_resource type="PackedScene" uid="uid://bjv4m5whn2djf" path="res://Prefabs/UI/Message.tscn" id="18_tnm7e"]
+[ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="19_6m4iw"]
 [ext_resource type="PackedScene" uid="uid://dxvamghbt08mr" path="res://Prefabs/UI/ScreenElements.tscn" id="19_screen"]
 
 [node name="ForestScene" type="Node2D"]
 
 [node name="Camera" type="Camera2D" parent="."]
-
-[node name="Environment" type="Node2D" parent="."]
-
-[node name="Background" type="Sprite2D" parent="Environment"]
-z_index = -10
-position = Vector2(-1, -5)
-scale = Vector2(0.800781, 0.688233)
-texture = ExtResource("2_8u8ny")
-
-[node name="Ground" parent="Environment" instance=ExtResource("3_r6l07")]
-z_index = 2
-position = Vector2(6, 294)
-
-[node name="Decorations" type="Node2D" parent="Environment"]
-
-[node name="NormalTree1" type="Sprite2D" parent="Environment/Decorations"]
-z_index = 5
-position = Vector2(-583, -172)
-scale = Vector2(0.669922, 0.649089)
-texture = ExtResource("7_wjun0")
-
-[node name="AppleTree" parent="Environment/Decorations" instance=ExtResource("4_tnm7e")]
-z_index = -1
-position = Vector2(-78, -374)
-
-[node name="NormalTree2" type="Sprite2D" parent="Environment/Decorations"]
-z_index = 5
-position = Vector2(570, -145)
-scale = Vector2(0.693148, 0.60584)
-texture = ExtResource("7_wjun0")
-
-[node name="Items" type="Node2D" parent="Environment"]
-
-[node name="Rock" parent="Environment/Items" instance=ExtResource("18_j8t0e")]
-position = Vector2(-190, 235)
-
-[node name="Rock2" parent="Environment/Items" instance=ExtResource("18_j8t0e")]
-position = Vector2(464, 227)
 
 [node name="UserInterface" type="CanvasLayer" parent="."]
 follow_viewport_enabled = true
@@ -81,8 +44,6 @@ mouse_filter = 2
 layout_mode = 1
 
 [node name="PerformanceMonitor" parent="UserInterface/HUD" instance=ExtResource("7_tnm7e")]
-layout_mode = 3
-anchors_preset = 0
 offset_left = 22.0
 offset_top = 1.0
 offset_right = 118.0
@@ -111,6 +72,331 @@ offset_left = 378.0
 offset_top = 532.0
 offset_right = 778.0
 offset_bottom = 632.0
+
+[node name="Environment" type="Node2D" parent="."]
+
+[node name="ForestBackground" type="Sprite2D" parent="Environment"]
+z_index = -5
+position = Vector2(-16, 3.5)
+scale = Vector2(0.37913, 0.229855)
+texture = ExtResource("14_j8t0e")
+
+[node name="Ground" parent="Environment" instance=ExtResource("3_r6l07")]
+z_index = 2
+position = Vector2(6, 294)
+
+[node name="Layer1" type="Node2D" parent="Environment"]
+
+[node name="FractalBushType1" parent="Environment/Layer1" instance=ExtResource("16_08kc0")]
+position = Vector2(-340.145, 295)
+InitialLength = 60.0
+BranchCount = 5
+BranchColor = Color(0, 0, 0, 1)
+LineWidth = 2.0
+WindStrength = 0.2
+
+[node name="FractalBushType2" parent="Environment/Layer1" instance=ExtResource("16_08kc0")]
+position = Vector2(200, 350)
+script = ExtResource("17_qsy24")
+InitialLength = 70.0
+LengthDecay = 0.7
+MinAngle = 8.0
+MaxAngle = 38.0
+AngleVariation = 8.0
+WidthDecay = 0.72
+InitialWidth = 13.0
+BranchCount = 4
+TrunkCount = 3
+BranchColor = Color(0, 0, 0, 1)
+WindStrength = 0.2
+
+[node name="OrganicFractalTree" type="Node2D" parent="Environment/Layer1"]
+position = Vector2(-300, 295)
+script = ExtResource("18_2ifor")
+maxDepth = 8
+initialLength = 200.0
+lengthReduction = 0.75
+branchAngle = 18.0
+angleVariation = 8.0
+curvature = 0.0
+minBranches = 3
+asymmetry = 0.0
+branchProbability = 1.0
+trunkColor = Color(0, 0, 0, 1)
+leafColor = Color(0.0768358, 0.0768358, 0.0768358, 1)
+leafSize = 1.4
+leafScale = 0.4
+leafDensity = 2
+leafSnowflakeDepth = 3
+leavesFalling = true
+leafFallSpawnRate = 2.5
+maxFallingLeaves = 25
+leafFallGravity = 1.3
+leafInitialVelocity = Vector2(0, 15)
+leafVelocityRandomness = Vector2(15, 25)
+WindStrength = 0.2
+appleQuantity = 4
+appleMinDistance = 30.0
+applePlacementHeight = 0.7
+applePrefab = ExtResource("19_6m4iw")
+
+[node name="OrganicFractalTree3" type="Node2D" parent="Environment/Layer1"]
+position = Vector2(400, 295)
+script = ExtResource("18_2ifor")
+maxDepth = 8
+initialLength = 200.0
+lengthReduction = 0.75
+branchAngle = 18.0
+angleVariation = 8.0
+curvature = 0.0
+minBranches = 3
+asymmetry = 0.0
+branchProbability = 1.0
+trunkColor = Color(0, 0, 0, 1)
+leafColor = Color(0.0768358, 0.0768358, 0.0768358, 1)
+leafSize = 1.4
+leafScale = 0.4
+leafDensity = 2
+leafSnowflakeDepth = 3
+leavesFalling = true
+leafFallSpawnRate = 2.5
+maxFallingLeaves = 25
+leafFallGravity = 1.3
+leafInitialVelocity = Vector2(0, 15)
+leafVelocityRandomness = Vector2(15, 25)
+WindStrength = 0.2
+appleQuantity = 4
+appleMinDistance = 30.0
+applePlacementHeight = 0.7
+applePrefab = ExtResource("19_6m4iw")
+
+[node name="OrganicFractalTree2" type="Node2D" parent="Environment/Layer1"]
+position = Vector2(0, 295)
+script = ExtResource("18_2ifor")
+maxDepth = 8
+initialLength = 200.0
+lengthReduction = 0.75
+branchAngle = 18.0
+angleVariation = 8.0
+curvature = 0.0
+minBranches = 3
+asymmetry = 0.0
+branchProbability = 1.0
+trunkColor = Color(0, 0, 0, 1)
+leafColor = Color(0.0768358, 0.0768358, 0.0768358, 1)
+leafSize = 1.4
+leafScale = 0.4
+leafDensity = 2
+leafSnowflakeDepth = 3
+leavesFalling = true
+leafFallSpawnRate = 2.5
+maxFallingLeaves = 25
+leafFallGravity = 1.3
+leafInitialVelocity = Vector2(0, 15)
+leafVelocityRandomness = Vector2(15, 25)
+WindStrength = 0.2
+hasApples = true
+appleQuantity = 5
+appleMinDistance = 30.0
+applePlacementHeight = 0.7
+applePrefab = ExtResource("19_6m4iw")
+
+[node name="Layer2" type="Node2D" parent="Environment"]
+
+[node name="OrganicFractalTree1" type="Node2D" parent="Environment/Layer2"]
+z_index = -1
+position = Vector2(-200, 295)
+script = ExtResource("18_2ifor")
+maxDepth = 8
+initialLength = 200.0
+lengthReduction = 0.75
+branchAngle = 18.0
+angleVariation = 8.0
+curvature = 0.0
+minBranches = 3
+asymmetry = 0.0
+branchProbability = 1.0
+trunkColor = Color(0.540991, 0.54099, 0.540991, 1)
+leafColor = Color(0.541176, 0.541176, 0.541176, 1)
+leafSize = 1.4
+leafScale = 0.4
+leafDensity = 2
+leafSnowflakeDepth = 3
+leavesFalling = true
+leafFallSpawnRate = 2.5
+maxFallingLeaves = 25
+leafFallGravity = 1.3
+leafInitialVelocity = Vector2(0, 15)
+leafVelocityRandomness = Vector2(15, 25)
+fallingLeavesInFrontOfPlayer = false
+WindStrength = 0.2
+appleQuantity = 4
+appleMinDistance = 30.0
+applePlacementHeight = 0.7
+applePrefab = ExtResource("19_6m4iw")
+
+[node name="OrganicFractalTree2" type="Node2D" parent="Environment/Layer2"]
+z_index = -1
+position = Vector2(154.8, 295)
+script = ExtResource("18_2ifor")
+maxDepth = 8
+initialLength = 200.0
+lengthReduction = 0.75
+branchAngle = 18.0
+angleVariation = 8.0
+curvature = 0.0
+minBranches = 3
+asymmetry = 0.0
+branchProbability = 1.0
+trunkColor = Color(0.540991, 0.54099, 0.540991, 1)
+leafColor = Color(0.541176, 0.541176, 0.541176, 1)
+leafSize = 1.4
+leafScale = 0.4
+leafDensity = 2
+leafSnowflakeDepth = 3
+leavesFalling = true
+leafFallSpawnRate = 2.5
+maxFallingLeaves = 25
+leafFallGravity = 1.3
+leafInitialVelocity = Vector2(0, 15)
+leafVelocityRandomness = Vector2(15, 25)
+fallingLeavesInFrontOfPlayer = false
+WindStrength = 0.2
+appleQuantity = 4
+appleMinDistance = 30.0
+applePlacementHeight = 0.7
+applePrefab = ExtResource("19_6m4iw")
+
+[node name="OrganicFractalTree3" type="Node2D" parent="Environment/Layer2"]
+z_index = -1
+position = Vector2(-450, 295)
+script = ExtResource("18_2ifor")
+maxDepth = 8
+initialLength = 200.0
+lengthReduction = 0.75
+branchAngle = 18.0
+angleVariation = 8.0
+curvature = 0.0
+minBranches = 3
+asymmetry = 0.0
+branchProbability = 1.0
+trunkColor = Color(0.540991, 0.54099, 0.540991, 1)
+leafColor = Color(0.541176, 0.541176, 0.541176, 1)
+leafSize = 1.4
+leafScale = 0.4
+leafDensity = 2
+leafSnowflakeDepth = 3
+leavesFalling = true
+leafFallSpawnRate = 2.5
+maxFallingLeaves = 25
+leafFallGravity = 1.3
+leafInitialVelocity = Vector2(0, 15)
+leafVelocityRandomness = Vector2(15, 25)
+fallingLeavesInFrontOfPlayer = false
+WindStrength = 0.2
+appleQuantity = 4
+appleMinDistance = 30.0
+applePlacementHeight = 0.7
+applePrefab = ExtResource("19_6m4iw")
+
+[node name="OrganicFractalTree4" type="Node2D" parent="Environment/Layer2"]
+z_index = -1
+position = Vector2(300, 295)
+script = ExtResource("18_2ifor")
+maxDepth = 8
+initialLength = 200.0
+lengthReduction = 0.75
+branchAngle = 18.0
+angleVariation = 8.0
+curvature = 0.0
+minBranches = 3
+asymmetry = 0.0
+branchProbability = 1.0
+trunkColor = Color(0.540991, 0.54099, 0.540991, 1)
+leafColor = Color(0.541176, 0.541176, 0.541176, 1)
+leafSize = 1.4
+leafScale = 0.4
+leafDensity = 2
+leafSnowflakeDepth = 3
+leavesFalling = true
+leafFallSpawnRate = 2.5
+maxFallingLeaves = 25
+leafFallGravity = 1.3
+leafInitialVelocity = Vector2(0, 15)
+leafVelocityRandomness = Vector2(15, 25)
+fallingLeavesInFrontOfPlayer = false
+WindStrength = 0.2
+appleQuantity = 4
+appleMinDistance = 30.0
+applePlacementHeight = 0.7
+applePrefab = ExtResource("19_6m4iw")
+
+[node name="Layer3" type="Node2D" parent="Environment"]
+z_index = 2
+
+[node name="OrganicFractalTree1" type="Node2D" parent="Environment/Layer3"]
+z_index = -1
+position = Vector2(-530, 295)
+script = ExtResource("18_2ifor")
+maxDepth = 8
+initialLength = 200.0
+lengthReduction = 0.75
+branchAngle = 18.0
+angleVariation = 8.0
+curvature = 0.0
+minBranches = 3
+asymmetry = 0.0
+branchProbability = 1.0
+trunkColor = Color(0, 0, 0, 1)
+leafColor = Color(0.0784314, 0.0784314, 0.0784314, 1)
+leafSize = 1.4
+leafScale = 0.4
+leafDensity = 2
+leafSnowflakeDepth = 3
+leavesFalling = true
+leafFallSpawnRate = 2.5
+maxFallingLeaves = 25
+leafFallGravity = 1.3
+leafInitialVelocity = Vector2(0, 15)
+leafVelocityRandomness = Vector2(15, 25)
+fallingLeavesInFrontOfPlayer = false
+WindStrength = 0.2
+appleQuantity = 4
+appleMinDistance = 30.0
+applePlacementHeight = 0.7
+applePrefab = ExtResource("19_6m4iw")
+
+[node name="OrganicFractalTree2" type="Node2D" parent="Environment/Layer3"]
+z_index = -1
+position = Vector2(550, 295)
+script = ExtResource("18_2ifor")
+maxDepth = 8
+initialLength = 200.0
+lengthReduction = 0.75
+branchAngle = 18.0
+angleVariation = 8.0
+curvature = 0.0
+minBranches = 3
+asymmetry = 0.0
+branchProbability = 1.0
+trunkColor = Color(0, 0, 0, 1)
+leafColor = Color(0.0784314, 0.0784314, 0.0784314, 1)
+leafSize = 1.4
+leafScale = 0.4
+leafDensity = 2
+leafSnowflakeDepth = 3
+leavesFalling = true
+leafFallSpawnRate = 2.5
+maxFallingLeaves = 25
+leafFallGravity = 1.3
+leafInitialVelocity = Vector2(0, 15)
+leafVelocityRandomness = Vector2(15, 25)
+fallingLeavesInFrontOfPlayer = false
+WindStrength = 0.2
+appleQuantity = 4
+appleMinDistance = 30.0
+applePlacementHeight = 0.7
+applePrefab = ExtResource("19_6m4iw")
 
 [node name="GameEntities" type="Node2D" parent="."]
 

@@ -1,6 +1,6 @@
 [gd_scene load_steps=15 format=3 uid="uid://54o6xy0qaoae"]
 
-[ext_resource type="PackedScene" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="2_bcr4f"]
+[ext_resource type="PackedScene" uid="uid://d0spjehyu6cuy" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="2_bcr4f"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
 [ext_resource type="Texture2D" uid="uid://cfddkmjhp734f" path="res://Art/ForestBackground.jpg" id="4_mqr8g"]
@@ -40,8 +40,6 @@ mouse_filter = 2
 layout_mode = 1
 
 [node name="PerformanceMonitor" parent="UserInterface/HUD" instance=ExtResource("2_bcr4f")]
-layout_mode = 3
-anchors_preset = 0
 offset_left = 9.0
 offset_top = 1.0
 offset_right = 9.0

@@ -1,19 +1,19 @@
 [gd_scene load_steps=4 format=3 uid="uid://b1tol8dfceoum"]
 
 [ext_resource type="Script" uid="uid://dakyi6pluqdcf" path="res://Scripts/Player/GhostPlayer.cs" id="1_l3qnp"]
-[ext_resource type="Texture2D" uid="uid://b4h0rpw2o2exe" path="res://Art/MarrieV5.png" id="2_ivqar"]
+[ext_resource type="Texture2D" uid="uid://cjxxgt3oycnys" path="res://Art/MarrieV6.png" id="2_ivqar"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
-size = Vector2(122, 278)
+size = Vector2(147, 258)
 
 [node name="GhostPlayer" type="CharacterBody2D"]
 script = ExtResource("1_l3qnp")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(-5, -6)
+position = Vector2(-9.5, 20)
 shape = SubResource("RectangleShape2D_kyqiw")
 
 [node name="GhostMarrieSprite" type="Sprite2D" parent="."]
-position = Vector2(6.49999, -2.5)
-scale = Vector2(0.219727, 0.207682)
+position = Vector2(0.999998, 22)
+scale = Vector2(0.181, 0.185)
 texture = ExtResource("2_ivqar")

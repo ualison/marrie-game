@@ -1,6 +1,6 @@
 [gd_scene load_steps=10 format=3 uid="uid://ckwbdf3jm340m"]
 
-[ext_resource type="Texture2D" uid="uid://b4h0rpw2o2exe" path="res://Art/MarrieV5.png" id="2_javds"]
+[ext_resource type="Texture2D" uid="uid://cjxxgt3oycnys" path="res://Art/MarrieV6.png" id="2_javds"]
 [ext_resource type="Script" uid="uid://dtbbh4gt6l7cr" path="res://Scripts/Player/Player.cs" id="2_kyqiw"]
 [ext_resource type="Script" uid="uid://bfetyy0iofqcj" path="res://Scripts/Player/PlayerLife.cs" id="3_gntrk"]
 [ext_resource type="Script" uid="uid://gp6wfjapkopj" path="res://Scripts/Player/PlayerMana.cs" id="4_mana"]
@@ -9,10 +9,10 @@
 [ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="7_javds"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_gntrk"]
-size = Vector2(133, 271)
+size = Vector2(156, 268)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
-size = Vector2(120, 278)
+size = Vector2(146, 262)
 
 [node name="Root2" type="Node2D"]
 
@@ -27,17 +27,17 @@ collision_layer = 2
 collision_mask = 16
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/HurtBox"]
-position = Vector2(0.5, -1.5)
+position = Vector2(0, 23)
 shape = SubResource("RectangleShape2D_gntrk")
-debug_color = Color(0.775656, 0.308414, 0.792495, 0.42)
+debug_color = Color(0.98055, 0.0671374, 0.312238, 0.42)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]
-position = Vector2(0, -5)
+position = Vector2(0, 27)
 shape = SubResource("RectangleShape2D_kyqiw")
 
 [node name="MarrieSprite" type="Sprite2D" parent="CharacterBody2D"]
-position = Vector2(13, 1.5)
-scale = Vector2(0.216797, 0.211589)
+position = Vector2(10, 29)
+scale = Vector2(0.19, 0.185)
 texture = ExtResource("2_javds")
 
 [node name="PlayerLife" type="Node2D" parent="CharacterBody2D"]
