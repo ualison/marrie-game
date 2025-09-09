@@ -1,5 +1,6 @@
-[gd_scene load_steps=15 format=3 uid="uid://54o6xy0qaoae"]
+[gd_scene load_steps=16 format=3 uid="uid://54o6xy0qaoae"]
 
+[ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="1_2e0hl"]
 [ext_resource type="PackedScene" uid="uid://d0spjehyu6cuy" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="2_bcr4f"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
@@ -17,8 +18,7 @@
 
 [node name="TreeAppleTestScene" type="Node2D"]
 
-[node name="Camera" type="Camera2D" parent="."]
-position = Vector2(0, -13)
+[node name="CameraFollower" parent="." instance=ExtResource("1_2e0hl")]
 
 [node name="UserInterface" type="CanvasLayer" parent="."]
 follow_viewport_enabled = true

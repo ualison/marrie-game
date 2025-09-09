@@ -1,5 +1,6 @@
-[gd_scene load_steps=20 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=21 format=3 uid="uid://bnv528gs1hngu"]
 
+[ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="1_08kc0"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
 [ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_wjun0"]
@@ -22,7 +23,7 @@
 
 [node name="ForestScene" type="Node2D"]
 
-[node name="Camera" type="Camera2D" parent="."]
+[node name="CameraFollower" parent="." instance=ExtResource("1_08kc0")]
 
 [node name="UserInterface" type="CanvasLayer" parent="."]
 follow_viewport_enabled = true
