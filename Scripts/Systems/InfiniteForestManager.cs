@@ -5,30 +5,32 @@ using System.Linq;
 public partial class InfiniteForestManager : Node2D
 {
     [ExportGroup("Environment Settings")]
-    [Export] public PackedScene EnvironmentChunkPrefab; // Your Environment.tscn prefab
-    [Export] public float ChunkWidth = 800.0f; // Width of each environment chunk
-    [Export] public float SpawnDistance = 1200.0f; // Distance from camera to spawn new chunks
-    [Export] public float DestroyDistance = 1600.0f; // Distance from camera to destroy chunks
-    [Export] public int MaxActiveChunks = 7; // Maximum number of chunks to keep active
+    [Export] public PackedScene EnvironmentChunkPrefab;
+    [Export] public float ChunkWidth = 800.0f;
+    [Export] public float SpawnDistance = 1200.0f;
+    [Export] public float DestroyDistance = 1600.0f;
+    [Export] public int MaxActiveChunks = 7;
 
     [ExportGroup("Camera Reference")]
     [Export] public Camera2D PlayerCamera;
 
     private Dictionary<int, Node2D> activeChunks = new Dictionary<int, Node2D>();
-    // Track indices currently being spawned to avoid double-instantiation when SpawnChunk is re-entered
-    private HashSet<int> spawningChunks = new HashSet<int>();
+    private HashSet<int> processingChunks = new HashSet<int>(); // Tracks all chunks being processed
     private float lastPlayerX = 0.0f;
     private int currentChunkIndex = 0;
+    
+    // Prevent too frequent updates
+    private float updateCooldown = 0.0f;
+    private const float UPDATE_COOLDOWN_TIME = 0.1f; // 100ms between updates
 
     public override void _Ready()
     {
         if (PlayerCamera == null)
         {
-            // Try to find the player camera automatically
             PlayerCamera = GetViewport().GetCamera2D();
             if (PlayerCamera == null)
             {
-                GD.PrintErr("InfiniteForestManager: No Camera2D found! Please assign PlayerCamera.");
+                GD.PrintErr("InfiniteForestManager: No Camera2D found!");
                 return;
             }
         }
@@ -48,13 +50,21 @@ public partial class InfiniteForestManager : Node2D
     {
         if (PlayerCamera == null) return;
 
+        // Update cooldown
+        if (updateCooldown > 0)
+        {
+            updateCooldown -= (float)delta;
+            return;
+        }
+
         float currentPlayerX = PlayerCamera.GlobalPosition.X;
         
-        // Check if player has moved significantly
+        // Check if player has moved significantly (reduced threshold for responsiveness)
         if (Mathf.Abs(currentPlayerX - lastPlayerX) > ChunkWidth * 0.1f)
         {
             UpdateChunks(currentPlayerX);
             lastPlayerX = currentPlayerX;
+            updateCooldown = UPDATE_COOLDOWN_TIME; // Set cooldown
         }
     }
 
@@ -65,7 +75,7 @@ public partial class InfiniteForestManager : Node2D
         // Determine which chunks should be active
         HashSet<int> requiredChunks = new HashSet<int>();
         
-        // Calculate how many chunks we need on each side based on spawn distance
+        // Calculate how many chunks we need on each side
         int chunksOnEachSide = Mathf.CeilToInt(SpawnDistance / ChunkWidth);
         
         for (int i = -chunksOnEachSide; i <= chunksOnEachSide; i++)
@@ -73,10 +83,11 @@ public partial class InfiniteForestManager : Node2D
             requiredChunks.Add(currentChunkIndex + i);
         }
 
-        // Spawn missing chunks
+        // Spawn missing chunks (with duplicate prevention)
         foreach (int chunkIndex in requiredChunks)
         {
-            if (!activeChunks.ContainsKey(chunkIndex))
+            // Check if chunk exists or is being processed
+            if (!activeChunks.ContainsKey(chunkIndex) && !processingChunks.Contains(chunkIndex))
             {
                 SpawnChunk(chunkIndex);
             }
@@ -89,12 +100,24 @@ public partial class InfiniteForestManager : Node2D
             int chunkIndex = kvp.Key;
             Node2D chunk = kvp.Value;
             
+            // Skip if chunk is invalid
+            if (chunk == null || !IsInstanceValid(chunk))
+            {
+                chunksToRemove.Add(chunkIndex);
+                continue;
+            }
+            
             float chunkX = chunkIndex * ChunkWidth;
             float distanceFromPlayer = Mathf.Abs(chunkX - playerX);
             
             if (distanceFromPlayer > DestroyDistance || !requiredChunks.Contains(chunkIndex))
             {
                 chunksToRemove.Add(chunkIndex);
+            }
+            else
+            {
+                // Apply LOD based on distance
+                ApplyLODToChunk(chunk, distanceFromPlayer);
             }
         }
 
@@ -104,112 +127,124 @@ public partial class InfiniteForestManager : Node2D
             DestroyChunk(chunkIndex);
         }
 
-        // Ensure we don't exceed the maximum number of chunks (safety measure)
+        // Ensure we don't exceed the maximum number of chunks
         EnforceMaxChunkLimit();
-        
-        // Debug info
-        GD.Print($"Active chunks: {activeChunks.Count}, Player chunk: {currentChunkIndex}");
     }
 
     private void SpawnChunk(int chunkIndex)
     {
-        if (EnvironmentChunkPrefab == null || activeChunks.ContainsKey(chunkIndex) || spawningChunks.Contains(chunkIndex))
+        // Comprehensive duplicate prevention
+        if (EnvironmentChunkPrefab == null || 
+            activeChunks.ContainsKey(chunkIndex) || 
+            processingChunks.Contains(chunkIndex))
+        {
             return;
+        }
 
-        // mark as spawning to prevent re-entrance for the same index
-        spawningChunks.Add(chunkIndex);
+        // Mark as being processed immediately
+        processingChunks.Add(chunkIndex);
+
+        // Calculate position
+        float chunkX = chunkIndex * ChunkWidth;
+
+        // Check if a chunk already exists at this position
+        if (IsPositionOccupied(chunkX))
+        {
+            GD.PrintErr($"Position {chunkX} already occupied, skipping chunk {chunkIndex}");
+            processingChunks.Remove(chunkIndex);
+            return;
+        }
 
         // Instantiate the chunk
         Node2D newChunk = EnvironmentChunkPrefab.Instantiate<Node2D>();
         if (newChunk == null)
         {
             GD.PrintErr($"Failed to instantiate chunk at index {chunkIndex}");
+            processingChunks.Remove(chunkIndex);
             return;
         }
 
-        // Position the chunk (compute target world X)
-        float chunkX = chunkIndex * ChunkWidth;
+        // Set name for debugging
+        newChunk.Name = $"EnvironmentChunk_{chunkIndex}";
 
-        // Safety: quick check for existing chunk at same X
-        foreach (var existing in activeChunks.Values)
-        {
-            if (existing == null) continue;
-            if (Mathf.Abs(existing.GlobalPosition.X - chunkX) < 0.01f)
-            {
-                GD.Print($"Skipping spawn for chunk {chunkIndex}: an active chunk already exists at X={chunkX} (" + existing.Name + ")");
-                spawningChunks.Remove(chunkIndex);
-                return;
-            }
-        }
-
-        // Temporarily add to scene so descendant GlobalPositions are valid for overlap checks,
-        // then set GlobalPosition to ensure consistent world coordinates after parenting.
+        // Add to scene and set position
         AddChild(newChunk);
         newChunk.GlobalPosition = new Vector2(chunkX, 0);
 
-        // If any node inside the new chunk overlaps with existing nodes (trees etc.), cancel spawn
-        if (ChunkOverlaps(newChunk, 2.0f))
+        // Initialize chunk if it has the appropriate methods
+        if (newChunk.HasMethod("InitializeChunk"))
         {
-            GD.Print($"Cancelled spawn for chunk {chunkIndex}: overlapping objects detected at position {chunkX}");
-            newChunk.QueueFree();
-            spawningChunks.Remove(chunkIndex);
-            return;
+            // Use chunk index for consistent random seed
+            ulong seed = (ulong)(chunkIndex * 12345 + 6789);
+            newChunk.Call("InitializeChunk", chunkIndex, seed);
+        }
+        else if (newChunk.HasMethod("ResetChunk"))
+        {
+            newChunk.Call("ResetChunk");
         }
 
-        // Add chunk name for debugging
-        newChunk.Name = $"EnvironmentChunk_{chunkIndex}";
-
-    // Track the chunk and allow future spawns for other indices
-    activeChunks[chunkIndex] = newChunk;
-    spawningChunks.Remove(chunkIndex);
-
-    GD.Print($"Spawned chunk {chunkIndex} at position {chunkX}");
-    }
-
-    // Collect all Node2D descendants of a node (recursive)
-    private List<Node2D> GetDescendantNode2Ds(Node node)
-    {
-        var list = new List<Node2D>();
-        foreach (var obj in node.GetChildren())
+        // Initialize dynamic tree spawner if present
+        var treeSpawner = newChunk.GetNodeOrNull<Node2D>("DynamicTreeSpawner");
+        if (treeSpawner != null && treeSpawner.HasMethod("InitializeChunk"))
         {
-            if (obj is Node child)
-            {
-                if (child is Node2D nd)
-                    list.Add(nd);
-
-                // Recurse into children
-                list.AddRange(GetDescendantNode2Ds(child));
-            }
+            ulong seed = (ulong)(chunkIndex * 12345 + 6789);
+            treeSpawner.Call("InitializeChunk", chunkIndex, seed);
         }
-        return list;
+
+        // Register the chunk
+        activeChunks[chunkIndex] = newChunk;
+        processingChunks.Remove(chunkIndex);
+
+        GD.Print($"Spawned chunk {chunkIndex} at position {chunkX}");
     }
 
-    // Check whether any Node2D inside newChunk overlaps (within threshold) any Node2D in existing active chunks
-    private bool ChunkOverlaps(Node2D newChunk, float threshold)
+    private bool IsPositionOccupied(float xPosition)
     {
-        var newNodes = new List<Node2D> { newChunk };
-        newNodes.AddRange(GetDescendantNode2Ds(newChunk));
-
-        foreach (var existing in activeChunks.Values)
+        // Check if any active chunk is already at this position
+        // Use a small tolerance to account for floating point precision
+        const float tolerance = 1.0f;
+        
+        foreach (var kvp in activeChunks)
         {
-            if (existing == null) continue;
-
-            var existingNodes = new List<Node2D> { existing };
-            existingNodes.AddRange(GetDescendantNode2Ds(existing));
-
-            foreach (var nn in newNodes)
+            if (kvp.Value != null && IsInstanceValid(kvp.Value))
             {
-                if (nn == null) continue;
-                foreach (var en in existingNodes)
+                float existingX = kvp.Value.GlobalPosition.X;
+                if (Mathf.Abs(existingX - xPosition) < tolerance)
                 {
-                    if (en == null) continue;
-                    if (nn.GlobalPosition.DistanceTo(en.GlobalPosition) <= threshold)
-                        return true;
+                    return true;
                 }
             }
         }
-
+        
         return false;
+    }
+
+    private void ApplyLODToChunk(Node2D chunk, float distance)
+    {
+        if (chunk == null || !IsInstanceValid(chunk))
+            return;
+
+        // Apply distance-based optimizations
+        if (chunk.HasMethod("OptimizeForDistance"))
+        {
+            chunk.Call("OptimizeForDistance", distance);
+        }
+        
+        // Freeze very distant chunks
+        if (distance > SpawnDistance * 0.9f)
+        {
+            if (chunk.HasMethod("FreezeChunk"))
+            {
+                chunk.Call("FreezeChunk");
+            }
+        }
+        else if (distance < SpawnDistance * 0.5f)
+        {
+            if (chunk.HasMethod("UnfreezeChunk"))
+            {
+                chunk.Call("UnfreezeChunk");
+            }
+        }
     }
 
     private void DestroyChunk(int chunkIndex)
@@ -224,6 +259,8 @@ public partial class InfiniteForestManager : Node2D
         }
         
         activeChunks.Remove(chunkIndex);
+        processingChunks.Remove(chunkIndex); // Clean up processing set too
+        
         GD.Print($"Destroyed chunk {chunkIndex}");
     }
 
@@ -237,24 +274,25 @@ public partial class InfiniteForestManager : Node2D
         if (activeChunks.Count <= MaxActiveChunks)
             return;
 
-        // Find chunks furthest from the player and remove them
+        // Find chunks furthest from the player
         var sortedChunks = activeChunks
+            .Where(kvp => kvp.Value != null && IsInstanceValid(kvp.Value))
             .OrderByDescending(kvp => Mathf.Abs(kvp.Key * ChunkWidth - PlayerCamera.GlobalPosition.X))
             .ToList();
 
         int chunksToRemove = activeChunks.Count - MaxActiveChunks;
-        for (int i = 0; i < chunksToRemove; i++)
+        for (int i = 0; i < chunksToRemove && i < sortedChunks.Count; i++)
         {
             DestroyChunk(sortedChunks[i].Key);
         }
     }
 
-    // Public method to manually trigger chunk updates (useful for debugging)
+    // Public method to manually trigger chunk updates
     public void ForceUpdateChunks()
     {
         if (PlayerCamera != null)
         {
-            // ONLY READ camera position, never modify it
+            updateCooldown = 0; // Reset cooldown to allow immediate update
             UpdateChunks(PlayerCamera.GlobalPosition.X);
         }
     }
@@ -265,15 +303,15 @@ public partial class InfiniteForestManager : Node2D
         return new Dictionary<string, object>
         {
             ["ActiveChunks"] = activeChunks.Count,
+            ["ProcessingChunks"] = processingChunks.Count,
             ["CurrentChunkIndex"] = currentChunkIndex,
-            ["PlayerPosition"] = PlayerCamera?.GlobalPosition ?? Vector2.Zero // READ ONLY
+            ["PlayerPosition"] = PlayerCamera?.GlobalPosition ?? Vector2.Zero
         };
     }
 
     // Clean up when the node is freed
     public override void _ExitTree()
     {
-        // Clean up all active chunks
         foreach (var chunk in activeChunks.Values)
         {
             if (chunk != null && IsInstanceValid(chunk))
@@ -282,5 +320,6 @@ public partial class InfiniteForestManager : Node2D
             }
         }
         activeChunks.Clear();
+        processingChunks.Clear();
     }
 }

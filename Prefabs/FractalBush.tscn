@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3 uid="uid://b3hvyadbepo6p"]
+
+[ext_resource type="Script" uid="uid://c0hillfxidu7w" path="res://Scripts/Environment/FractalBush.cs" id="1_fsrxf"]
+
+[node name="FractalBush" type="Node2D"]
+script = ExtResource("1_fsrxf")
+AngleVariation = 6.0
+WidthDecay = 0.65
+InitialWidth = 10.0
+BranchCount = 2
+BranchColor = Color(0, 0, 0, 1)

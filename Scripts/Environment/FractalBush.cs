@@ -1,7 +1,7 @@
 using Godot;
 using System.Collections.Generic;
 
-public partial class FractalBushType2 : Node2D
+public partial class FractalBush : Node2D
 {
     [Export] public int MaxDepth { get; set; } = 9;
     [Export] public float InitialLength { get; set; } = 120f;

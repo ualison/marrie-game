@@ -2,7 +2,7 @@
 
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="1_08kc0"]
 [ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="2_djgpu"]
-[ext_resource type="PackedScene" uid="uid://cgis0ssk303fi" path="res://Prefabs/Environment.tscn" id="2_wjun0"]
+[ext_resource type="PackedScene" uid="uid://bprvmud1sukcc" path="res://Prefabs/Environment.tscn" id="2_wjun0"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
 [ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_wjun0"]
 [ext_resource type="Script" uid="uid://bmh2wdvmm4i7l" path="res://Scripts/Systems/EnemyManager.cs" id="7_r6l07"]

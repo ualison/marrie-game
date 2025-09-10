@@ -269,15 +269,20 @@ public partial class EnvironmentChunk : Node2D
         // Only update critical systems that must continue running
 
         // Update only 1 tree per frame to spread load
-        if (cachedTreeNodes.Count > 0)
-        {
-            int treeIndex = (int)(Time.GetUnixTimeFromSystem() * 2) % cachedTreeNodes.Count;
-            var tree = cachedTreeNodes[treeIndex];
+        if (cachedTreeNodes.Count == 0)
+            return;
 
-            if (tree?.HasMethod("ProcessLOD") == true)
-            {
-                tree.Call("ProcessLOD", delta);
-            }
+        // Use a stable, non-negative index derived from system time.
+        // Time.GetUnixTimeFromSystem() can be large and casting or using
+        // the remainder directly may produce negative values. Normalize
+        // via Math.Abs on a long and then modulo by the valid count.
+        long unix = (long)Math.Floor(Time.GetUnixTimeFromSystem());
+        int treeIndex = (int)((Math.Abs(unix * 2L) % cachedTreeNodes.Count));
+        var tree = cachedTreeNodes[treeIndex];
+
+        if (tree?.HasMethod("ProcessLOD") == true)
+        {
+            tree.Call("ProcessLOD", delta);
         }
     }
 
@@ -286,7 +291,8 @@ public partial class EnvironmentChunk : Node2D
         // Normal processing for nearby chunks
         // Stagger updates across frames to reduce load spikes
 
-        int frameOffset = (int)(Time.GetUnixTimeFromSystem() * 60) % 3;
+    long unix = (long)Math.Floor(Time.GetUnixTimeFromSystem());
+    int frameOffset = (int)((Math.Abs(unix * 60L) % 3));
 
         switch (frameOffset)
         {
@@ -305,8 +311,13 @@ public partial class EnvironmentChunk : Node2D
     private void UpdateTrees(float delta)
     {
         // Update trees with load balancing
+        if (cachedTreeNodes.Count == 0)
+            return;
+
         int maxTreesPerFrame = Mathf.Max(1, cachedTreeNodes.Count / 3);
-        int startIndex = ((int)(Time.GetUnixTimeFromSystem() * 10)) % cachedTreeNodes.Count;
+
+        long unix = (long)Math.Floor(Time.GetUnixTimeFromSystem());
+        int startIndex = (int)(Math.Abs(unix * 10L) % cachedTreeNodes.Count);
 
         for (int i = 0; i < maxTreesPerFrame && i < cachedTreeNodes.Count; i++)
         {

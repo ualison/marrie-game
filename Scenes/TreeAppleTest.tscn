@@ -1,10 +1,9 @@
-[gd_scene load_steps=11 format=3 uid="uid://54o6xy0qaoae"]
+[gd_scene load_steps=10 format=3 uid="uid://54o6xy0qaoae"]
 
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="1_2e0hl"]
 [ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="1_bcr4f"]
-[ext_resource type="PackedScene" uid="uid://cgis0ssk303fi" path="res://Prefabs/Environment.tscn" id="3_2dfbj"]
+[ext_resource type="PackedScene" uid="uid://bprvmud1sukcc" path="res://Prefabs/Environment.tscn" id="3_2dfbj"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
-[ext_resource type="Script" uid="uid://dr6sxgjhikyw2" path="res://Scripts/Environment/EnvironmentChunk.cs" id="4_k6sf1"]
 [ext_resource type="Script" uid="uid://sdqhqn52n3xp" path="res://Scripts/Systems/InfiniteForestManager.cs" id="8_p6q5y"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
 [ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="12_r6l07"]
@@ -19,7 +18,6 @@
 FollowOffset = Vector2(0, -165)
 
 [node name="Environment" parent="." instance=ExtResource("3_2dfbj")]
-script = ExtResource("4_k6sf1")
 
 [node name="GameEntities" type="Node2D" parent="."]
 
@@ -42,10 +40,6 @@ script = ExtResource("13_r6l07")
 [node name="InfinityForestManager" type="Node2D" parent="GameSystems/Managers" node_paths=PackedStringArray("PlayerCamera")]
 script = ExtResource("8_p6q5y")
 EnvironmentChunkPrefab = ExtResource("3_2dfbj")
-ChunkWidth = 600.0
-SpawnDistance = 1500.0
-DestroyDistance = 1500.0
-MaxActiveChunks = 2
 PlayerCamera = NodePath("../../../CameraFollower")
 
 [node name="AudioSystem" type="Node" parent="GameSystems"]
