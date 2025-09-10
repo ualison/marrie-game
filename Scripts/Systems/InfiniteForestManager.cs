@@ -15,6 +15,8 @@ public partial class InfiniteForestManager : Node2D
     [Export] public Camera2D PlayerCamera;
 
     private Dictionary<int, Node2D> activeChunks = new Dictionary<int, Node2D>();
+    // Track indices currently being spawned to avoid double-instantiation when SpawnChunk is re-entered
+    private HashSet<int> spawningChunks = new HashSet<int>();
     private float lastPlayerX = 0.0f;
     private int currentChunkIndex = 0;
 
@@ -111,8 +113,11 @@ public partial class InfiniteForestManager : Node2D
 
     private void SpawnChunk(int chunkIndex)
     {
-        if (EnvironmentChunkPrefab == null || activeChunks.ContainsKey(chunkIndex))
+        if (EnvironmentChunkPrefab == null || activeChunks.ContainsKey(chunkIndex) || spawningChunks.Contains(chunkIndex))
             return;
+
+        // mark as spawning to prevent re-entrance for the same index
+        spawningChunks.Add(chunkIndex);
 
         // Instantiate the chunk
         Node2D newChunk = EnvironmentChunkPrefab.Instantiate<Node2D>();
@@ -122,18 +127,89 @@ public partial class InfiniteForestManager : Node2D
             return;
         }
 
-        // Position the chunk
+        // Position the chunk (compute target world X)
         float chunkX = chunkIndex * ChunkWidth;
+
+        // Safety: quick check for existing chunk at same X
+        foreach (var existing in activeChunks.Values)
+        {
+            if (existing == null) continue;
+            if (Mathf.Abs(existing.GlobalPosition.X - chunkX) < 0.01f)
+            {
+                GD.Print($"Skipping spawn for chunk {chunkIndex}: an active chunk already exists at X={chunkX} (" + existing.Name + ")");
+                spawningChunks.Remove(chunkIndex);
+                return;
+            }
+        }
+
+        // Temporarily add to scene so descendant GlobalPositions are valid for overlap checks,
+        // then set GlobalPosition to ensure consistent world coordinates after parenting.
+        AddChild(newChunk);
         newChunk.GlobalPosition = new Vector2(chunkX, 0);
-        
+
+        // If any node inside the new chunk overlaps with existing nodes (trees etc.), cancel spawn
+        if (ChunkOverlaps(newChunk, 2.0f))
+        {
+            GD.Print($"Cancelled spawn for chunk {chunkIndex}: overlapping objects detected at position {chunkX}");
+            newChunk.QueueFree();
+            spawningChunks.Remove(chunkIndex);
+            return;
+        }
+
         // Add chunk name for debugging
         newChunk.Name = $"EnvironmentChunk_{chunkIndex}";
-        
-        // Add to scene and track it
-        AddChild(newChunk);
-        activeChunks[chunkIndex] = newChunk;
-        
-        GD.Print($"Spawned chunk {chunkIndex} at position {chunkX}");
+
+    // Track the chunk and allow future spawns for other indices
+    activeChunks[chunkIndex] = newChunk;
+    spawningChunks.Remove(chunkIndex);
+
+    GD.Print($"Spawned chunk {chunkIndex} at position {chunkX}");
+    }
+
+    // Collect all Node2D descendants of a node (recursive)
+    private List<Node2D> GetDescendantNode2Ds(Node node)
+    {
+        var list = new List<Node2D>();
+        foreach (var obj in node.GetChildren())
+        {
+            if (obj is Node child)
+            {
+                if (child is Node2D nd)
+                    list.Add(nd);
+
+                // Recurse into children
+                list.AddRange(GetDescendantNode2Ds(child));
+            }
+        }
+        return list;
+    }
+
+    // Check whether any Node2D inside newChunk overlaps (within threshold) any Node2D in existing active chunks
+    private bool ChunkOverlaps(Node2D newChunk, float threshold)
+    {
+        var newNodes = new List<Node2D> { newChunk };
+        newNodes.AddRange(GetDescendantNode2Ds(newChunk));
+
+        foreach (var existing in activeChunks.Values)
+        {
+            if (existing == null) continue;
+
+            var existingNodes = new List<Node2D> { existing };
+            existingNodes.AddRange(GetDescendantNode2Ds(existing));
+
+            foreach (var nn in newNodes)
+            {
+                if (nn == null) continue;
+                foreach (var en in existingNodes)
+                {
+                    if (en == null) continue;
+                    if (nn.GlobalPosition.DistanceTo(en.GlobalPosition) <= threshold)
+                        return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private void DestroyChunk(int chunkIndex)

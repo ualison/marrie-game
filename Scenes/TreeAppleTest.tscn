@@ -42,8 +42,9 @@ script = ExtResource("13_r6l07")
 [node name="InfinityForestManager" type="Node2D" parent="GameSystems/Managers" node_paths=PackedStringArray("PlayerCamera")]
 script = ExtResource("8_p6q5y")
 EnvironmentChunkPrefab = ExtResource("3_2dfbj")
-SpawnDistance = 1000.0
-DestroyDistance = 1000.0
+ChunkWidth = 600.0
+SpawnDistance = 1500.0
+DestroyDistance = 1500.0
 MaxActiveChunks = 2
 PlayerCamera = NodePath("../../../CameraFollower")
 
