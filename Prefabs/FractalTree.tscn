@@ -3,29 +3,31 @@
 [ext_resource type="Script" uid="uid://o04haht8ruox" path="res://Scripts/Environment/OrganicFractalTree.cs" id="1_2bh4g"]
 [ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="2_hul7h"]
 
-[node name="OrganicFractalTree0" type="Node2D"]
+[node name="FractalTree" type="Node2D"]
 z_index = -1
 script = ExtResource("1_2bh4g")
-maxDepth = 6
+maxDepth = 8
 initialLength = 200.0
 lengthReduction = 0.75
 branchAngle = 18.0
 angleVariation = 8.0
 curvature = 0.0
-maxBranches = 2
+minBranches = 3
+maxBranches = 3
 asymmetry = 0.0
 branchProbability = 1.0
 trunkColor = Color(0, 0, 0, 1)
 leafColor = Color(0.0784314, 0.0784314, 0.0784314, 1)
 leafSize = 1.4
 leafScale = 0.4
-leafDensity = 2
+leafDensity = 3
+leafSnowflakeDepth = 3
+leavesFalling = true
 leafFallSpawnRate = 2.5
 maxFallingLeaves = 25
 leafFallGravity = 1.3
 leafInitialVelocity = Vector2(0, 15)
 leafVelocityRandomness = Vector2(15, 25)
-fallingLeavesInFrontOfPlayer = false
 WindStrength = 0.2
 appleQuantity = 4
 appleMinDistance = 30.0

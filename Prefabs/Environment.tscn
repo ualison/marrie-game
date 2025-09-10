@@ -22,7 +22,8 @@ position = Vector2(6, 294)
 
 [node name="DynamicTreeSpawner" type="Node2D" parent="."]
 script = ExtResource("4_lrc6l")
-MaxTreeSpacing = 120.0
-TreeSpacingVariation = 60.0
+MaxTreesPerChunk = 6
+MaxTreeSpacing = 100.0
+TreeSpacingVariation = 80.0
 TreePrefabs = Array[PackedScene]([ExtResource("5_opdns")])
 BushPrefab = ExtResource("3_uboq2")

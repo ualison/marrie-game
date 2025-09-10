@@ -58,14 +58,10 @@ public partial class CameraFollow : Camera2D
                     if (childBody != null)
                     {
                         _target = childBody;
-                        if (DebugTarget)
-                            GD.Print($"CameraFollow: Resolved CharacterBody2D inside TargetPath node: {_target.Name} at {_target.GlobalPosition}");
                         return;
                     }
                 }
 
-                if (DebugTarget)
-                    GD.Print($"CameraFollow: Found target via TargetPath: {_target.Name} at {_target.GlobalPosition}");
                 return;
             }
             // Don't error yet; try other strategies below before reporting failure
@@ -77,11 +73,7 @@ public partial class CameraFollow : Camera2D
         {
             _target = players[0] as Node2D;
             if (_target != null)
-            {
-                if (DebugTarget)
-                    GD.Print($"CameraFollow: Found target via 'player' group: {_target.Name} at {_target.GlobalPosition}");
                 return;
-            }
         }
 
         // Strategy 3: Search for CharacterBody2D in GameEntities/Player
@@ -95,8 +87,6 @@ public partial class CameraFollow : Camera2D
                 if (characterBody != null)
                 {
                     _target = characterBody;
-                    if (DebugTarget)
-                        GD.Print($"CameraFollow: Found target via GameEntities search: {_target.Name} at {_target.GlobalPosition}");
                     return;
                 }
             }
@@ -109,8 +99,6 @@ public partial class CameraFollow : Camera2D
             if (node is CharacterBody2D characterBody2D)
             {
                 _target = characterBody2D;
-                if (DebugTarget)
-                    GD.Print($"CameraFollow: Found CharacterBody2D in player group: {_target.Name} at {_target.GlobalPosition}");
                 return;
             }
             
@@ -119,8 +107,6 @@ public partial class CameraFollow : Camera2D
             if (childCharacterBody != null)
             {
                 _target = childCharacterBody;
-                if (DebugTarget)
-                    GD.Print($"CameraFollow: Found CharacterBody2D as child: {_target.Name} at {_target.GlobalPosition}");
                 return;
             }
         }
@@ -140,7 +126,7 @@ public partial class CameraFollow : Camera2D
         }
         else if (DebugTarget)
         {
-            GD.Print($"CameraFollow: Final target found: {_target.Name} at {_target.GlobalPosition}");
+            GD.Print($"CameraFollow: Target acquired: {_target.Name}");
         }
     }
 
@@ -216,11 +202,6 @@ public partial class CameraFollow : Camera2D
         else
         {
             GlobalPosition = desired;
-        }
-
-        if (DebugTarget)
-        {
-            GD.Print($"CameraFollow: Following {_target.Name} at {_target.GlobalPosition}, camera at {GlobalPosition}");
         }
     }
 
