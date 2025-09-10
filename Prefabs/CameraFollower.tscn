@@ -6,3 +6,4 @@
 script = ExtResource("1_lqiqu")
 FollowOffset = Vector2(0, -195)
 TargetPath = NodePath("GameEntities/Player")
+DebugTarget = true

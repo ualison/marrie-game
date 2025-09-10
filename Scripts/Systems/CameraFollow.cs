@@ -33,20 +33,42 @@ public partial class CameraFollow : Camera2D
 
     private void FindTarget()
     {
-        // Strategy 1: Use explicitly set TargetPath
+        // Strategy 1: Use explicitly set TargetPath (more robust)
         if (!string.IsNullOrEmpty(TargetPath.ToString()))
         {
+            // Try resolving relative to this node first
             _target = GetNodeOrNull<Node2D>(TargetPath);
+
+            // If not found, try a root-wide search for the final segment of the path
+            if (_target == null)
+            {
+                var segments = TargetPath.ToString().Split('/');
+                var last = segments.Length > 0 ? segments[segments.Length - 1] : TargetPath.ToString();
+                var found = FindNodeByNameRecursive(GetTree().Root, last);
+                if (found is Node2D nd)
+                    _target = nd;
+            }
+
             if (_target != null)
             {
+                // If the found node isn't the actual CharacterBody2D, try to resolve a child CharacterBody2D
+                if (!(_target is CharacterBody2D))
+                {
+                    var childBody = FindCharacterBodyInTree(_target);
+                    if (childBody != null)
+                    {
+                        _target = childBody;
+                        if (DebugTarget)
+                            GD.Print($"CameraFollow: Resolved CharacterBody2D inside TargetPath node: {_target.Name} at {_target.GlobalPosition}");
+                        return;
+                    }
+                }
+
                 if (DebugTarget)
                     GD.Print($"CameraFollow: Found target via TargetPath: {_target.Name} at {_target.GlobalPosition}");
                 return;
             }
-            else
-            {
-                GD.PrintErr($"CameraFollow: TargetPath '{TargetPath}' is invalid!");
-            }
+            // Don't error yet; try other strategies below before reporting failure
         }
 
         // Strategy 2: Find player via group (most reliable)
@@ -137,8 +159,34 @@ public partial class CameraFollow : Camera2D
         return null;
     }
 
+    // Helper to find a node by name recursively starting from the given parent
+    private Node FindNodeByNameRecursive(Node parent, string name)
+    {
+        if (parent == null) return null;
+
+        if (parent.Name == name)
+            return parent;
+
+        foreach (Node child in parent.GetChildren())
+        {
+            var result = FindNodeByNameRecursive(child, name);
+            if (result != null)
+                return result;
+        }
+
+        return null;
+    }
+
     public override void _PhysicsProcess(double delta)
     {
+        // Ensure this camera is current if requested
+        if (SetCurrentOnStart && !IsCurrent())
+        {
+            MakeCurrent();
+            if (DebugTarget)
+                GD.Print($"CameraFollow: MakeCurrent() called to activate camera {Name}");
+        }
+
         if (_target == null)
         {
             // Try to find target again if it was null
