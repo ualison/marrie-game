@@ -588,4 +588,26 @@ public partial class DynamicTreeSpawner : Node2D
             _chunkCache.Remove(key);
         }
     }
+    
+    // Debug methods to help troubleshoot apple tree spawning
+    public int GetTotalTreeCount() => _totalSpawnedTrees;
+    
+    public void ResetTreeCount()
+    {
+        _totalSpawnedTrees = 0;
+        GD.Print("Tree counter reset to 0");
+    }
+    
+    public void PrintAppleTreeDebugInfo()
+    {
+        GD.Print($"Total trees spawned: {_totalSpawnedTrees}");
+        GD.Print($"Trees per apple: {TreesPerApple}");
+        if (TreesPerApple > 0)
+        {
+            int nextAppleTree = TreesPerApple - (_totalSpawnedTrees % TreesPerApple);
+            if (nextAppleTree == TreesPerApple) nextAppleTree = 0;
+            GD.Print($"Next apple tree in: {nextAppleTree} trees");
+        }
+        GD.Print($"Apple bearing prefab set: {AppleBearingTreePrefab != null}");
+    }
 }
