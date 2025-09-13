@@ -23,6 +23,7 @@ position = Vector2(6, 294)
 
 [node name="DynamicTreeSpawner" type="Node2D" parent="."]
 script = ExtResource("4_lrc6l")
+MinTreesPerChunk = 3
 MaxTreesPerChunk = 5
 MinTreeSpacing = 60.0
 MaxTreeSpacing = 120.0
@@ -30,6 +31,10 @@ TreeSpacingVariation = 40.0
 TreeYVariation = 15.0
 TreePrefabs = Array[PackedScene]([ExtResource("5_opdns")])
 BushPrefab = ExtResource("3_uboq2")
-TreesPerApple = 6
+BackgroundTreeProbability = 0.4
+BushProbability = 0.2
+TreesPerApple = 4
 AppleBearingTreePrefab = ExtResource("7_opdns")
-ChunkGapMin = 20.0
+ChunkOverlapMin = -85.0
+ChunkOverlapMax = 100.0
+ChunkTransitionSmoothness = 0.9

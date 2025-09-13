@@ -1,6 +1,6 @@
 using Godot;
 using System.Collections.Generic;
-using System.Linq;
+using System.Runtime.CompilerServices;
 
 public partial class DynamicTreeSpawner : Node2D
 {
@@ -15,10 +15,10 @@ public partial class DynamicTreeSpawner : Node2D
     [Export] public float TreeYVariation = 10.0f;
     
     [ExportGroup("Bush Distribution")]
-    [Export] public float MinBushSpacing = 60.0f; // Bushes can be closer together
+    [Export] public float MinBushSpacing = 60.0f;
     [Export] public float MaxBushSpacing = 120.0f;
-    [Export] public float BushToTreeMinDistance = 40.0f; // Minimum distance from bush to tree
-    [Export] public float BushYOffset = 15.0f; // Bushes sit slightly higher
+    [Export] public float BushToTreeMinDistance = 40.0f;
+    [Export] public float BushYOffset = 15.0f;
     
     [ExportGroup("Tree Prefabs")]
     [Export] public PackedScene[] TreePrefabs;
@@ -31,105 +31,240 @@ public partial class DynamicTreeSpawner : Node2D
     [Export] public Color ForegroundTreeColor = new Color(0.0f, 0.0f, 0.0f, 1.0f);
     
     [ExportGroup("Layer Depth Control")]
-    [Export] public int BackgroundZIndex = -3; // Far background trees
-    [Export] public int MidBackgroundZIndex = -2; // Mid background trees
-    [Export] public int BehindPlayerZIndex = -1; // Just behind player
-    [Export] public int PlayerZIndex = 0; // Player layer (reference)
-    [Export] public int ForegroundZIndex = 1; // In front of player
-    [Export] public float DepthVariationIntensity = 0.4f; // How much Y affects depth perception
-    [Export] public float LayerTransitionSmoothness = 0.7f; // Probability distribution smoothness
+    [Export] public int BackgroundZIndex = -3;
+    [Export] public int MidBackgroundZIndex = -2;
+    [Export] public int BehindPlayerZIndex = -1;
+    [Export] public int PlayerZIndex = 0;
+    [Export] public int ForegroundZIndex = 1;
+    [Export] public float DepthVariationIntensity = 0.4f;
+    [Export] public float LayerTransitionSmoothness = 0.7f;
     
     [ExportGroup("Apple Settings")]
     [Export] public int TreesPerApple = 5;
     [Export] public PackedScene AppleBearingTreePrefab;
     
-    [ExportGroup("Chunk Spacing")]
-    [Export] public float ChunkGapMin = -50.0f;
-    [Export] public float ChunkGapMax = 50.0f;
+    [ExportGroup("Natural Chunk Spacing")]
+    [Export] public float ChunkOverlapMin = -80.0f;
+    [Export] public float ChunkOverlapMax = 120.0f;
+    [Export] public float ChunkTransitionSmoothness = 0.8f;
+    [Export] public bool UseNaturalSpacing = true;
     
-    // Performance optimization: Object pooling
-    private readonly Queue<Node2D> _treePool = new Queue<Node2D>();
-    private readonly Queue<Node2D> _bushPool = new Queue<Node2D>();
-    private const int POOL_PREALLOC_SIZE = 20;
+    // Robust object pools with validation
+    private readonly Queue<PooledObject> _treePool = new Queue<PooledObject>(32);
+    private readonly Queue<PooledObject> _bushPool = new Queue<PooledObject>(16);
+    private readonly Queue<PooledObject> _appleTreePool = new Queue<PooledObject>(8);
     
-    // Cached data structures for performance
+    // Pre-allocated collections to avoid GC
+    private readonly float[] _positionBuffer = new float[32];
+    private readonly float[] _constraintBuffer = new float[16];
+    private readonly bool[] _gridBuffer = new bool[64]; // Reusable grid
+    private readonly (float x, bool isBush, int z, bool isApple)[] _spawnBuffer = new (float, bool, int, bool)[32];
+    
+    // Cache-friendly data structures
+    private readonly Dictionary<int, ChunkData> _chunks = new Dictionary<int, ChunkData>(16);
     private readonly RandomNumberGenerator _rng = new RandomNumberGenerator();
-    private readonly Dictionary<int, CachedChunkData> _chunkCache = new Dictionary<int, CachedChunkData>();
-    private readonly List<float> _tempPositionList = new List<float>(16); // Reusable list
-    private readonly List<float> _tempCandidatesList = new List<float>(32); // Reusable list
     
-    // Layer containers
-    private Node2D _backLayerContainer;
-    private Node2D _frontLayerContainer;
-    private int _totalSpawnedTrees = 0;
+    // Cached components and frequently accessed data
+    private Node2D _backContainer;
+    private Node2D _frontContainer;
+    private int _treeCount;
+    private int _treePrefabCount;
+    private bool _hasBushPrefab;
+    private bool _hasApplePrefab;
     
-    // Cached data structure for chunk information
-    private struct CachedChunkData
+    // Precomputed values for performance
+    private float _invChunkWidth;
+    private float _minSpacingSquared;
+    private float _layerSmoothnessRecip;
+    private float _depthIntensityPi;
+    
+    // Safe object wrapper for pooling
+    private class PooledObject
     {
-        public List<SpawnedObjectInfo> SpawnedObjects;
-        public float ChunkOffset;
+        public Node2D Object { get; private set; }
+        public bool IsValid { get; private set; }
+        public int UseCount { get; private set; }
         
-        public CachedChunkData(float offset)
+        public PooledObject(Node2D obj)
         {
-            SpawnedObjects = new List<SpawnedObjectInfo>();
-            ChunkOffset = offset;
+            Object = obj;
+            IsValid = true;
+            UseCount = 0;
+        }
+        
+        public bool TryUse()
+        {
+            if (!IsValid || Object == null || Object.IsQueuedForDeletion())
+            {
+                IsValid = false;
+                return false;
+            }
+            
+            try
+            {
+                // Test object validity with a safe operation
+                var _ = Object.Position;
+                UseCount++;
+                return true;
+            }
+            catch
+            {
+                IsValid = false;
+                return false;
+            }
+        }
+        
+        public void ReturnToPool()
+        {
+            if (IsValid && Object != null && !Object.IsQueuedForDeletion())
+            {
+                try
+                {
+                    Object.Visible = false;
+                    if (Object.GetParent() != null)
+                        Object.GetParent().RemoveChild(Object);
+                }
+                catch
+                {
+                    IsValid = false;
+                }
+            }
+        }
+        
+        public void Dispose()
+        {
+            if (Object != null && !Object.IsQueuedForDeletion())
+            {
+                Object.QueueFree();
+            }
+            IsValid = false;
+            Object = null;
         }
     }
     
-    // Information about spawned objects for collision detection
-    private struct SpawnedObjectInfo
+    // Compact chunk data structure
+    private struct ChunkData
     {
-        public float XPosition;
-        public bool IsBush;
-        public int ZLayer;
+        public float[] Positions;
+        public byte[] Types; // 0=tree, 1=bush, 2=apple
+        public float Offset;
+        public int Count;
+        public float NaturalTransition; // For smoother chunk blending
         
-        public SpawnedObjectInfo(float x, bool bush, int z)
+        public ChunkData(int capacity)
         {
-            XPosition = x;
-            IsBush = bush;
-            ZLayer = z;
+            Positions = new float[capacity];
+            Types = new byte[capacity];
+            Offset = 0f;
+            Count = 0;
+            NaturalTransition = 0f;
         }
     }
     
     public override void _Ready()
     {
-        InitializeContainers();
-        PreallocateObjectPool();
+        InitializeOptimized();
     }
     
-    private void InitializeContainers()
+    private void InitializeOptimized()
     {
-        _backLayerContainer = new Node2D
-        {
-            Name = "OnlyBehindPlayerLayerTrees",
-            ZIndex = BehindPlayerZIndex
-        };
-        AddChild(_backLayerContainer);
+        // Cache frequently used values
+        _invChunkWidth = 1f / ChunkWidth;
+        _minSpacingSquared = MinTreeSpacing * MinTreeSpacing;
+        _layerSmoothnessRecip = 1f / LayerTransitionSmoothness;
+        _depthIntensityPi = DepthVariationIntensity * Mathf.Pi;
+        _treePrefabCount = TreePrefabs?.Length ?? 0;
+        _hasBushPrefab = BushPrefab != null;
+        _hasApplePrefab = AppleBearingTreePrefab != null;
         
-        _frontLayerContainer = new Node2D
-        {
-            Name = "FrontOrBehindPlayerLayerTrees"
-        };
-        AddChild(_frontLayerContainer);
+        // Initialize containers
+        _backContainer = new Node2D { Name = "BackTrees", ZIndex = BehindPlayerZIndex };
+        _frontContainer = new Node2D { Name = "FrontTrees" };
+        AddChild(_backContainer);
+        AddChild(_frontContainer);
+        
+        // Warm up object pools safely
+        WarmupPoolsSafely();
     }
     
-    private void PreallocateObjectPool()
+    private void WarmupPoolsSafely()
     {
-        // Pre-create objects for pooling to reduce instantiation overhead
-        for (int i = 0; i < POOL_PREALLOC_SIZE; i++)
+        // Pre-instantiate common objects with validation
+        if (_treePrefabCount > 0)
         {
-            if (TreePrefabs?.Length > 0)
+            for (int i = 0; i < 16; i++)
             {
-                var tree = TreePrefabs[0].Instantiate<Node2D>();
-                tree.Visible = false;
-                _treePool.Enqueue(tree);
+                try
+                {
+                    var tree = TreePrefabs[0].Instantiate<Node2D>();
+                    var pooledObj = new PooledObject(tree);
+                    if (pooledObj.TryUse())
+                    {
+                        pooledObj.ReturnToPool();
+                        _treePool.Enqueue(pooledObj);
+                    }
+                    else
+                    {
+                        tree?.QueueFree();
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    GD.PrintErr($"Failed to warm up tree pool: {ex.Message}");
+                    break;
+                }
             }
-            
-            if (BushPrefab != null)
+        }
+        
+        if (_hasBushPrefab)
+        {
+            for (int i = 0; i < 8; i++)
             {
-                var bush = BushPrefab.Instantiate<Node2D>();
-                bush.Visible = false;
-                _bushPool.Enqueue(bush);
+                try
+                {
+                    var bush = BushPrefab.Instantiate<Node2D>();
+                    var pooledObj = new PooledObject(bush);
+                    if (pooledObj.TryUse())
+                    {
+                        pooledObj.ReturnToPool();
+                        _bushPool.Enqueue(pooledObj);
+                    }
+                    else
+                    {
+                        bush?.QueueFree();
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    GD.PrintErr($"Failed to warm up bush pool: {ex.Message}");
+                    break;
+                }
+            }
+        }
+        
+        if (_hasApplePrefab)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                try
+                {
+                    var appleTree = AppleBearingTreePrefab.Instantiate<Node2D>();
+                    var pooledObj = new PooledObject(appleTree);
+                    if (pooledObj.TryUse())
+                    {
+                        pooledObj.ReturnToPool();
+                        _appleTreePool.Enqueue(pooledObj);
+                    }
+                    else
+                    {
+                        appleTree?.QueueFree();
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    GD.PrintErr($"Failed to warm up apple tree pool: {ex.Message}");
+                    break;
+                }
             }
         }
     }
@@ -139,429 +274,467 @@ public partial class DynamicTreeSpawner : Node2D
         ClearTrees();
         _rng.Seed = seed;
         
-        // Generate chunk offset
-        float offset = _rng.RandfRange(ChunkGapMin, ChunkGapMax);
-        
-        // Initialize cached chunk data
-        if (!_chunkCache.ContainsKey(chunkIndex))
+        // Get or create chunk data
+        if (!_chunks.TryGetValue(chunkIndex, out var chunk))
         {
-            _chunkCache[chunkIndex] = new CachedChunkData(offset);
+            chunk = new ChunkData(MaxTreesPerChunk + 4);
+            _chunks[chunkIndex] = chunk;
         }
         
-        // Generate and spawn objects
-        var positions = GenerateOptimizedPositions(chunkIndex);
-        SpawnObjectsAtPositions(positions, chunkIndex);
+        // Calculate natural chunk transitions
+        if (UseNaturalSpacing)
+        {
+            chunk.Offset = CalculateNaturalChunkOffset(chunkIndex);
+            chunk.NaturalTransition = CalculateChunkTransition(chunkIndex);
+        }
+        else
+        {
+            chunk.Offset = _rng.RandfRange(ChunkOverlapMin, ChunkOverlapMax);
+            chunk.NaturalTransition = 0f;
+        }
+        
+        // Generate positions using optimized algorithm
+        int spawnCount = GeneratePositionsOptimized(chunkIndex, chunk);
+        
+        // Spawn objects in batch
+        SpawnObjectsBatch(spawnCount, chunkIndex);
     }
     
-    private List<(float x, bool isBush, int zLayer)> GenerateOptimizedPositions(int chunkIndex)
+    private float CalculateNaturalChunkOffset(int chunkIndex)
     {
-        var results = new List<(float, bool, int)>();
-        _tempPositionList.Clear();
+        // Create natural variation based on chunk position using Perlin-like noise
+        float baseNoise = Mathf.Sin(chunkIndex * 0.7f) * Mathf.Cos(chunkIndex * 0.3f);
+        float detailNoise = Mathf.Sin(chunkIndex * 2.1f) * 0.3f;
+        float combinedNoise = (baseNoise + detailNoise) * 0.5f;
         
-        // Get boundary constraints from adjacent chunks
-        var constraints = GetAdjacentConstraints(chunkIndex);
-        
+        // Map noise to overlap range with bias toward slight overlap for natural look
+        float naturalBias = -20.0f; // Slight overlap preference
+        return Mathf.Lerp(ChunkOverlapMin, ChunkOverlapMax, (combinedNoise + 1f) * 0.5f) + naturalBias;
+    }
+    
+    private float CalculateChunkTransition(int chunkIndex)
+    {
+        // Smooth transition factor for blending chunk boundaries
+        return Mathf.Sin(chunkIndex * 0.5f + Mathf.Pi * 0.25f) * ChunkTransitionSmoothness;
+    }
+    
+    private int GeneratePositionsOptimized(int chunkIndex, ChunkData chunk)
+    {
+        // Reset buffers
+        int constraintCount = GetConstraintsOptimized(chunkIndex);
         int targetCount = _rng.RandiRange(MinTreesPerChunk, MaxTreesPerChunk);
         
-        // Use optimized Poisson disk sampling
-        var treePositions = GenerateOptimizedPoissonPositions(targetCount, constraints);
+        // Use spatial hashing for ultra-fast collision detection
+        var gridSize = (int)(ChunkWidth / MinTreeSpacing) + 1;
+        if (gridSize > _gridBuffer.Length)
+            gridSize = _gridBuffer.Length;
         
-        foreach (float pos in treePositions)
+        System.Array.Clear(_gridBuffer, 0, gridSize);
+        
+        // Mark constraint cells with natural transition zones
+        for (int i = 0; i < constraintCount; i++)
         {
-            bool isBush = _rng.Randf() < BushProbability;
-            int zLayer = CalculateNaturalZLayer(pos);
-            
-            results.Add((pos, isBush, zLayer));
-            
-            // Cache this position
-            _chunkCache[chunkIndex].SpawnedObjects.Add(new SpawnedObjectInfo(pos, isBush, zLayer));
-        }
-        
-        return results;
-    }
-    
-    private int CalculateNaturalZLayer(float xPosition)
-    {
-        // Create natural depth distribution based on position and randomness
-        float normalizedX = xPosition / ChunkWidth; // 0 to 1
-        float depthSeed = _rng.Randf();
-        
-        // Create a more natural distribution with multiple depth layers
-        float depthFactor = (normalizedX * 0.3f + depthSeed * 0.7f + 
-                           Mathf.Sin(normalizedX * Mathf.Pi) * DepthVariationIntensity);
-        
-        // Smooth probability distribution for layer assignment
-        if (depthFactor < 0.15f * LayerTransitionSmoothness)
-            return BackgroundZIndex;
-        else if (depthFactor < 0.35f * LayerTransitionSmoothness)
-            return MidBackgroundZIndex;
-        else if (depthFactor < 0.65f)
-            return BehindPlayerZIndex;
-        else if (depthFactor < 0.85f)
-            return PlayerZIndex;
-        else
-            return ForegroundZIndex;
-    }
-    
-    private List<float> GetAdjacentConstraints(int chunkIndex)
-    {
-        var constraints = new List<float>();
-        
-        // Check left chunk
-        if (_chunkCache.ContainsKey(chunkIndex - 1))
-        {
-            var leftChunk = _chunkCache[chunkIndex - 1];
-            foreach (var obj in leftChunk.SpawnedObjects)
+            int cell = FastFloatToInt(_constraintBuffer[i] / MinTreeSpacing);
+            if (cell >= 0 && cell < gridSize)
             {
-                if (obj.XPosition > ChunkWidth - GetMaxSpacing(obj.IsBush) * 2)
+                _gridBuffer[cell] = true;
+                // Vary exclusion zone based on natural transition
+                float transitionFactor = 1f + chunk.NaturalTransition * 0.3f;
+                int exclusionRadius = (int)(transitionFactor + 0.5f);
+                
+                for (int offset = -exclusionRadius; offset <= exclusionRadius; offset++)
                 {
-                    constraints.Add(obj.XPosition - (ChunkWidth + leftChunk.ChunkOffset));
+                    int targetCell = cell + offset;
+                    if (targetCell >= 0 && targetCell < gridSize)
+                        _gridBuffer[targetCell] = true;
                 }
             }
         }
         
-        // Check right chunk
-        if (_chunkCache.ContainsKey(chunkIndex + 1))
-        {
-            var rightChunk = _chunkCache[chunkIndex + 1];
-            foreach (var obj in rightChunk.SpawnedObjects)
-            {
-                if (obj.XPosition < GetMaxSpacing(obj.IsBush) * 2)
-                {
-                    constraints.Add(obj.XPosition + (ChunkWidth + rightChunk.ChunkOffset));
-                }
-            }
-        }
-        
-        return constraints;
-    }
-    
-    private float GetMinSpacing(bool isBush) => isBush ? MinBushSpacing : MinTreeSpacing;
-    private float GetMaxSpacing(bool isBush) => isBush ? MaxBushSpacing : MaxTreeSpacing;
-    
-    private List<float> GenerateOptimizedPoissonPositions(int targetCount, List<float> constraints)
-    {
-        _tempPositionList.Clear();
-        _tempCandidatesList.Clear();
-        
-        // Optimized grid-based approach for better performance
-        float cellSize = MinTreeSpacing;
-        int gridWidth = Mathf.CeilToInt(ChunkWidth / cellSize);
-        bool[] occupiedCells = new bool[gridWidth];
-        
-        // Mark constrained areas
-        foreach (float constraint in constraints)
-        {
-            int cellIndex = Mathf.FloorToInt(constraint / cellSize);
-            if (cellIndex >= 0 && cellIndex < gridWidth)
-            {
-                occupiedCells[cellIndex] = true;
-                // Mark adjacent cells too
-                if (cellIndex > 0) occupiedCells[cellIndex - 1] = true;
-                if (cellIndex < gridWidth - 1) occupiedCells[cellIndex + 1] = true;
-            }
-        }
-        
+        // Generate positions with optimized collision detection
+        int posCount = 0;
         int attempts = 0;
-        while (_tempPositionList.Count < targetCount && attempts < targetCount * 10)
+        int maxAttempts = targetCount * 8;
+        
+        while (posCount < targetCount && attempts < maxAttempts)
         {
             attempts++;
             
-            float candidateX = _rng.RandfRange(MinTreeSpacing, ChunkWidth - MinTreeSpacing);
-            int cellIndex = Mathf.FloorToInt(candidateX / cellSize);
+            // Add natural spacing variation
+            float spacingVariation = UseNaturalSpacing ? 
+                _rng.RandfRange(-TreeSpacingVariation, TreeSpacingVariation) * chunk.NaturalTransition : 0f;
+            float effectiveMinSpacing = MinTreeSpacing + spacingVariation;
+            float effectiveMaxSpacing = ChunkWidth - effectiveMinSpacing;
             
-            if (cellIndex >= 0 && cellIndex < gridWidth && !occupiedCells[cellIndex])
+            float x = _rng.RandfRange(effectiveMinSpacing, effectiveMaxSpacing);
+            int cell = FastFloatToInt(x / MinTreeSpacing);
+            
+            if (cell >= 0 && cell < gridSize && !_gridBuffer[cell] && 
+                IsPositionValidFast(x, posCount))
             {
-                if (IsPositionValidOptimized(candidateX, _tempPositionList, constraints))
+                _positionBuffer[posCount] = x;
+                bool isBush = _rng.Randf() < BushProbability;
+                int zLayer = CalculateZLayerFast(x);
+                bool isApple = false;
+                
+                if (!isBush && TreesPerApple > 0)
                 {
-                    _tempPositionList.Add(candidateX);
-                    occupiedCells[cellIndex] = true;
-                    
-                    // Mark adjacent cells
-                    if (cellIndex > 0) occupiedCells[cellIndex - 1] = true;
-                    if (cellIndex < gridWidth - 1) occupiedCells[cellIndex + 1] = true;
+                    _treeCount++;
+                    isApple = _treeCount % TreesPerApple == 0;
+                    if (isApple)
+                    {
+                        GD.Print($"Apple tree #{_treeCount} at {x}");
+                        zLayer = zLayer < PlayerZIndex ? BehindPlayerZIndex : ForegroundZIndex;
+                    }
+                }
+                
+                _spawnBuffer[posCount] = (x, isBush, zLayer, isApple);
+                
+                // Update chunk data
+                chunk.Positions[posCount] = x;
+                chunk.Types[posCount] = (byte)(isApple ? 2 : (isBush ? 1 : 0));
+                
+                _gridBuffer[cell] = true;
+                if (cell > 0) _gridBuffer[cell - 1] = true;
+                if (cell < gridSize - 1) _gridBuffer[cell + 1] = true;
+                
+                posCount++;
+            }
+        }
+        
+        chunk.Count = posCount;
+        return posCount;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private int FastFloatToInt(float value) => (int)value;
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsPositionValidFast(float x, int posCount)
+    {
+        float minDist = MinTreeSpacing;
+        for (int i = 0; i < posCount; i++)
+        {
+            if (Mathf.Abs(x - _positionBuffer[i]) < minDist)
+                return false;
+        }
+        return true;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private int CalculateZLayerFast(float x)
+    {
+        float normalizedX = x * _invChunkWidth;
+        float depthFactor = normalizedX * 0.3f + _rng.Randf() * 0.7f + 
+                           Mathf.Sin(normalizedX * _depthIntensityPi);
+        
+        float smoothness = LayerTransitionSmoothness;
+        if (depthFactor < 0.15f * smoothness) return BackgroundZIndex;
+        if (depthFactor < 0.35f * smoothness) return MidBackgroundZIndex;
+        if (depthFactor < 0.65f) return BehindPlayerZIndex;
+        if (depthFactor < 0.85f) return PlayerZIndex;
+        return ForegroundZIndex;
+    }
+    
+    private int GetConstraintsOptimized(int chunkIndex)
+    {
+        int count = 0;
+        
+        // Left chunk constraints with natural spacing
+        if (_chunks.TryGetValue(chunkIndex - 1, out var leftChunk))
+        {
+            float threshold = ChunkWidth - MaxTreeSpacing * 2;
+            if (UseNaturalSpacing)
+                threshold += leftChunk.NaturalTransition * 50f; // Adjust threshold based on transition
+                
+            for (int i = 0; i < leftChunk.Count; i++)
+            {
+                if (leftChunk.Positions[i] > threshold && count < _constraintBuffer.Length - 1)
+                {
+                    _constraintBuffer[count++] = leftChunk.Positions[i] - (ChunkWidth + leftChunk.Offset);
                 }
             }
         }
         
-        return new List<float>(_tempPositionList);
-    }
-    
-    private bool IsPositionValidOptimized(float x, List<float> existingPositions, List<float> constraints)
-    {
-        // Optimized distance checking with early termination
-        float minSpacing = MinTreeSpacing;
-        
-        for (int i = 0; i < existingPositions.Count; i++)
+        // Right chunk constraints with natural spacing
+        if (_chunks.TryGetValue(chunkIndex + 1, out var rightChunk))
         {
-            if (Mathf.Abs(x - existingPositions[i]) < minSpacing)
-                return false;
-        }
-        
-        for (int i = 0; i < constraints.Count; i++)
-        {
-            if (Mathf.Abs(x - constraints[i]) < minSpacing)
-                return false;
-        }
-        
-        return x >= minSpacing * 0.5f && x <= ChunkWidth - minSpacing * 0.5f;
-    }
-    
-    private void SpawnObjectsAtPositions(List<(float x, bool isBush, int zLayer)> positions, int chunkIndex)
-    {
-        foreach (var (x, isBush, zLayer) in positions)
-        {
-            // Check if this should be an apple tree (only for trees, not bushes)
-            bool shouldBeAppleTree = false;
-            if (!isBush)
+            float threshold = MaxTreeSpacing * 2;
+            if (UseNaturalSpacing)
+                threshold -= rightChunk.NaturalTransition * 50f; // Adjust threshold based on transition
+                
+            for (int i = 0; i < rightChunk.Count; i++)
             {
-                _totalSpawnedTrees++;
-                shouldBeAppleTree = TreesPerApple > 0 && _totalSpawnedTrees % TreesPerApple == 0;
+                if (rightChunk.Positions[i] < threshold && count < _constraintBuffer.Length - 1)
+                {
+                    _constraintBuffer[count++] = rightChunk.Positions[i] + (ChunkWidth + rightChunk.Offset);
+                }
             }
+        }
+        
+        return count;
+    }
+    
+    private void SpawnObjectsBatch(int count, int chunkIndex)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            var (x, isBush, zLayer, isApple) = _spawnBuffer[i];
             
-            Node2D objectNode = GetPooledObject(isBush, shouldBeAppleTree);
+            Node2D obj = GetPooledObjectSafe(isBush, isApple);
+            if (obj == null) continue;
             
-            if (objectNode == null)
-                continue;
-            
-            // Apple trees get special Z-layer treatment: always in front of other trees
-            int finalZLayer = zLayer;
-            if (shouldBeAppleTree)
+            ConfigureObjectFast(obj, x, isBush, zLayer, isApple);
+        }
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Node2D GetPooledObjectSafe(bool isBush, bool isApple)
+    {
+        if (isBush && _hasBushPrefab)
+        {
+            while (_bushPool.Count > 0)
             {
-                // Apple trees should be in front of other trees but can be behind/front of player
-                if (zLayer < PlayerZIndex)
-                    finalZLayer = BehindPlayerZIndex; // Behind player but in front of other background trees
+                var pooledObj = _bushPool.Dequeue();
+                if (pooledObj.TryUse())
+                {
+                    return pooledObj.Object;
+                }
                 else
-                    finalZLayer = ForegroundZIndex; // In front of player and other trees
+                {
+                    pooledObj.Dispose();
+                }
             }
-            
-            ConfigureSpawnedObject(objectNode, x, isBush, finalZLayer, shouldBeAppleTree);
-        }
-    }
-    
-    private Node2D GetPooledObject(bool isBush, bool shouldBeAppleTree = false)
-    {
-        Node2D objectNode = null;
-        
-        if (isBush && BushPrefab != null)
-        {
-            if (_bushPool.Count > 0)
-            {
-                objectNode = _bushPool.Dequeue();
-                objectNode.Visible = true;
-            }
-            else
-            {
-                objectNode = BushPrefab.Instantiate<Node2D>();
-            }
-        }
-        else if (shouldBeAppleTree && AppleBearingTreePrefab != null)
-        {
-            // Always use the special apple tree prefab when available
-            objectNode = AppleBearingTreePrefab.Instantiate<Node2D>();
-        }
-        else if (TreePrefabs?.Length > 0)
-        {
-            if (_treePool.Count > 0)
-            {
-                objectNode = _treePool.Dequeue();
-                objectNode.Visible = true;
-            }
-            else
-            {
-                int treeIndex = _rng.RandiRange(0, TreePrefabs.Length - 1);
-                objectNode = TreePrefabs[treeIndex].Instantiate<Node2D>();
-            }
-        }
-        
-        return objectNode;
-    }
-    
-    private void ConfigureSpawnedObject(Node2D objectNode, float x, bool isBush, int zLayer, bool isAppleTree = false)
-    {
-        // Position with appropriate Y offset
-        float yOffset = isBush ? BushYOffset : 0f;
-        float yVariation = _rng.RandfRange(-TreeYVariation, TreeYVariation);
-        objectNode.Position = new Vector2(x, TreeYPosition + yOffset + yVariation);
-        
-        // Set Z-layer for natural depth
-        objectNode.ZIndex = zLayer;
-        
-        // Determine which container to use and apply coloring
-        bool isBackground = zLayer < PlayerZIndex;
-        Node2D targetContainer = isBackground ? _backLayerContainer : _frontLayerContainer;
-        
-        targetContainer.AddChild(objectNode);
-        
-        // Apply appropriate coloring (apple trees keep their natural colors)
-        if (isAppleTree)
-        {
-            // Apple trees keep their default/natural colors - don't override
-        }
-        else if (isBackground)
-        {
-            ApplyColor(objectNode, BackgroundTreeColor);
-        }
-        else
-        {
-            ApplyColor(objectNode, ForegroundTreeColor);
-        }
-        
-        // Apply apple properties if this is an apple tree
-        if (isAppleTree)
-        {
-            ApplyAppleLogic(objectNode);
-        }
-        
-        // Apply object-specific configuration
-        ConfigureObjectParameters(objectNode, isBush, isAppleTree);
-        
-        // Apply wind and randomization
-        ApplyEnvironmentalEffects(objectNode);
-    }
-    
-    private void ApplyColor(Node2D objectNode, Color color)
-    {
-        if (objectNode.HasMethod("SetTreeColor"))
-        {
-            objectNode.Call("SetTreeColor", color);
-        }
-        else if (objectNode is CanvasItem canvasItem)
-        {
-            canvasItem.Modulate = color;
-        }
-    }
-    
-    private void ApplyAppleLogic(Node2D treeNode)
-    {
-        // Set apple properties using multiple methods for compatibility
-        if (treeNode.HasMethod("SetHasApples"))
-        {
-            treeNode.Call("SetHasApples", true);
-        }
-        
-        // Try setting the hasApples property
-        try
-        {
-            treeNode.Set("hasApples", true);
-        }
-        catch
-        {
-            // Ignore if property doesn't exist
-        }
-        
-        // Try setting apple quantity if the tree supports it
-        if (treeNode.HasMethod("SetAppleQuantity"))
-        {
-            int appleCount = _rng.RandiRange(3, 8); // More apples for special trees
-            treeNode.Call("SetAppleQuantity", appleCount);
-        }
-        else
-        {
+            // Fallback to new instance
             try
             {
-                treeNode.Set("appleQuantity", _rng.RandiRange(3, 8));
+                return BushPrefab.Instantiate<Node2D>();
             }
             catch
             {
-                // Ignore if property doesn't exist
+                return null;
             }
         }
         
-        // Try enabling apple visibility if the tree supports it
-        try
+        if (isApple && _hasApplePrefab)
         {
-            treeNode.Set("showApples", true);
-        }
-        catch
-        {
-            // Ignore if property doesn't exist
-        }
-    }
-    
-    private void ConfigureObjectParameters(Node2D objectNode, bool isBush, bool isAppleTree = false)
-    {
-        if (isBush)
-        {
-            // Configure bush parameters
-            if (objectNode.HasMethod("SetBranchCount"))
+            while (_appleTreePool.Count > 0)
             {
-                objectNode.Set("BranchCount", _rng.RandiRange(4, 6));
-                objectNode.Set("InitialLength", _rng.RandfRange(50f, 80f));
-            }
-        }
-        else
-        {
-            // Configure tree parameters
-            if (objectNode.HasMethod("SetMaxDepth"))
-            {
-                objectNode.Set("maxDepth", _rng.RandiRange(5, 7));
-                objectNode.Set("initialLength", _rng.RandfRange(180f, 220f));
-                objectNode.Set("branchAngle", _rng.RandfRange(15f, 22f));
-                objectNode.Set("angleVariation", _rng.RandfRange(5f, 10f));
-                objectNode.Set("maxBranches", _rng.RandiRange(2, 3));
-                objectNode.Set("leafDensity", _rng.RandiRange(1, 3));
-            }
-            
-            // Apple trees get special configuration
-            if (isAppleTree)
-            {
-                // Make apple trees slightly more prominent
-                if (objectNode.HasMethod("SetMaxDepth"))
+                var pooledObj = _appleTreePool.Dequeue();
+                if (pooledObj.TryUse())
                 {
-                    objectNode.Set("maxDepth", _rng.RandiRange(6, 8)); // Slightly taller
-                    objectNode.Set("initialLength", _rng.RandfRange(200f, 240f)); // Slightly bigger
-                    objectNode.Set("leafDensity", _rng.RandiRange(2, 4)); // More leaves
+                    return pooledObj.Object;
+                }
+                else
+                {
+                    pooledObj.Dispose();
                 }
             }
+            // Fallback to new instance
+            try
+            {
+                return AppleBearingTreePrefab.Instantiate<Node2D>();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        
+        if (_treePrefabCount > 0)
+        {
+            while (_treePool.Count > 0)
+            {
+                var pooledObj = _treePool.Dequeue();
+                if (pooledObj.TryUse())
+                {
+                    return pooledObj.Object;
+                }
+                else
+                {
+                    pooledObj.Dispose();
+                }
+            }
+            // Fallback to new instance
+            try
+            {
+                int idx = _rng.RandiRange(0, _treePrefabCount - 1);
+                return TreePrefabs[idx].Instantiate<Node2D>();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        
+        return null;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ConfigureObjectFast(Node2D obj, float x, bool isBush, int zLayer, bool isApple)
+    {
+        // Position
+        float yOffset = isBush ? BushYOffset : 0f;
+        float yVar = _rng.RandfRange(-TreeYVariation, TreeYVariation);
+        obj.Position = new Vector2(x, TreeYPosition + yOffset + yVar);
+        obj.ZIndex = zLayer;
+        obj.Visible = true;
+        
+        // Container
+        var container = zLayer < PlayerZIndex ? _backContainer : _frontContainer;
+        container.AddChild(obj);
+        
+        // Color (skip for apple trees to preserve natural colors)
+        if (!isApple)
+        {
+            var color = zLayer < PlayerZIndex ? BackgroundTreeColor : ForegroundTreeColor;
+            ApplyColorSafe(obj, color);
+        }
+        
+        // Properties
+        if (isApple) ApplyApplePropertiesSafe(obj);
+        ConfigureParametersSafe(obj, isBush, isApple);
+        ApplyEffectsSafe(obj);
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ApplyColorSafe(Node2D obj, Color color)
+    {
+        try
+        {
+            if (obj.HasMethod("SetTreeColor"))
+                obj.Call("SetTreeColor", color);
+            else if (obj is CanvasItem ci)
+                ci.Modulate = color;
+        }
+        catch (System.Exception ex)
+        {
+            GD.PrintErr($"Failed to apply color: {ex.Message}");
         }
     }
     
-    private void ApplyEnvironmentalEffects(Node2D objectNode)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ApplyApplePropertiesSafe(Node2D obj)
     {
-        // Randomize appearance
-        if (objectNode.HasMethod("RandomizeTree"))
+        try
         {
-            objectNode.Call("RandomizeTree", _rng.Randi());
+            // Use fastest method available
+            if (obj.HasMethod("SetHasApples"))
+                obj.Call("SetHasApples", true);
+            else
+                obj.Set("hasApples", true);
+            
+            int appleCount = _rng.RandiRange(3, 8);
+            if (obj.HasMethod("SetAppleQuantity"))
+                obj.Call("SetAppleQuantity", appleCount);
+            else
+            {
+                obj.Set("appleQuantity", appleCount);
+                obj.Set("showApples", true);
+            }
         }
-        
-        // Apply wind variation
-        if (objectNode.HasMethod("SetWindStrength"))
+        catch (System.Exception ex)
         {
-            float windStrength = _rng.RandfRange(0.15f, 0.25f);
-            objectNode.Call("SetWindStrength", windStrength);
+            GD.PrintErr($"Failed to apply apple properties: {ex.Message}");
+        }
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ConfigureParametersSafe(Node2D obj, bool isBush, bool isApple)
+    {
+        try
+        {
+            if (isBush)
+            {
+                if (obj.HasMethod("SetBranchCount"))
+                {
+                    obj.Set("BranchCount", _rng.RandiRange(4, 6));
+                    obj.Set("InitialLength", _rng.RandfRange(50f, 80f));
+                }
+            }
+            else if (obj.HasMethod("SetMaxDepth"))
+            {
+                if (isApple)
+                {
+                    // Enhanced apple tree parameters
+                    obj.Set("maxDepth", _rng.RandiRange(6, 8));
+                    obj.Set("initialLength", _rng.RandfRange(200f, 240f));
+                    obj.Set("leafDensity", _rng.RandiRange(2, 4));
+                }
+                else
+                {
+                    // Regular tree parameters
+                    obj.Set("maxDepth", _rng.RandiRange(5, 7));
+                    obj.Set("initialLength", _rng.RandfRange(180f, 220f));
+                    obj.Set("leafDensity", _rng.RandiRange(1, 3));
+                }
+                
+                obj.Set("branchAngle", _rng.RandfRange(15f, 22f));
+                obj.Set("angleVariation", _rng.RandfRange(5f, 10f));
+                obj.Set("maxBranches", _rng.RandiRange(2, 3));
+            }
+        }
+        catch (System.Exception ex)
+        {
+            GD.PrintErr($"Failed to configure parameters: {ex.Message}");
+        }
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ApplyEffectsSafe(Node2D obj)
+    {
+        try
+        {
+            if (obj.HasMethod("RandomizeTree"))
+                obj.Call("RandomizeTree", _rng.Randi());
+            
+            if (obj.HasMethod("SetWindStrength"))
+                obj.Call("SetWindStrength", _rng.RandfRange(0.15f, 0.25f));
+        }
+        catch (System.Exception ex)
+        {
+            GD.PrintErr($"Failed to apply effects: {ex.Message}");
         }
     }
     
     private void ClearTrees()
     {
-        // Return objects to pool instead of destroying them
-        ReturnChildrenToPool(_frontLayerContainer, false);
-        ReturnChildrenToPool(_backLayerContainer, false);
+        ReturnToPoolSafe(_frontContainer);
+        ReturnToPoolSafe(_backContainer);
     }
     
-    private void ReturnChildrenToPool(Node2D container, bool isBushContainer)
+    private void ReturnToPoolSafe(Node2D container)
     {
-        foreach (Node child in container.GetChildren())
+        var children = container.GetChildren();
+        foreach (Node child in children)
         {
-            if (child is Node2D node2D)
+            if (child is Node2D obj)
             {
-                container.RemoveChild(node2D);
-                node2D.Visible = false;
+                container.RemoveChild(obj);
                 
-                // Determine if it's a bush based on type or container
-                bool isBush = (BushPrefab != null && 
-                              node2D.GetType().Name == System.IO.Path.GetFileNameWithoutExtension(BushPrefab.ResourcePath));
-                
-                if (isBush && _bushPool.Count < POOL_PREALLOC_SIZE * 2)
+                // Determine object type and return to appropriate pool safely
+                try
                 {
-                    _bushPool.Enqueue(node2D);
+                    var pooledObj = new PooledObject(obj);
+                    if (pooledObj.TryUse())
+                    {
+                        pooledObj.ReturnToPool();
+                        
+                        if (_hasBushPrefab && IsBushType(obj) && _bushPool.Count < 16)
+                            _bushPool.Enqueue(pooledObj);
+                        else if (_hasApplePrefab && IsAppleTreeType(obj) && _appleTreePool.Count < 8)
+                            _appleTreePool.Enqueue(pooledObj);
+                        else if (_treePool.Count < 32)
+                            _treePool.Enqueue(pooledObj);
+                        else
+                            pooledObj.Dispose();
+                    }
+                    else
+                    {
+                        pooledObj.Dispose();
+                    }
                 }
-                else if (!isBush && _treePool.Count < POOL_PREALLOC_SIZE * 2)
-                {
-                    _treePool.Enqueue(node2D);
-                }
-                else
+                catch
                 {
                     child.QueueFree();
                 }
@@ -573,41 +746,91 @@ public partial class DynamicTreeSpawner : Node2D
         }
     }
     
-    public void ResetChunk()
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsBushType(Node2D obj)
     {
-        ClearTrees();
+        try
+        {
+            return _hasBushPrefab && 
+                obj.GetType().Name == System.IO.Path.GetFileNameWithoutExtension(BushPrefab.ResourcePath);
+        }
+        catch
+        {
+            return false;
+        }
     }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsAppleTreeType(Node2D obj)
+    {
+        try
+        {
+            return _hasApplePrefab && 
+                obj.GetType().Name == System.IO.Path.GetFileNameWithoutExtension(AppleBearingTreePrefab.ResourcePath);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+    
+    public void ResetChunk() => ClearTrees();
     
     public void CleanupOldPositions(int currentChunkIndex, int keepRadius = 3)
     {
-        var keysToRemove = _chunkCache.Keys.Where(index => 
-            Mathf.Abs(index - currentChunkIndex) > keepRadius).ToList();
-        
-        foreach (int key in keysToRemove)
+        var toRemove = new List<int>();
+        foreach (var kvp in _chunks)
         {
-            _chunkCache.Remove(key);
+            if (Mathf.Abs(kvp.Key - currentChunkIndex) > keepRadius)
+                toRemove.Add(kvp.Key);
+        }
+        
+        foreach (int key in toRemove)
+            _chunks.Remove(key);
+    }
+    
+    // Enhanced cleanup method to prevent disposed object issues
+    public void ClearAllPools()
+    {
+        // Clear all pools and dispose invalid objects safely
+        while (_treePool.Count > 0)
+        {
+            var pooledObj = _treePool.Dequeue();
+            pooledObj.Dispose();
+        }
+        
+        while (_bushPool.Count > 0)
+        {
+            var pooledObj = _bushPool.Dequeue();
+            pooledObj.Dispose();
+        }
+        
+        while (_appleTreePool.Count > 0)
+        {
+            var pooledObj = _appleTreePool.Dequeue();
+            pooledObj.Dispose();
         }
     }
     
-    // Debug methods to help troubleshoot apple tree spawning
-    public int GetTotalTreeCount() => _totalSpawnedTrees;
-    
-    public void ResetTreeCount()
-    {
-        _totalSpawnedTrees = 0;
-        GD.Print("Tree counter reset to 0");
-    }
-    
+    // Debug methods
+    public int GetTotalTreeCount() => _treeCount;
+    public void ResetTreeCount() { _treeCount = 0; GD.Print("Tree counter reset"); }
     public void PrintAppleTreeDebugInfo()
     {
-        GD.Print($"Total trees spawned: {_totalSpawnedTrees}");
-        GD.Print($"Trees per apple: {TreesPerApple}");
-        if (TreesPerApple > 0)
-        {
-            int nextAppleTree = TreesPerApple - (_totalSpawnedTrees % TreesPerApple);
-            if (nextAppleTree == TreesPerApple) nextAppleTree = 0;
-            GD.Print($"Next apple tree in: {nextAppleTree} trees");
-        }
-        GD.Print($"Apple bearing prefab set: {AppleBearingTreePrefab != null}");
+        GD.Print($"Trees: {_treeCount}, Per apple: {TreesPerApple}, Next in: {TreesPerApple - (_treeCount % TreesPerApple)}");
+    }
+    
+    // Natural spacing validation methods
+    public float GetChunkNaturalOffset(int chunkIndex)
+    {
+        if (_chunks.TryGetValue(chunkIndex, out var chunk))
+            return chunk.Offset;
+        return 0f;
+    }
+    
+    public void SetNaturalSpacing(bool enabled)
+    {
+        UseNaturalSpacing = enabled;
+        GD.Print($"Natural spacing: {(enabled ? "enabled" : "disabled")}");
     }
 }
