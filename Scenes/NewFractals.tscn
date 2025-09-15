@@ -1,6 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://c0abacw7aimd0"]
+[gd_scene load_steps=4 format=3 uid="uid://c0abacw7aimd0"]
 
 [ext_resource type="Script" uid="uid://qbroyuxfpv76" path="res://Scripts/Environment/NewFractals/FractalTree.cs" id="1_2lb8r"]
+[ext_resource type="Texture2D" uid="uid://dt1yf6gkvx5qj" path="res://FractalsExports/fractal_tree_2025-09-15_18-58-40.png" id="2_2lb8r"]
+[ext_resource type="Texture2D" uid="uid://djpj4ni5fwoki" path="res://FractalsExports/fractal_tree_2025-09-15_18-59-36.png" id="3_047bp"]
 
 [node name="Main" type="Node2D"]
 
@@ -20,3 +22,14 @@ MinBranches = 4
 MaxBranches = 4
 TrunkColor = Color(0.0977967, 0.0621536, 0.133017, 1)
 LeafColor = Color(1, 1, 1, 1)
+AutoSaveAfterGeneration = true
+ExportFolderName = "FractalsExports"
+
+[node name="FractalTree2025-09-1518-58-40" type="Sprite2D" parent="."]
+position = Vector2(-1510, -445)
+scale = Vector2(0.510254, 0.470703)
+texture = ExtResource("2_2lb8r")
+
+[node name="FractalTree2025-09-1518-59-36" type="Sprite2D" parent="."]
+position = Vector2(662, -511)
+texture = ExtResource("3_047bp")
