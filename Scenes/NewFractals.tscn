@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3 uid="uid://c0abacw7aimd0"]
+
+[ext_resource type="Script" uid="uid://qbroyuxfpv76" path="res://Scripts/Environment/NewFractals/FractalTree.cs" id="1_2lb8r"]
+
+[node name="Main" type="Node2D"]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(0, -133)
+
+[node name="NewFractalTree" type="Node2D" parent="."]
+script = ExtResource("1_2lb8r")
+MaxDepth = 20
+InitialLength = 250.0
+AngleVariation = 30.0
+MinAngle = 30.0
+MaxAngle = 30.0
+MinBranches = 3
+TrunkColor = Color(0.0977967, 0.0621536, 0.133017, 1)
+LeafColor = Color(1, 1, 1, 1)

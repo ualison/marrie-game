@@ -15,7 +15,7 @@
 
 [node name="hair" type="Polygon2D" parent="Polygons"]
 z_index = -5
-position = Vector2(-1316.93, -2006.33)
+position = Vector2(-1286.93, -2012.33)
 scale = Vector2(2.53591, 2.38922)
 texture = ExtResource("1_gbrhp")
 skeleton = NodePath("../../Skeleton")
@@ -25,7 +25,7 @@ bones = ["hip", PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 
 [node name="head" type="Polygon2D" parent="Polygons"]
 z_index = 1
-position = Vector2(-584.334, -1659.28)
+position = Vector2(-554.334, -1665.28)
 scale = Vector2(0.969273, 0.952176)
 texture = ExtResource("2_nx8gh")
 skeleton = NodePath("../../Skeleton")
@@ -94,7 +94,7 @@ bones = ["hip", PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 
 [node name="Skeleton" type="Skeleton2D" parent="."]
 z_index = 5
-rotation = 0.228046
+rotation = 0.224595
 
 [node name="hip" type="Bone2D" parent="Skeleton"]
 top_level = true
@@ -115,26 +115,25 @@ rest = Transform2D(1.67055, 0, 0, 1, 30.4932, -16.8706)
 
 [node name="head" type="Bone2D" parent="Skeleton/hip/chest/shoulder"]
 position = Vector2(13.3105, -0.220023)
-rotation = -0.0080501
+rotation = -0.00805009
 scale = Vector2(1, 1)
 rest = Transform2D(0.999968, -0.00805001, 0.00805001, 0.999968, 13.3105, -0.220023)
 
 [node name="right_arm_1" type="Bone2D" parent="Skeleton/hip/chest/shoulder"]
 position = Vector2(0.991107, -33.9072)
 rotation = -2.66464
-scale = Vector2(1.96048, 1)
+scale = Vector2(1.96049, 1)
 rest = Transform2D(-1.74169, -0.900012, 0.459076, -0.888397, 0.991107, -33.9072)
 
 [node name="right_arm_2" type="Bone2D" parent="Skeleton/hip/chest/shoulder/right_arm_1"]
 position = Vector2(17.7291, 0.63886)
 rotation = -0.363951
-scale = Vector2(1, 1)
 rest = Transform2D(0.934498, -0.355969, 0.355969, 0.934498, 17.7291, 0.63886)
 
 [node name="left_arm_1" type="Bone2D" parent="Skeleton/hip/chest/shoulder"]
 position = Vector2(1.12259, 36.7772)
 rotation = 2.51601
-scale = Vector2(2.13489, -125.951)
+scale = Vector2(2.13488, -125.951)
 rest = Transform2D(-1.73058, 1.25013, 73.7533, 102.098, 1.12259, 36.7772)
 
 [node name="left_arm_2" type="Bone2D" parent="Skeleton/hip/chest/shoulder/left_arm_1"]
@@ -146,7 +145,7 @@ rest = Transform2D(0.818778, 0.00597069, 0.393417, -0.0155383, 15.9863, -0.01741
 
 [node name="right_foot_1" type="Bone2D" parent="Skeleton/hip"]
 position = Vector2(-34.9875, -40.133)
-rotation = -3.05561
+rotation = -3.1248
 scale = Vector2(1.50347, 1)
 rest = Transform2D(-1.50326, -0.0252511, 0.0167952, -0.999859, -34.9875, -40.133)
 
@@ -158,7 +157,7 @@ rest = Transform2D(1.38306, -0.0798613, 0.0576467, 0.998337, 50.8524, -1.47364)
 
 [node name="left_foot_1" type="Bone2D" parent="Skeleton/hip"]
 position = Vector2(-32.1462, 29.6398)
-rotation = -0.147396
+rotation = -0.173084
 rest = Transform2D(0.985058, -0.172221, 0.172221, 0.985058, -32.1462, 29.6398)
 
 [node name="left_foot_2" type="Bone2D" parent="Skeleton/hip/left_foot_1"]
