@@ -8,12 +8,15 @@
 position = Vector2(0, -133)
 
 [node name="NewFractalTree" type="Node2D" parent="."]
+position = Vector2(0, 248)
 script = ExtResource("1_2lb8r")
-MaxDepth = 20
+MaxDepth = 18
 InitialLength = 250.0
+LengthReduction = 0.75
 AngleVariation = 30.0
 MinAngle = 30.0
 MaxAngle = 30.0
-MinBranches = 3
+MinBranches = 4
+MaxBranches = 4
 TrunkColor = Color(0.0977967, 0.0621536, 0.133017, 1)
 LeafColor = Color(1, 1, 1, 1)

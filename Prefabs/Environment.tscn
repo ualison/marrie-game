@@ -12,6 +12,7 @@
 script = ExtResource("7_envc")
 
 [node name="ForestBackground" type="Sprite2D" parent="."]
+visible = false
 z_index = -5
 position = Vector2(-9.49996, -119.5)
 scale = Vector2(0.377681, 0.288986)
@@ -24,7 +25,7 @@ position = Vector2(6, 294)
 [node name="DynamicTreeSpawner" type="Node2D" parent="."]
 script = ExtResource("4_lrc6l")
 MinTreesPerChunk = 3
-MaxTreesPerChunk = 5
+MaxTreesPerChunk = 3
 MinTreeSpacing = 60.0
 MaxTreeSpacing = 120.0
 TreeSpacingVariation = 40.0
