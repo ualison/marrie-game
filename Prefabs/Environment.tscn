@@ -1,13 +1,11 @@
-[gd_scene load_steps=6 format=3 uid="uid://bprvmud1sukcc"]
+[gd_scene load_steps=5 format=3 uid="uid://bprvmud1sukcc"]
 
 [ext_resource type="Texture2D" uid="uid://cfddkmjhp734f" path="res://Art/ForestBackground.jpg" id="1_lrc6l"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="2_opdns"]
 [ext_resource type="Script" uid="uid://s5qg2tiue4f7" path="res://Scripts/Environment/DynamicTreeSpawner.cs" id="4_lrc6l"]
 [ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="5_p64kh"]
-[ext_resource type="Script" uid="uid://dr6sxgjhikyw2" path="res://Scripts/Environment/EnvironmentChunk.cs" id="7_envc"]
 
 [node name="Environment" type="Node2D"]
-script = ExtResource("7_envc")
 
 [node name="ForestBackground" type="Sprite2D" parent="."]
 visible = false
@@ -22,11 +20,13 @@ position = Vector2(6, 294)
 
 [node name="DynamicTreeSpawner" type="Node2D" parent="."]
 script = ExtResource("4_lrc6l")
-MaxTreesPerChunk = 3
-TreeYVariation = 15.0
+MaxTreesPerChunk = 5
+MinTreeSpacing = 150.0
+TreeYPosition = 300.0
+TreeYVariation = 20.0
 ChunkOverlapMin = -85.0
-ChunkOverlapMax = 100.0
-ChunkTransitionSmoothness = 0.9
+ChunkOverlapMax = 50.0
+ChunkTransitionSmoothness = 1.0
 FractalTreeWidth = 1024.0
 FractalTreeHeight = 1024.0
 FractalVerticalOffset = 100.0
