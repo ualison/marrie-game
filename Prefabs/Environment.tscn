@@ -35,18 +35,34 @@ ApplePlacementOffsetY = -150.0
 AppleMinSpacing = 60.0
 BranchAttachmentRadius = 50.0
 
-[node name="SnowTempest" type="GPUParticles2D" parent="."]
+[node name="SnowTempestFront" type="GPUParticles2D" parent="."]
 z_index = 10
 position = Vector2(-11, -416)
 scale = Vector2(6.399997, 0.19999987)
 amount = 100
 process_material = SubResource("ParticleProcessMaterial_opdns")
 script = ExtResource("4_p64kh")
-TempestIntensity = 0.7
+TempestIntensity = 0.6
 WindDirection = Vector2(0.8, 0.3)
 WindStrength = 20.0
 TextureWeight = 0.09
 TextureHeight = 0.09
 SnowflakeTexture = ExtResource("5_lrc6l")
-GravityVelocity = 13.0
+GravityVelocity = 12.0
+ParticleLifetime = 20.0
+
+[node name="SnowTempestBack" type="GPUParticles2D" parent="."]
+z_index = -10
+position = Vector2(-11, -416)
+scale = Vector2(6.399997, 0.19999987)
+amount = 100
+process_material = SubResource("ParticleProcessMaterial_opdns")
+script = ExtResource("4_p64kh")
+TempestIntensity = 0.6
+WindDirection = Vector2(0.8, 0.3)
+WindStrength = 20.0
+TextureWeight = 0.07
+TextureHeight = 0.07
+SnowflakeTexture = ExtResource("5_lrc6l")
+GravityVelocity = 12.0
 ParticleLifetime = 20.0
