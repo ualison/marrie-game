@@ -39,11 +39,21 @@ public partial class FractalTree : Node2D
         
         // Pre-allocate arrays for better performance
         int maxBranches = EstimateMaxBranches(MaxDepth);
-        linePoints = new Vector2[maxBranches * 2];
-        lineColors = new Color[maxBranches];
-        lineWidths = new float[maxBranches];
+
+        // Safety caps to avoid huge allocations or overflow from bad inspector values
+        const int SAFE_MAX_BRANCHES = 100000; // adjustable hard cap
+        if (maxBranches < 1) maxBranches = 1;
+        if (maxBranches > SAFE_MAX_BRANCHES) maxBranches = SAFE_MAX_BRANCHES;
+
+        // Ensure arrays have at least minimal positive size
+    int pointsArraySize = System.Math.Max(2, maxBranches * 2);
+    int branchesArraySize = System.Math.Max(1, maxBranches);
+
+        linePoints = new Vector2[pointsArraySize];
+        lineColors = new Color[branchesArraySize];
+        lineWidths = new float[branchesArraySize];
         
-        int maxLeaves = maxBranches / 4;
+    int maxLeaves = System.Math.Max(4, branchesArraySize / 4);
         leafPositions = new Vector2[maxLeaves];
         leafColors = new Color[maxLeaves];
         leafSizes = new float[maxLeaves];
@@ -103,6 +113,15 @@ public partial class FractalTree : Node2D
         {
             DrawCircle(leafPositions[i], leafSizes[i], leafColors[i]);
         }
+        
+        // Draw joint caps at branch endpoints for a more organic look
+        for (int i = 0; i < lineCount; i++)
+        {
+            int pointIndex = i * 2;
+            Vector2 end = linePoints[pointIndex + 1];
+            float w = lineWidths[i] * 0.6f;
+            DrawCircle(end, w, lineColors[i]);
+        }
     }
 
     // Calculate the bounding box of the entire tree
@@ -142,15 +161,6 @@ public partial class FractalTree : Node2D
         return new Rect2(min, max - min);
     }
 
-    // Remove the problematic async method - use SaveTreeAsPNGSimple() instead
-    /*
-    public async void SaveTreeAsPNG()
-    {
-        // This method has been removed due to complexity issues
-        // Use SaveTreeAsPNGSimple() instead
-    }
-    */
-    
     // Simpler method that renders to an ImageTexture at high resolution
     public void SaveTreeAsPNGSimple()
     {
@@ -162,7 +172,7 @@ public partial class FractalTree : Node2D
         }
         
         // Create high-resolution image directly
-        Image image = Image.Create(ExportWidth, ExportHeight, false, Image.Format.Rgba8);
+    Image image = Image.CreateEmpty(ExportWidth, ExportHeight, false, Image.Format.Rgba8);
         image.Fill(new Color(0, 0, 0, 0)); // Transparent background
         
         // Calculate tree bounds and scaling
@@ -192,6 +202,14 @@ public partial class FractalTree : Node2D
             DrawCircleOnImage(image, leafPos, leafSize, leafColors[i]);
         }
         
+        // Draw joint caps for each branch end on the image
+        for (int i = 0; i < lineCount; i++)
+        {
+            int pointIndex = i * 2;
+            Vector2 end = linePoints[pointIndex + 1] * scale + offset;
+            float w = lineWidths[i] * scale * 0.6f;
+            DrawCircleOnImage(image, end, w, lineColors[i]);
+        }
         // Generate filename and save
         string timestamp = System.DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
         string filename = $"fractal_tree_{timestamp}.png";
@@ -279,11 +297,6 @@ public partial class FractalTree : Node2D
             }
         }
     }
-    
-    private void CaptureAndSave()
-    {
-        // This method is no longer needed - using direct image rendering instead
-    }
 
     // Method to manually save tree (can be called from UI or input)
     public override void _Input(InputEvent @event)
@@ -363,18 +376,11 @@ public partial class FractalTree : Node2D
                     Vector2 leftDirection = new Vector2(Mathf.Cos(leftAngle), Mathf.Sin(leftAngle));
                     Vector2 rightDirection = new Vector2(Mathf.Cos(rightAngle), Mathf.Sin(rightAngle));
 
-                    float leftPosOffset = rng.RandfRange(-0.06f, 0.04f);
-                    float rightPosOffset = rng.RandfRange(-0.04f, 0.06f);
+                    // FIXED: Use consistent branch position without random offsets
+                    Vector2 branchStart = startPos.Lerp(endPos, baseBranchPosition);
 
-                    Vector2 leftStart = startPos.Lerp(endPos, Mathf.Clamp(baseBranchPosition + leftPosOffset, 0.4f, 0.95f));
-                    Vector2 rightStart = startPos.Lerp(endPos, Mathf.Clamp(baseBranchPosition + rightPosOffset, 0.4f, 0.95f));
-
-                    Vector2 perp = new Vector2(-direction.Y, direction.X);
-                    leftStart += perp * rng.RandfRange(-0.6f, 0.6f) * (thickness * 0.2f);
-                    rightStart += perp * rng.RandfRange(-0.6f, 0.6f) * (thickness * 0.2f);
-
-                    GenerateBranch(leftStart, leftDirection, newLength, depth - 1, newThickness);
-                    GenerateBranch(rightStart, rightDirection, newLength, depth - 1, newThickness);
+                    GenerateBranch(branchStart, leftDirection, newLength, depth - 1, newThickness);
+                    GenerateBranch(branchStart, rightDirection, newLength, depth - 1, newThickness);
                 }
                 else if (branchCount == 3)
                 {
@@ -392,18 +398,14 @@ public partial class FractalTree : Node2D
 
                     if (sideLength >= 5f && sideThickness >= 0.5f)
                     {
-                        float centerPos = Mathf.Clamp(baseBranchPosition + rng.RandfRange(-0.03f, 0.03f), 0.5f, 0.95f);
-                        float leftPos = Mathf.Clamp(baseBranchPosition + rng.RandfRange(-0.08f, -0.02f), 0.4f, 0.9f);
-                        float rightPos = Mathf.Clamp(baseBranchPosition + rng.RandfRange(0.02f, 0.08f), 0.45f, 0.95f);
+                    // FIXED: Use consistent branch positions with bounds checking
+                    float centerPos = Mathf.Clamp(baseBranchPosition, 0.5f, 0.95f);
+                    float leftPos = Mathf.Clamp(baseBranchPosition - 0.05f, 0.4f, 0.9f);
+                    float rightPos = Mathf.Clamp(baseBranchPosition + 0.05f, 0.45f, 0.95f);
 
-                        Vector2 centerStart = startPos.Lerp(endPos, centerPos);
-                        Vector2 leftStart = startPos.Lerp(endPos, leftPos);
-                        Vector2 rightStart = startPos.Lerp(endPos, rightPos);
-
-                        Vector2 perp = new Vector2(-direction.Y, direction.X);
-                        centerStart += perp * rng.RandfRange(-0.4f, 0.4f) * (thickness * 0.18f);
-                        leftStart += perp * rng.RandfRange(-0.5f, 0.5f) * (thickness * 0.18f);
-                        rightStart += perp * rng.RandfRange(-0.5f, 0.5f) * (thickness * 0.18f);
+                    Vector2 centerStart = startPos.Lerp(endPos, centerPos);
+                    Vector2 leftStart = startPos.Lerp(endPos, leftPos);
+                    Vector2 rightStart = startPos.Lerp(endPos, rightPos);
 
                         GenerateBranch(centerStart, centerDirection, centerLength, depth - 1, newThickness);
                         GenerateBranch(leftStart, leftDirection, sideLength, depth - 1, sideThickness);
@@ -422,11 +424,9 @@ public partial class FractalTree : Node2D
                         
                         Vector2 branchDirection = new Vector2(Mathf.Cos(branchAngle), Mathf.Sin(branchAngle));
                         
-                        float posOffset = rng.RandfRange(-0.05f, 0.05f);
+                        // FIXED: Use consistent branch position with minimal offset
+                        float posOffset = (i - branchCount / 2f) * 0.02f; // Small predictable offset based on branch index
                         Vector2 branchStart = startPos.Lerp(endPos, Mathf.Clamp(baseBranchPosition + posOffset, 0.4f, 0.95f));
-                        
-                        Vector2 perp = new Vector2(-direction.Y, direction.X);
-                        branchStart += perp * rng.RandfRange(-0.5f, 0.5f) * (thickness * 0.15f);
                         
                         float branchLength = newLength;
                         float branchThickness = newThickness;

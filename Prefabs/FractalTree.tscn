@@ -10,5 +10,6 @@ InitialLength = 280.0
 AngleVariation = 30.0
 MinAngle = 30.0
 MaxAngle = 30.0
-TrunkColor = Color(0.0797075, 0.0482555, 0.11078, 1)
+MinBranches = 3
+TrunkColor = Color(0, 0, 0, 1)
 LeafColor = Color(1, 1, 1, 1)

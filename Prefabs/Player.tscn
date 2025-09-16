@@ -1,6 +1,6 @@
 [gd_scene load_steps=10 format=3 uid="uid://ckwbdf3jm340m"]
 
-[ext_resource type="Texture2D" uid="uid://cjxxgt3oycnys" path="res://Art/MarrieV6.png" id="2_javds"]
+[ext_resource type="PackedScene" uid="uid://cqfnsp48rsmge" path="res://Prefabs/MarrieStatic.tscn" id="2_javds"]
 [ext_resource type="Script" uid="uid://dtbbh4gt6l7cr" path="res://Scripts/Player/Player.cs" id="2_kyqiw"]
 [ext_resource type="Script" uid="uid://bfetyy0iofqcj" path="res://Scripts/Player/PlayerLife.cs" id="3_gntrk"]
 [ext_resource type="Script" uid="uid://gp6wfjapkopj" path="res://Scripts/Player/PlayerMana.cs" id="4_mana"]
@@ -35,10 +35,9 @@ debug_color = Color(0.98055, 0.0671374, 0.312238, 0.42)
 position = Vector2(0, 27)
 shape = SubResource("RectangleShape2D_kyqiw")
 
-[node name="MarrieSprite" type="Sprite2D" parent="CharacterBody2D"]
-position = Vector2(10, 29)
-scale = Vector2(0.19, 0.185)
-texture = ExtResource("2_javds")
+[node name="MarrieSprite" parent="CharacterBody2D" instance=ExtResource("2_javds")]
+position = Vector2(2.0000005, -17.000004)
+scale = Vector2(0.8, 0.8)
 
 [node name="PlayerLife" type="Node2D" parent="CharacterBody2D"]
 position = Vector2(0, -4)

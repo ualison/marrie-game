@@ -1,12 +1,9 @@
-[gd_scene load_steps=8 format=3 uid="uid://bprvmud1sukcc"]
+[gd_scene load_steps=5 format=3 uid="uid://bprvmud1sukcc"]
 
 [ext_resource type="Texture2D" uid="uid://cfddkmjhp734f" path="res://Art/ForestBackground.jpg" id="1_lrc6l"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="2_opdns"]
-[ext_resource type="PackedScene" uid="uid://b3hvyadbepo6p" path="res://Prefabs/FractalBush.tscn" id="3_uboq2"]
 [ext_resource type="Script" uid="uid://s5qg2tiue4f7" path="res://Scripts/Environment/DynamicTreeSpawner.cs" id="4_lrc6l"]
-[ext_resource type="PackedScene" uid="uid://durjleer4sl0n" path="res://Prefabs/FractalTree.tscn" id="5_opdns"]
 [ext_resource type="Script" uid="uid://dr6sxgjhikyw2" path="res://Scripts/Environment/EnvironmentChunk.cs" id="7_envc"]
-[ext_resource type="PackedScene" uid="uid://b1ipystqqby04" path="res://Prefabs/FractalTreeApples.tscn" id="7_opdns"]
 
 [node name="Environment" type="Node2D"]
 script = ExtResource("7_envc")
@@ -27,15 +24,10 @@ script = ExtResource("4_lrc6l")
 MinTreesPerChunk = 3
 MaxTreesPerChunk = 3
 MinTreeSpacing = 60.0
-MaxTreeSpacing = 120.0
-TreeSpacingVariation = 40.0
 TreeYVariation = 15.0
-TreePrefabs = Array[PackedScene]([ExtResource("5_opdns")])
-BushPrefab = ExtResource("3_uboq2")
-BackgroundTreeProbability = 0.4
-BushProbability = 0.2
-TreesPerApple = 4
-AppleBearingTreePrefab = ExtResource("7_opdns")
 ChunkOverlapMin = -85.0
 ChunkOverlapMax = 100.0
 ChunkTransitionSmoothness = 0.9
+FractalTreeWidth = 1024.0
+FractalTreeHeight = 1024.0
+FractalVerticalOffset = 100.0
