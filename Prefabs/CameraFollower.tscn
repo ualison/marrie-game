@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://3xysy2jcdjr0"]
+
+[ext_resource type="Script" uid="uid://mjm40v3v02t" path="res://Scripts/Systems/CameraFollow.cs" id="1_lqiqu"]
+
+[node name="CameraFollower" type="Camera2D"]
+script = ExtResource("1_lqiqu")
+FollowOffset = Vector2(0, -195)
+TargetPath = NodePath("GameEntities/Player")
+DebugTarget = true

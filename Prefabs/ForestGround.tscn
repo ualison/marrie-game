@@ -3,28 +3,26 @@
 [ext_resource type="Script" uid="uid://c7rmh10cc2qsn" path="res://Scripts/Environment/ProceduralGround.cs" id="1_cgf43"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_rxw4n"]
-size = Vector2(1303, 86.2685)
+size = Vector2(1303, 70)
 
 [node name="StaticBody2D" type="StaticBody2D"]
 
 [node name="ProceduralGround" type="Node2D" parent="."]
 script = ExtResource("1_cgf43")
 GroundWidth = 1300.0
-GroundHeight = 90.0
-GrassDensity = 450
+GroundHeight = 0.0
+GrassDensity = 500
 GrassHeightMin = 25.0
-GrassHeightMax = 35.0
-GrassWidthMin = 6.0
+GrassHeightMax = 25.0
+GrassWidthMin = 8.0
 GrassCurvature = 0.5
-WindStrength = 0.6
-GroundColor = Color(0, 0, 0, 1)
-GrassColorBase = Color(0, 0, 0, 1)
-GrassColorMid = Color(0.111197, 0.111197, 0.111197, 1)
+GrassSegments = 20
+GrassColorBase = Color(0.08797749, 0.009666499, 0.009669296, 1)
+GrassColorMid = Color(0.24545547, 0.004246853, 0.12762356, 1)
 GrassColorTip = Color(0, 0, 0, 1)
-SummitCount = 120
-GroundBlendDepth = 35.0
-GroundTextureDensity = 0.5
+SummitCount = 100
+GroundBlendDepth = 40.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(-14.5, 42.1342)
+position = Vector2(-14.5, 40)
 shape = SubResource("RectangleShape2D_rxw4n")

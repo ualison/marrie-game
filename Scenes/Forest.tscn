@@ -1,126 +1,29 @@
-[gd_scene load_steps=19 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=10 format=3 uid="uid://54o6xy0qaoae"]
 
-[ext_resource type="Texture2D" uid="uid://c6aa6kainriit" path="res://Art/Background.png" id="2_8u8ny"]
-[ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="3_r6l07"]
+[ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="1_08kc0"]
+[ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="2_djgpu"]
+[ext_resource type="PackedScene" uid="uid://bprvmud1sukcc" path="res://Prefabs/Environment.tscn" id="2_wjun0"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
-[ext_resource type="PackedScene" uid="uid://dbt3v1ee4f7fr" path="res://Prefabs/AppleTree.tscn" id="4_tnm7e"]
-[ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_wjun0"]
-[ext_resource type="Script" uid="uid://bmh2wdvmm4i7l" path="res://Scripts/Systems/EnemyManager.cs" id="7_r6l07"]
-[ext_resource type="PackedScene" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="7_tnm7e"]
-[ext_resource type="Texture2D" uid="uid://dl1p663jvus6i" path="res://Art/Tree1.png" id="7_wjun0"]
-[ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="8_4xied"]
-[ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/ForestBackground2.mp3" id="9_r6l07"]
-[ext_resource type="Script" uid="uid://bb2ife872jlja" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_r6l07"]
+[ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="6_8u8ny"]
+[ext_resource type="Script" uid="uid://sdqhqn52n3xp" path="res://Scripts/Systems/InfiniteForestManager.cs" id="8_r6l07"]
+[ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="9_e2fbs"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
-[ext_resource type="Script" uid="uid://cf5q88b7yl5la" path="res://Scripts/Systems/ReplaySystemManager.cs" id="14_r6l07"]
-[ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
-[ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="18_j8t0e"]
-[ext_resource type="PackedScene" uid="uid://bjv4m5whn2djf" path="res://Prefabs/UI/Message.tscn" id="18_tnm7e"]
-[ext_resource type="PackedScene" uid="uid://dxvamghbt08mr" path="res://Prefabs/UI/ScreenElements.tscn" id="19_screen"]
 
-[node name="ForestScene" type="Node2D"]
+[node name="TreeAppleTestScene" type="Node2D"]
 
-[node name="Camera" type="Camera2D" parent="."]
+[node name="UserInterface" parent="." instance=ExtResource("2_djgpu")]
 
-[node name="Environment" type="Node2D" parent="."]
+[node name="CameraFollower" parent="." instance=ExtResource("1_08kc0")]
+FollowOffset = Vector2(0, -200)
+SmoothSpeed = 10.0
 
-[node name="Background" type="Sprite2D" parent="Environment"]
-z_index = -10
-position = Vector2(-1, -5)
-scale = Vector2(0.800781, 0.688233)
-texture = ExtResource("2_8u8ny")
-
-[node name="Ground" parent="Environment" instance=ExtResource("3_r6l07")]
-z_index = 2
-position = Vector2(6, 294)
-
-[node name="Decorations" type="Node2D" parent="Environment"]
-
-[node name="NormalTree1" type="Sprite2D" parent="Environment/Decorations"]
-z_index = 5
-position = Vector2(-583, -172)
-scale = Vector2(0.669922, 0.649089)
-texture = ExtResource("7_wjun0")
-
-[node name="AppleTree" parent="Environment/Decorations" instance=ExtResource("4_tnm7e")]
-z_index = -1
-position = Vector2(-78, -374)
-
-[node name="NormalTree2" type="Sprite2D" parent="Environment/Decorations"]
-z_index = 5
-position = Vector2(570, -145)
-scale = Vector2(0.693148, 0.60584)
-texture = ExtResource("7_wjun0")
-
-[node name="Items" type="Node2D" parent="Environment"]
-
-[node name="Rock" parent="Environment/Items" instance=ExtResource("18_j8t0e")]
-position = Vector2(-190, 235)
-
-[node name="Rock2" parent="Environment/Items" instance=ExtResource("18_j8t0e")]
-position = Vector2(464, 227)
-
-[node name="UserInterface" type="CanvasLayer" parent="."]
-follow_viewport_enabled = true
-
-[node name="HUD" type="Control" parent="UserInterface"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -576.0
-offset_top = -324.0
-offset_right = -576.0
-offset_bottom = -324.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="ScreenElements" parent="UserInterface/HUD" instance=ExtResource("19_screen")]
-layout_mode = 1
-
-[node name="PerformanceMonitor" parent="UserInterface/HUD" instance=ExtResource("7_tnm7e")]
-layout_mode = 3
-anchors_preset = 0
-offset_left = 22.0
-offset_top = 1.0
-offset_right = 118.0
-offset_bottom = 269.0
-
-[node name="Overlays" type="Control" parent="UserInterface"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -568.0
-offset_top = -329.0
-offset_right = -568.0
-offset_bottom = -329.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="GameOver" parent="UserInterface/Overlays" instance=ExtResource("8_4xied")]
-visible = false
-layout_mode = 1
-
-[node name="Message" parent="UserInterface/Overlays" instance=ExtResource("18_tnm7e")]
-visible = false
-offset_left = 378.0
-offset_top = 532.0
-offset_right = 778.0
-offset_bottom = 632.0
+[node name="Environment" parent="." instance=ExtResource("2_wjun0")]
 
 [node name="GameEntities" type="Node2D" parent="."]
 
 [node name="Player" parent="GameEntities" instance=ExtResource("4_e2fbs")]
 position = Vector2(-327, 116)
-
-[node name="Enemies" type="Node2D" parent="GameEntities"]
-
-[node name="Monster" parent="GameEntities/Enemies" instance=ExtResource("5_wjun0")]
-position = Vector2(286, 68)
 
 [node name="GameSystems" type="Node" parent="."]
 
@@ -129,24 +32,19 @@ position = Vector2(286, 68)
 [node name="SceneLifecycleManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("11_r6l07")
 
+[node name="PlayerStateManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("6_8u8ny")
+
 [node name="UIManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("13_r6l07")
 
-[node name="EnemyManager" type="Node" parent="GameSystems/Managers"]
-script = ExtResource("7_r6l07")
-
-[node name="ReplaySystemManager" type="Node" parent="GameSystems/Managers"]
-script = ExtResource("14_r6l07")
-
-[node name="ReplaySystem" type="Node" parent="GameSystems"]
-
-[node name="ReplayRecorder" type="Node" parent="GameSystems/ReplaySystem"]
-script = ExtResource("10_r6l07")
+[node name="InfinityForestManager" type="Node2D" parent="GameSystems/Managers" node_paths=PackedStringArray("PlayerCamera")]
+position = Vector2(-19, -44)
+script = ExtResource("8_r6l07")
+EnvironmentChunkPrefab = ExtResource("2_wjun0")
+PlayerCamera = NodePath("../../../CameraFollower")
 
 [node name="AudioSystem" type="Node" parent="GameSystems"]
 
-[node name="AudioManager" type="AudioStreamPlayer2D" parent="GameSystems/AudioSystem"]
-stream = ExtResource("9_r6l07")
-volume_db = 6.038
-autoplay = true
-script = ExtResource("15_r6l07")
+[node name="Rock" parent="GameSystems/AudioSystem" instance=ExtResource("9_e2fbs")]
+position = Vector2(-156, 246)

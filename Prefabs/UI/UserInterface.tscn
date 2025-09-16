@@ -1,0 +1,50 @@
+[gd_scene load_steps=5 format=3 uid="uid://bhff38051b28y"]
+
+[ext_resource type="Script" uid="uid://dfikillaf8den" path="res://Scripts/Systems/CanvasCameraFollower.cs" id="1_pryuf"]
+[ext_resource type="PackedScene" uid="uid://dxvamghbt08mr" path="res://Prefabs/UI/ScreenElements.tscn" id="2_3h2j0"]
+[ext_resource type="PackedScene" uid="uid://d0spjehyu6cuy" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="3_7ddsm"]
+[ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="4_7aa8c"]
+
+[node name="UserInterface" type="CanvasLayer"]
+follow_viewport_enabled = true
+script = ExtResource("1_pryuf")
+
+[node name="HUD" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -576.0
+offset_top = -324.0
+offset_right = -576.0
+offset_bottom = -324.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ScreenElements" parent="HUD" instance=ExtResource("2_3h2j0")]
+layout_mode = 1
+
+[node name="PerformanceMonitor" parent="HUD" instance=ExtResource("3_7ddsm")]
+offset_left = 9.0
+offset_top = 1.0
+offset_right = 9.0
+offset_bottom = 1.0
+
+[node name="Overlays" type="Control" parent="."]
+layout_mode = 3
+anchor_left = -0.444
+anchor_top = -0.457
+anchor_right = 0.556
+anchor_bottom = 0.543
+offset_left = 0.320068
+offset_top = 0.0400085
+offset_right = 0.319946
+offset_bottom = 0.039978
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="GameOverUI" parent="Overlays" instance=ExtResource("4_7aa8c")]
+visible = false
+layout_mode = 1

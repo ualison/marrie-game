@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3 uid="uid://durjleer4sl0n"]
+
+[ext_resource type="Script" uid="uid://qbroyuxfpv76" path="res://Scripts/Environment/NewFractals/FractalTree.cs" id="1_vqbxb"]
+
+[node name="FractalTree" type="Node2D"]
+z_index = -1
+script = ExtResource("1_vqbxb")
+MaxDepth = 156
+InitialLength = 280.0
+AngleVariation = 30.0
+MinAngle = 30.0
+MaxAngle = 30.0
+MinBranches = 3
+TrunkColor = Color(0, 0, 0, 1)
+LeafColor = Color(1, 1, 1, 1)

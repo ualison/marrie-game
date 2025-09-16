@@ -1,8 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://c3nj0a2earb3r"]
-
-[ext_resource type="Script" uid="uid://di86avtcgcxm" path="res://Scripts/Environment/OrganicFractalBush.cs" id="1_8ctcw"]
-
-[node name="OrganicFractalBush" type="Node2D"]
-script = ExtResource("1_8ctcw")
-AngleAsymmetry = 0.0
-MaxDepth = 15

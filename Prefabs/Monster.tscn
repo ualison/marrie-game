@@ -1,15 +1,15 @@
 [gd_scene load_steps=7 format=3 uid="uid://djryvxjy0bkfe"]
 
 [ext_resource type="Script" uid="uid://c0o15dmumujxy" path="res://Scripts/Enemy/Monster.cs" id="1_x8qak"]
-[ext_resource type="Texture2D" uid="uid://brg0tm2b1puno" path="res://Art/Monster.png" id="2_x8qak"]
+[ext_resource type="Texture2D" uid="uid://xaif04xg1b71" path="res://Art/Monster.png" id="2_hp6r8"]
 [ext_resource type="Script" uid="uid://2hx87sinu6t" path="res://Scripts/Enemy/MonsterLife.cs" id="3_monsterlife"]
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wqfq0"]
-size = Vector2(284, 369)
+size = Vector2(297, 378)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
-size = Vector2(262, 365)
+size = Vector2(277, 369)
 
 [node name="Root3" type="Node2D"]
 
@@ -33,18 +33,18 @@ position = Vector2(0, -4)
 collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/DamageArea"]
-position = Vector2(4, 1.5)
+position = Vector2(-9.5, -4)
 shape = SubResource("RectangleShape2D_wqfq0")
 debug_color = Color(0.764087, 0.04706, 0.125471, 0.42)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]
-position = Vector2(3, 0.5)
+position = Vector2(-10.5, -1.5)
 shape = SubResource("RectangleShape2D_kyqiw")
 
 [node name="MonsterSprite" type="Sprite2D" parent="CharacterBody2D"]
-position = Vector2(5.99999, 27.625)
-scale = Vector2(0.302734, 0.309408)
-texture = ExtResource("2_x8qak")
+position = Vector2(-1, -4)
+scale = Vector2(0.32, 0.306)
+texture = ExtResource("2_hp6r8")
 
 [node name="MonsterLifeBar" parent="CharacterBody2D" instance=ExtResource("4_lifebar")]
 offset_left = -53.0

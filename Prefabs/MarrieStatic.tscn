@@ -1,0 +1,51 @@
+[gd_scene load_steps=9 format=3 uid="uid://cqfnsp48rsmge"]
+
+[ext_resource type="Texture2D" uid="uid://dfnoqr5ni2res" path="res://Art/MarrieParts/HairWithoutHead.png" id="1_gi3o0"]
+[ext_resource type="Texture2D" uid="uid://boa3kmpdshlnt" path="res://Art/MarrieParts/LeftFoot.png" id="2_f8ce4"]
+[ext_resource type="Texture2D" uid="uid://dpoj0nafqf576" path="res://Art/MarrieParts/RightFoot.png" id="3_moto1"]
+[ext_resource type="Texture2D" uid="uid://cwycgoqlr6wxo" path="res://Art/MarrieParts/Skirt.png" id="4_8ud4j"]
+[ext_resource type="Texture2D" uid="uid://8adir5udyo0q" path="res://Art/MarrieParts/RightHand.png" id="5_vv2ps"]
+[ext_resource type="Texture2D" uid="uid://blbidujhx8lw2" path="res://Art/MarrieParts/Torso.png" id="6_0qdoq"]
+[ext_resource type="Texture2D" uid="uid://7ljeq4n41q2y" path="res://Art/MarrieParts/FaceV2.png" id="7_ltmqm"]
+[ext_resource type="Texture2D" uid="uid://cq0ybok6jh5e6" path="res://Art/MarrieParts/RightHandBasket.png" id="8_ijn26"]
+
+[node name="Node2D" type="Node2D"]
+
+[node name="HairWithoutHead" type="Sprite2D" parent="."]
+position = Vector2(-7, 0)
+scale = Vector2(0.17775497, 0.17775497)
+texture = ExtResource("1_gi3o0")
+
+[node name="LeftFoot" type="Sprite2D" parent="."]
+position = Vector2(23.000002, 171)
+scale = Vector2(0.28313252, 0.24159719)
+texture = ExtResource("2_f8ce4")
+
+[node name="RightFoot" type="Sprite2D" parent="."]
+position = Vector2(-13, 172)
+scale = Vector2(0.28571427, 0.24764155)
+texture = ExtResource("3_moto1")
+
+[node name="Skirt" type="Sprite2D" parent="."]
+position = Vector2(-2, 104.00001)
+scale = Vector2(0.27455798, 0.274558)
+texture = ExtResource("4_8ud4j")
+
+[node name="RightHand" type="Sprite2D" parent="."]
+position = Vector2(37.000004, 33.000008)
+scale = Vector2(0.2954545, 0.2954545)
+texture = ExtResource("5_vv2ps")
+
+[node name="Torso" type="Sprite2D" parent="."]
+scale = Vector2(0.3275401, 0.3275401)
+texture = ExtResource("6_0qdoq")
+
+[node name="FaceV2" type="Sprite2D" parent="."]
+position = Vector2(-1.9999998, -63)
+scale = Vector2(0.058638442, 0.05863843)
+texture = ExtResource("7_ltmqm")
+
+[node name="RightHandBasket" type="Sprite2D" parent="."]
+position = Vector2(-49, 68)
+scale = Vector2(0.32456154, 0.32456154)
+texture = ExtResource("8_ijn26")

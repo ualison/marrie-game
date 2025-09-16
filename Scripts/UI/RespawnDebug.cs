@@ -34,7 +34,7 @@ public partial class RespawnDebug : Control
         if (_headerLabel == null)
         {
             _headerLabel = new Label();
-            _headerLabel.AddThemeColorOverride("font_color", Colors.White);
+            _headerLabel.AddThemeColorOverride("font_color", Colors.Green);
             _headerLabel.AddThemeFontSizeOverride("font_size", 14);
             _headerLabel.CustomMinimumSize = new Vector2(400, 24);
         }
