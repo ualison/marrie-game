@@ -70,6 +70,7 @@ interact={
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.09239707, 0.09239706, 0.09239706, 1)
 
 [user_data]
 
