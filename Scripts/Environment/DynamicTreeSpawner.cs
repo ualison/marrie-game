@@ -32,6 +32,18 @@ public partial class DynamicTreeSpawner : Node2D
     [Export] public float FractalTreeWidth = 200.0f;
     [Export] public float FractalTreeHeight = 300.0f;
     [Export] public float FractalVerticalOffset = 0.0f;
+    // Apple settings
+    [Export] public PackedScene ApplePrefab;
+    [Export] public int MinApplesPerTree = 1;
+    [Export] public int MaxApplesPerTree = 3;
+    // Height on the tree where apples are placed (0 = bottom, 1 = top)
+    [Export] public float AppleHeightNormalizedMin = 0.25f;
+    [Export] public float AppleHeightNormalizedMax = 0.75f;
+    // Horizontal spread from center in pixels
+    [Export] public float AppleHorizontalPadding = 40.0f;
+    // Bias controls (lower than 1 biases towards the max end - i.e., higher and more external)
+    [Export] public float AppleVerticalBiasExponent = 0.5f;
+    [Export] public float AppleHorizontalBiasExponent = 0.5f;
     
     // Optimized data structures
     private readonly Dictionary<int, ChunkData> _chunks = new Dictionary<int, ChunkData>();
@@ -77,7 +89,7 @@ public partial class DynamicTreeSpawner : Node2D
         _invChunkWidth = 1f / ChunkWidth;
         _depthIntensityPi = DepthVariationIntensity * Mathf.Pi;
         
-        // Load fractal textures
+        // Load fractal textures (FractalsExports is expected to always contain textures)
         LoadFractalTextures();
         
         // Create containers
@@ -88,6 +100,8 @@ public partial class DynamicTreeSpawner : Node2D
         
         GD.Print($"Initialized with {_fractalTextures.Count} fractal textures");
     }
+
+    // No fallback loader: FractalsExports is assumed to always contain textures
     
     private void LoadFractalTextures()
     {
@@ -184,7 +198,11 @@ public partial class DynamicTreeSpawner : Node2D
     
     private int GenerateTreePositions(int chunkIndex, ChunkData chunk)
     {
-        int targetCount = _rng.RandiRange(MinTreesPerChunk, MaxTreesPerChunk);
+        // Ensure targetCount never exceeds the allocated array capacity for this chunk
+        int capacity = chunk.Positions != null ? chunk.Positions.Length : MaxTreesPerChunk;
+        int minCount = Mathf.Clamp(MinTreesPerChunk, 0, capacity);
+        int maxCount = Mathf.Clamp(MaxTreesPerChunk, minCount, capacity);
+        int targetCount = _rng.RandiRange(minCount, maxCount);
         int posCount = 0;
         int maxAttempts = targetCount * 10;
         
@@ -197,7 +215,15 @@ public partial class DynamicTreeSpawner : Node2D
             
             if (IsPositionValid(x, chunk.Positions, posCount, constraints))
             {
+                // Guard against possible race where posCount reaches capacity
+                if (posCount >= capacity)
+                    break;
+
                 chunk.Positions[posCount] = x;
+                // Ensure ZLayers array exists and has enough capacity
+                if (chunk.ZLayers == null || chunk.ZLayers.Length < capacity)
+                    chunk.ZLayers = new int[capacity];
+
                 chunk.ZLayers[posCount] = CalculateZLayer(x);
                 posCount++;
             }
@@ -289,13 +315,21 @@ public partial class DynamicTreeSpawner : Node2D
     
     private Node2D CreateTree()
     {
-        if (_hasFractalTextures && _rng.Randf() < FractalTreeProbability)
+        // Always create fractal sprites. The project assumes FractalsExports contains textures.
+        var fractal = CreateFractalSprite();
+        if (fractal != null)
+            return fractal;
+
+        // Last-resort minimal placeholder if something unexpected happens
+        var root = new Node2D { Name = "PlaceholderTreeFallback" };
+        var rect = new ColorRect
         {
-            return CreateFractalSprite();
-        }
-        
-        // Fallback: create simple colored rectangle as placeholder
-        return CreatePlaceholderTree();
+            Size = new Vector2(20, 100),
+            Color = Colors.SaddleBrown,
+            Position = new Vector2(-10, -100)
+        };
+        root.AddChild(rect);
+        return root;
     }
     
     private Node2D CreateFractalSprite()
@@ -336,8 +370,10 @@ public partial class DynamicTreeSpawner : Node2D
                 float baseOffset = -(texH * sprite.Scale.Y * 0.5f) + FractalVerticalOffset;
                 sprite.Position = new Vector2(0f, baseOffset);
             }
-            
             root.AddChild(sprite);
+
+            // Spawn apples as children of the fractal root (positioned relative to the tree)
+            TrySpawnApples(root, sprite, texture);
             return root;
         }
         catch (System.Exception ex)
@@ -346,19 +382,45 @@ public partial class DynamicTreeSpawner : Node2D
             return null;
         }
     }
-    
-    private Node2D CreatePlaceholderTree()
+
+    private void TrySpawnApples(Node2D treeRoot, Sprite2D treeSprite, Texture2D texture)
     {
-        var root = new Node2D { Name = "PlaceholderTree" };
-        var rect = new ColorRect 
-        { 
-            Size = new Vector2(20, 100),
-            Color = Colors.SaddleBrown,
-            Position = new Vector2(-10, -100)
-        };
-        root.AddChild(rect);
-        return root;
+        if (ApplePrefab == null) return;
+        if (texture == null) return;
+
+        int appleCount = Mathf.Clamp(_rng.RandiRange(MinApplesPerTree, MaxApplesPerTree), MinApplesPerTree, MaxApplesPerTree);
+
+        float texW = texture.GetWidth();
+        float texH = texture.GetHeight();
+
+        for (int i = 0; i < appleCount; i++)
+        {
+            var inst = ApplePrefab.Instantiate() as Node2D;
+            if (inst == null) continue;
+
+            // pick a normalized height along the trunk/branches biased towards the top (external branches)
+            float t = _rng.Randf();
+            float skewedT = Mathf.Pow(t, Mathf.Max(0.0001f, AppleVerticalBiasExponent));
+            float hNorm = Mathf.Lerp(AppleHeightNormalizedMin, AppleHeightNormalizedMax, skewedT);
+
+            // convert normalized height to local y; note sprite is centered and we've positioned it so y=baseOffset
+            float localY = (0.5f - hNorm) * texH * treeSprite.Scale.Y + treeSprite.Position.Y;
+
+            // horizontal spread biased to be more external (further from center)
+            float r = _rng.Randf();
+            float mag = Mathf.Pow(r, Mathf.Max(0.0001f, AppleHorizontalBiasExponent)) * AppleHorizontalPadding;
+            // bias magnitude slightly by height so higher apples sit further out
+            float heightNormRemap = (hNorm - AppleHeightNormalizedMin) / Mathf.Max(0.0001f, (AppleHeightNormalizedMax - AppleHeightNormalizedMin));
+            mag *= Mathf.Lerp(0.9f, 1.4f, Mathf.Clamp(heightNormRemap, 0f, 1f));
+            float sign = _rng.Randf() < 0.5f ? -1f : 1f;
+            float localX = sign * mag;
+
+            inst.Position = new Vector2(localX, localY);
+            treeRoot.AddChild(inst);
+        }
     }
+    
+    // Placeholder tree method removed: fractal textures are expected to always be present.
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void ConfigureTree(Node2D tree, float x, int zLayer)

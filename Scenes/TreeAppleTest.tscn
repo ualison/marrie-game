@@ -15,7 +15,7 @@
 [node name="UserInterface" parent="." instance=ExtResource("1_bcr4f")]
 
 [node name="CameraFollower" parent="." instance=ExtResource("1_2e0hl")]
-FollowOffset = Vector2(0, -165)
+FollowOffset = Vector2(0, -200)
 SmoothSpeed = 10.0
 
 [node name="Environment" parent="." instance=ExtResource("3_2dfbj")]
@@ -39,6 +39,7 @@ script = ExtResource("12_r6l07")
 script = ExtResource("13_r6l07")
 
 [node name="InfinityForestManager" type="Node2D" parent="GameSystems/Managers" node_paths=PackedStringArray("PlayerCamera")]
+position = Vector2(-19, -44)
 script = ExtResource("8_p6q5y")
 EnvironmentChunkPrefab = ExtResource("3_2dfbj")
 PlayerCamera = NodePath("../../../CameraFollower")
