@@ -10,14 +10,14 @@ position = Vector2(0, -133)
 [node name="NewFractalTree" type="Node2D" parent="."]
 position = Vector2(0, 248)
 script = ExtResource("1_heqb1")
-MaxDepth = 20
+MaxDepth = 21
 InitialLength = 250.0
 LengthReduction = 0.75
 AngleVariation = 30.0
 MinAngle = 30.0
 MaxAngle = 30.0
 MinBranches = 3
-InitialThickness = 12.0
+InitialThickness = 10.0
 TrunkColor = Color(0, 0, 0, 1)
 LeafColor = Color(1, 1, 1, 1)
 AutoSaveAfterGeneration = true

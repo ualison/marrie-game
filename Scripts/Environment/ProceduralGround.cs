@@ -186,12 +186,13 @@ public partial class ProceduralGround : Node2D
                     for (int c = 0; c < colors.Length; c++)
                     {
                         float hf = Mathf.Clamp((filler.BasePosition.Y - filler.CachedPoints[c].Y) / filler.Height, -0.2f, 1.0f);
-                        // Make tip colors less saturated/green: mix toward a slightly desaturated tip
+                        // Natural color transitions for filler blades - stay within grass palette
                         Color baseCol = filler.Color;
-                        Color tipDesat = GrassColorTip.Lerp(new Color(0.45f, 0.4f, 0.35f), 0.6f);
                         float tipBlend = Mathf.Clamp((hf - 0.6f) * 2.5f, 0f, 1f);
                         Color finalCol = baseCol.Lerp(GrassColorMid, Mathf.Clamp(hf * 1.25f, 0f, 1f));
-                        finalCol = finalCol.Lerp(tipDesat, tipBlend);
+                        // Use a more natural desaturated tip color within the grass palette
+                        Color naturalTipColor = GrassColorTip * 0.9f; // Slightly darker tip
+                        finalCol = finalCol.Lerp(naturalTipColor, tipBlend);
                         // Add subtle noise
                         finalCol *= (1.0f + _noise.GetNoise2D(filler.BasePosition.X * 0.1f, filler.CachedPoints[c].Y * 0.05f) * 0.08f);
                         colors[c] = finalCol;
@@ -351,14 +352,25 @@ public partial class ProceduralGround : Node2D
         // Validate and clean the polygon
         bladePoints = CleanPolygonPoints(bladePoints);
         
-        // More natural color variation
+        // More natural color variation - stay strictly within grass palette
         float colorVariation = (float)_random.NextDouble();
-        float hueShift = ((float)_random.NextDouble() - 0.5f) * 0.15f;
-        float saturationShift = ((float)_random.NextDouble() - 0.5f) * 0.2f;
         
-        Color bladeColor = GrassColorBase.Lerp(GrassColorMid, colorVariation);
-        bladeColor.H = Mathf.Clamp(bladeColor.H + hueShift, 0.0f, 1.0f);
-        bladeColor.S = Mathf.Clamp(bladeColor.S + saturationShift, 0.1f, 1.0f);
+        // Instead of HSV manipulation, blend only between the defined grass colors
+        Color bladeColor;
+        if (colorVariation < 0.5f)
+        {
+            // Blend between base and mid
+            bladeColor = GrassColorBase.Lerp(GrassColorMid, colorVariation * 2.0f);
+        }
+        else
+        {
+            // Blend between mid and tip
+            bladeColor = GrassColorMid.Lerp(GrassColorTip, (colorVariation - 0.5f) * 2.0f);
+        }
+        
+        // Add only subtle brightness variation to stay in grass color range
+        float brightnessVariation = 0.85f + ((float)_random.NextDouble() * 0.3f); // 0.85 to 1.15
+        bladeColor = bladeColor * brightnessVariation;
         
         var blade = new GrassBlade
         {
@@ -373,35 +385,40 @@ public partial class ProceduralGround : Node2D
 
         // Cache arrays for faster drawing
         blade.CachedPoints = blade.Points.ToArray();
-        // Precompute per-vertex colors based on height with more variation
+        // Precompute per-vertex colors using only the defined grass color palette
         var cachedColors = new Color[blade.CachedPoints.Length];
         for (int i = 0; i < blade.CachedPoints.Length; i++)
         {
             float heightFactor = Mathf.Clamp((blade.BasePosition.Y - blade.CachedPoints[i].Y) / blade.Height, -0.2f, 1.0f);
             Color pointColor;
             
-            // More natural color transitions
+            // Strict color transitions using only the three defined colors
             if (heightFactor < 0)
             {
-                pointColor = blade.Color * 0.8f; // Darker base
+                // Underground - use darker base color
+                pointColor = GrassColorBase * 0.7f;
             }
-            else if (heightFactor < 0.3f)
+            else if (heightFactor < 0.4f)
             {
-                pointColor = blade.Color.Lerp(GrassColorMid, heightFactor * 3.33f);
+                // Base to mid transition
+                float t = heightFactor / 0.4f;
+                pointColor = GrassColorBase.Lerp(GrassColorMid, t);
             }
             else if (heightFactor < 0.8f)
             {
-                pointColor = GrassColorMid.Lerp(GrassColorTip, (heightFactor - 0.3f) * 2.0f);
+                // Mid to tip transition
+                float t = (heightFactor - 0.4f) / 0.4f;
+                pointColor = GrassColorMid.Lerp(GrassColorTip, t);
             }
             else
             {
-                // Lighter tips with some variation
-                Color tipColor = GrassColorTip.Lerp(new Color(0.3f, 0.8f, 0.25f), (heightFactor - 0.8f) * 5.0f);
-                pointColor = tipColor;
+                // Tip area - use only GrassColorTip with subtle brightness variation
+                float tipVariation = 0.9f + (heightFactor - 0.8f) * 0.5f; // 0.9 to 1.0
+                pointColor = GrassColorTip * tipVariation;
             }
             
-            // Add subtle color noise
-            float colorNoise = _noise.GetNoise2D(blade.BasePosition.X * 0.1f, blade.CachedPoints[i].Y * 0.05f) * 0.1f;
+            // Add minimal noise variation while staying in color range
+            float colorNoise = _noise.GetNoise2D(blade.BasePosition.X * 0.1f, blade.CachedPoints[i].Y * 0.05f) * 0.05f; // Reduced from 0.1f
             pointColor = pointColor * (1.0f + colorNoise);
 
             cachedColors[i] = pointColor;

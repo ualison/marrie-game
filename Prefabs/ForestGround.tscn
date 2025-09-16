@@ -17,9 +17,9 @@ GrassHeightMax = 25.0
 GrassWidthMin = 8.0
 GrassCurvature = 0.5
 GrassSegments = 20
-GrassColorBase = Color(1, 1, 1, 1)
-GrassColorMid = Color(0.13985379, 0.13985384, 0.13985379, 1)
-GrassColorTip = Color(0, 0, 0, 1)
+GrassColorBase = Color(0.099985994, 0.099985994, 0.099985994, 1)
+GrassColorMid = Color(0.27752772, 0.27752772, 0.27752772, 1)
+GrassColorTip = Color(0.7835232, 0.78352356, 0.78352314, 1)
 SummitCount = 100
 GroundBlendDepth = 40.0
 
