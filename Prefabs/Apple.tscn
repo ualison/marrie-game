@@ -1,8 +1,8 @@
 [gd_scene load_steps=9 format=3 uid="uid://dx0uy3xgtdtry"]
 
-[ext_resource type="Texture2D" uid="uid://drdwnrxrmpqqt" path="res://Art/AppleLife.png" id="1_redapple"]
-[ext_resource type="Texture2D" uid="uid://bwwymn4vuk225" path="res://Art/AppleMana.png" id="2_purpleapple"]
-[ext_resource type="Texture2D" uid="uid://ds0lsvvxhe7l8" path="res://Art/AppleNeutral.png" id="3_neutralapple"]
+[ext_resource type="Texture2D" uid="uid://cwplfbhtc2piy" path="res://Art/AppleLife.png" id="2_658v3"]
+[ext_resource type="Texture2D" uid="uid://bkyxpgddwqgo0" path="res://Art/AppleMana.png" id="3_yavds"]
+[ext_resource type="Texture2D" uid="uid://djpgtx4sceary" path="res://Art/AppleNeutral.png" id="4_3dd00"]
 [ext_resource type="Script" uid="uid://c8mt75j5vt54r" path="res://Scripts/Items/Apple.cs" id="4_applescript"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_658v3"]
@@ -19,9 +19,9 @@ radius = 18.0
 
 [node name="Apple" type="Node2D"]
 script = ExtResource("4_applescript")
-RedAppleTexture = ExtResource("1_redapple")
-PurpleAppleTexture = ExtResource("2_purpleapple")
-NeutralAppleTexture = ExtResource("3_neutralapple")
+RedAppleTexture = ExtResource("2_658v3")
+PurpleAppleTexture = ExtResource("3_yavds")
+NeutralAppleTexture = ExtResource("4_3dd00")
 
 [node name="RigidBody2D" type="RigidBody2D" parent="."]
 position = Vector2(-7.575, 18.73)
@@ -35,7 +35,7 @@ shape = SubResource("RectangleShape2D_658v3")
 
 [node name="AppleSprite" type="Sprite2D" parent="RigidBody2D"]
 scale = Vector2(0.0441406, 0.0436523)
-texture = ExtResource("1_redapple")
+texture = ExtResource("2_658v3")
 
 [node name="PromptLabel" type="Label" parent="RigidBody2D"]
 offset_left = -19.0

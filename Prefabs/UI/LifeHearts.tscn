@@ -1,8 +1,8 @@
 [gd_scene load_steps=4 format=3 uid="uid://jlrj0meior1r"]
 
 [ext_resource type="Script" uid="uid://g3qhhrdutgk5" path="res://Scripts/UI/LifeBar.cs" id="1_gwh80"]
-[ext_resource type="Texture2D" uid="uid://c8u1u42hhwaci" path="res://Art/FullLifeHeart.png" id="2_gknlv"]
-[ext_resource type="Texture2D" uid="uid://bw6408wklaekv" path="res://Art/EmptyLifeHeart.png" id="3_mydo5"]
+[ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/A.png" id="2_xch3n"]
+[ext_resource type="Texture2D" uid="uid://di3snpkk83b15" path="res://Art/C.png" id="3_e337m"]
 
 [node name="LifeHearts" type="Control" groups=["life_bar_ui"]]
 layout_mode = 3
@@ -12,8 +12,8 @@ offset_top = -326.0
 offset_right = 573.0
 offset_bottom = 328.0
 script = ExtResource("1_gwh80")
-FullHeartTexture = ExtResource("2_gknlv")
-EmptyHeartTexture = ExtResource("3_mydo5")
+FullHeartTexture = ExtResource("2_xch3n")
+EmptyHeartTexture = ExtResource("3_e337m")
 
 [node name="HeartsContainer" type="HBoxContainer" parent="."]
 custom_minimum_size = Vector2(65, 65)

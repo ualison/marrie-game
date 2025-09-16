@@ -101,26 +101,32 @@ public partial class FractalTree : Node2D
 
     public override void _Draw()
     {
-        // Draw all lines in batch
+        // Draw all branches with seamless connections
         for (int i = 0; i < lineCount; i++)
         {
             int pointIndex = i * 2;
-            DrawLine(linePoints[pointIndex], linePoints[pointIndex + 1], lineColors[i], lineWidths[i]);
+            Vector2 start = linePoints[pointIndex];
+            Vector2 end = linePoints[pointIndex + 1];
+            float width = lineWidths[i];
+            Color color = lineColors[i];
+            
+            // Draw the branch line
+            DrawLine(start, end, color, width);
         }
         
-        // Draw all leaves in batch
+        // Only draw a rounded cap at the very base of the trunk
+        if (lineCount > 0)
+        {
+            Vector2 trunkBase = linePoints[0];
+            float trunkWidth = lineWidths[0];
+            Color trunkColor = lineColors[0];
+            DrawCircle(trunkBase, trunkWidth * 0.5f, trunkColor);
+        }
+        
+        // Draw all leaves
         for (int i = 0; i < leafCount; i++)
         {
             DrawCircle(leafPositions[i], leafSizes[i], leafColors[i]);
-        }
-        
-        // Draw joint caps at branch endpoints for a more organic look
-        for (int i = 0; i < lineCount; i++)
-        {
-            int pointIndex = i * 2;
-            Vector2 end = linePoints[pointIndex + 1];
-            float w = lineWidths[i] * 0.6f;
-            DrawCircle(end, w, lineColors[i]);
         }
     }
 
@@ -193,6 +199,15 @@ public partial class FractalTree : Node2D
             DrawLineOnImage(image, start, end, lineColors[i], lineWidths[i] * scale);
         }
         
+        // Only draw rounded cap at the very base of the trunk
+        if (lineCount > 0)
+        {
+            Vector2 trunkBase = linePoints[0] * scale + offset;
+            float trunkWidth = lineWidths[0] * scale;
+            Color trunkColor = lineColors[0];
+            DrawCircleOnImage(image, trunkBase, trunkWidth * 0.5f, trunkColor);
+        }
+        
         // Draw leaves directly to image
         for (int i = 0; i < leafCount; i++)
         {
@@ -200,15 +215,6 @@ public partial class FractalTree : Node2D
             float leafSize = leafSizes[i] * scale;
             
             DrawCircleOnImage(image, leafPos, leafSize, leafColors[i]);
-        }
-        
-        // Draw joint caps for each branch end on the image
-        for (int i = 0; i < lineCount; i++)
-        {
-            int pointIndex = i * 2;
-            Vector2 end = linePoints[pointIndex + 1] * scale + offset;
-            float w = lineWidths[i] * scale * 0.6f;
-            DrawCircleOnImage(image, end, w, lineColors[i]);
         }
         // Generate filename and save
         string timestamp = System.DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
@@ -364,6 +370,10 @@ public partial class FractalTree : Node2D
                     Vector2 newDirection = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
                     Vector2 branchStart = startPos.Lerp(endPos, baseBranchPosition);
                     
+                    // Extend branch start backward along parent direction for seamless connection
+                    Vector2 parentDirection = direction.Normalized();
+                    branchStart -= parentDirection * (thickness * 0.3f);
+                    
                     GenerateBranch(branchStart, newDirection, newLength, depth - 1, newThickness);
                 }
                 else if (branchCount == 2)
@@ -376,8 +386,11 @@ public partial class FractalTree : Node2D
                     Vector2 leftDirection = new Vector2(Mathf.Cos(leftAngle), Mathf.Sin(leftAngle));
                     Vector2 rightDirection = new Vector2(Mathf.Cos(rightAngle), Mathf.Sin(rightAngle));
 
-                    // FIXED: Use consistent branch position without random offsets
                     Vector2 branchStart = startPos.Lerp(endPos, baseBranchPosition);
+                    
+                    // Extend branch start backward along parent direction for seamless connection
+                    Vector2 parentDirection = direction.Normalized();
+                    branchStart -= parentDirection * (thickness * 0.3f);
 
                     GenerateBranch(branchStart, leftDirection, newLength, depth - 1, newThickness);
                     GenerateBranch(branchStart, rightDirection, newLength, depth - 1, newThickness);
@@ -398,7 +411,6 @@ public partial class FractalTree : Node2D
 
                     if (sideLength >= 5f && sideThickness >= 0.5f)
                     {
-                    // FIXED: Use consistent branch positions with bounds checking
                     float centerPos = Mathf.Clamp(baseBranchPosition, 0.5f, 0.95f);
                     float leftPos = Mathf.Clamp(baseBranchPosition - 0.05f, 0.4f, 0.9f);
                     float rightPos = Mathf.Clamp(baseBranchPosition + 0.05f, 0.45f, 0.95f);
@@ -406,6 +418,13 @@ public partial class FractalTree : Node2D
                     Vector2 centerStart = startPos.Lerp(endPos, centerPos);
                     Vector2 leftStart = startPos.Lerp(endPos, leftPos);
                     Vector2 rightStart = startPos.Lerp(endPos, rightPos);
+                    
+                    // Extend branch starts backward along parent direction for seamless connection
+                    Vector2 parentDirection = direction.Normalized();
+                    float connectionOffset = thickness * 0.25f;
+                    centerStart -= parentDirection * connectionOffset;
+                    leftStart -= parentDirection * connectionOffset;
+                    rightStart -= parentDirection * connectionOffset;
 
                         GenerateBranch(centerStart, centerDirection, centerLength, depth - 1, newThickness);
                         GenerateBranch(leftStart, leftDirection, sideLength, depth - 1, sideThickness);
@@ -424,9 +443,13 @@ public partial class FractalTree : Node2D
                         
                         Vector2 branchDirection = new Vector2(Mathf.Cos(branchAngle), Mathf.Sin(branchAngle));
                         
-                        // FIXED: Use consistent branch position with minimal offset
+                        // Use consistent branch position with minimal offset
                         float posOffset = (i - branchCount / 2f) * 0.02f; // Small predictable offset based on branch index
                         Vector2 branchStart = startPos.Lerp(endPos, Mathf.Clamp(baseBranchPosition + posOffset, 0.4f, 0.95f));
+                        
+                        // Extend branch start backward along parent direction for seamless connection
+                        Vector2 parentDirection = direction.Normalized();
+                        branchStart -= parentDirection * (thickness * 0.2f);
                         
                         float branchLength = newLength;
                         float branchThickness = newThickness;
