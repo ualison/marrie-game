@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://b1ipystqqby04"]
+[gd_scene load_steps=3 format=3 uid="uid://c6u0p1wgp7wqh"]
 
 [ext_resource type="Script" uid="uid://o04haht8ruox" path="res://Scripts/Environment/OrganicFractalTree.cs" id="1_7b3ep"]
 [ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="2_t5wru"]

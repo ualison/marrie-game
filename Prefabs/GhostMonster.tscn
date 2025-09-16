@@ -1,7 +1,7 @@
 [gd_scene load_steps=7 format=3 uid="uid://bqj7y8lk5uq60"]
 
 [ext_resource type="Script" uid="uid://d0e7xcevrndxm" path="res://Scripts/Enemy/GhostMonster.cs" id="1_uqgqf"]
-[ext_resource type="Texture2D" uid="uid://xaif04xg1b71" path="res://Art/MonsterV5.png" id="2_6ib6h"]
+[ext_resource type="Texture2D" uid="uid://xaif04xg1b71" path="res://Art/Monster.png" id="2_6ib6h"]
 [ext_resource type="Script" uid="uid://dq22yqfge47s5" path="res://Scripts/Enemy/GhostMonsterLife.cs" id="4_6ib6h"]
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
 

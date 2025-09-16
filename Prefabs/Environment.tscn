@@ -1,18 +1,10 @@
-[gd_scene load_steps=5 format=3 uid="uid://bprvmud1sukcc"]
+[gd_scene load_steps=4 format=3 uid="uid://bprvmud1sukcc"]
 
-[ext_resource type="Texture2D" uid="uid://cfddkmjhp734f" path="res://Art/ForestBackground.jpg" id="1_lrc6l"]
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="2_opdns"]
 [ext_resource type="Script" uid="uid://s5qg2tiue4f7" path="res://Scripts/Environment/DynamicTreeSpawner.cs" id="4_lrc6l"]
 [ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="5_p64kh"]
 
 [node name="Environment" type="Node2D"]
-
-[node name="ForestBackground" type="Sprite2D" parent="."]
-visible = false
-z_index = -5
-position = Vector2(-9.49996, -119.5)
-scale = Vector2(0.377681, 0.288986)
-texture = ExtResource("1_lrc6l")
 
 [node name="Ground" parent="." instance=ExtResource("2_opdns")]
 z_index = 2
