@@ -4,13 +4,14 @@
 [ext_resource type="Script" uid="uid://bxuhtqy3h0aun" path="res://Scripts/Items/PuzzleCrystal.cs" id="1_qk8mj"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_xrl1k"]
-radius = 39.0
+radius = 34.0147
 
 [node name="Root" type="Node2D"]
 script = ExtResource("1_qk8mj")
 
 [node name="GemSprite" type="Sprite2D" parent="."]
-scale = Vector2(0.07, 0.07)
+position = Vector2(0.17999999, -0.4000012)
+scale = Vector2(0.060330883, 0.059166662)
 texture = ExtResource("1_lo8mh")
 
 [node name="Area2D" type="Area2D" parent="."]

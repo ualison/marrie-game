@@ -129,6 +129,13 @@ public partial class ReplayRecorder : Node
         Log.Debug($"Recording mode set to: {CurrentRecordingMode}", "ReplayRecorder");
     }
 
+    // Allow external systems to force the mode when scenes change
+    public void ForceSetRecordingMode(ReplayRecordingMode mode)
+    {
+        CurrentRecordingMode = mode;
+        Log.Debug($"Recording mode forcibly set to: {CurrentRecordingMode}", "ReplayRecorder");
+    }
+
     // NEW METHOD: Called by EnemyManager when monster visibility changes
     public void OnMonsterVisibilityChanged(Monster monster, bool isVisible)
     {

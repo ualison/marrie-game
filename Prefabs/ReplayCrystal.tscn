@@ -4,7 +4,7 @@
 [ext_resource type="Texture2D" uid="uid://durtoyot83hxg" path="res://Art/RewindCrystal.png" id="2_qm0lk"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_jl5wn"]
-radius = 39.0512
+radius = 35.014282
 
 [node name="ReplayGem" type="Node2D"]
 z_index = -1
@@ -12,15 +12,15 @@ script = ExtResource("2_6hmlc")
 FloatingDuration = 1.0
 
 [node name="GemSprite" type="Sprite2D" parent="."]
-position = Vector2(2.86102e-06, -7)
-scale = Vector2(0.075, 0.07)
+position = Vector2(0.499999, -8.272499)
+scale = Vector2(0.07832617, 0.07313038)
 texture = ExtResource("2_qm0lk")
 
 [node name="PromptLabel" type="Label" parent="."]
-offset_left = -18.0
-offset_top = -52.0
-offset_right = 21.0
-offset_bottom = -38.0
+offset_left = -19.0
+offset_top = -64.0
+offset_right = 20.0
+offset_bottom = -50.0
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_font_sizes/font_size = 10
 text = "Press E"

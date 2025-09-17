@@ -77,10 +77,10 @@ script = null
 [node name="GameEntities" type="Node2D" parent="."]
 
 [node name="Player" parent="GameEntities" instance=ExtResource("4_ju2da")]
-position = Vector2(-550, 128)
+position = Vector2(-559, 136)
 
 [node name="ReplayGem" parent="." instance=ExtResource("10_soofq")]
-position = Vector2(-353, 219)
+position = Vector2(-357, 235)
 
 [node name="GameSystems" type="Node" parent="."]
 
@@ -105,21 +105,21 @@ position = Vector2(-12, -440)
 
 [node name="PuzzleCrystal1" parent="PuzzleManager" instance=ExtResource("17_tfei0")]
 z_index = -1
-position = Vector2(-33, 650)
+position = Vector2(-13, 667)
 
 [node name="PuzzleCrystal2" parent="PuzzleManager" instance=ExtResource("17_tfei0")]
 z_index = -1
-position = Vector2(464, 650)
+position = Vector2(523, 671)
 
 [node name="MainPlatform" parent="PuzzleManager" instance=ExtResource("17_dyyws")]
-position = Vector2(201.99998, 229)
+position = Vector2(257, 229)
 
 [node name="Rock3" parent="PuzzleManager" instance=ExtResource("19_x336q")]
-position = Vector2(180, 169)
+position = Vector2(237, 175)
 
 [node name="Rock4" parent="PuzzleManager" instance=ExtResource("19_x336q")]
-position = Vector2(219, 169)
+position = Vector2(276, 175)
 
 [node name="SceneSwicherCrystal" parent="." instance=ExtResource("19_dyyws")]
-position = Vector2(-541, 223)
+position = Vector2(-560, 231)
 TargetScenePath = "uid://54o6xy0qaoae"

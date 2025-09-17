@@ -41,8 +41,11 @@ public partial class ReplaySystemManager : Node
             GameEventSystem.GameRestart += OnGameRestart;
             _subscriptionHelper.AddUnsubscriber(() => GameEventSystem.GameRestart -= OnGameRestart);
             
-            // Initialize
+            // Initialize for current scene
             CallDeferred(nameof(Initialize));
+
+            // Listen for scene changes to reinitialize recorder/orchestrator and reset mode
+            SceneLifecycleManager.SceneReady += OnSceneReady;
         }
         else
         {
@@ -58,6 +61,7 @@ public partial class ReplaySystemManager : Node
             Instance = null;
             // Centralized cleanup
             _subscriptionHelper.UnsubscribeAll();
+            SceneLifecycleManager.SceneReady -= OnSceneReady;
         }
     }
     #endregion
@@ -109,6 +113,40 @@ public partial class ReplaySystemManager : Node
     }
     #endregion
 
+    #region Scene Lifecycle Integration
+    private void OnSceneReady()
+    {
+        // Ensure reality is reset when entering a new scene
+        if (RealityManager.IsInstanceAvailable)
+        {
+            RealityManager.Instance.Reset();
+        }
+
+        // Recreate or discover components under the new current scene
+        Initialize();
+
+        // Clear any old death records bound to previous scene context
+        _deathRecords.Clear();
+        _currentDeathId = string.Empty;
+
+        // Reset recorder for the new scene and start fresh recording with correct mode
+        if (_recorder != null && IsInstanceValid(_recorder))
+        {
+            // Recreate the recorder to force mode re-detection based on the new scene
+            _recorder.QueueFree();
+            _recorder = null;
+        }
+
+        if (_recorder == null)
+        {
+            _recorder = new ReplayRecorder { Name = "ReplayRecorder" };
+            GetTree().CurrentScene.AddChild(_recorder);
+        }
+
+        Log.Debug("ReplaySystemManager reset after scene change", "ReplaySystemManager");
+    }
+    #endregion
+
     #region Event Handlers
     private void OnPlayerDied(MarrieGame.Core.Models.PlayerDeath death)
     {
@@ -120,7 +158,6 @@ public partial class ReplaySystemManager : Node
             Log.Warning("No replay data available for death (no current recording)", "ReplaySystemManager");
             return;
         }
-
         // Always stop current recording and save death record
     _recorder.StopRecording();
     SaveDeathRecord(death.Position);
@@ -191,7 +228,9 @@ public partial class ReplaySystemManager : Node
 
         var stats = _recorder.GetStats();
         Log.Replay($"Death record saved: {record.TotalFrames} frames, {stats.duration:F1}s duration at position {deathPosition}", "ReplaySystemManager");
-    }    private string GenerateDeathId()
+    }
+
+    private string GenerateDeathId()
     {
         return $"death_{Time.GetUnixTimeFromSystem()}_{_deathRecords.Count}";
     }
