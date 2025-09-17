@@ -62,6 +62,17 @@ public partial class ReplayRecorder : Node
         ProcessMode = ProcessModeEnum.Always;
         AddToGroup("replay_recorder");
 
+        // Listen to scene changes to reinitialize on scene transitions
+        if (SceneLifecycleManager.Instance != null)
+        {
+            SceneLifecycleManager.SceneReady += OnSceneReady;
+        }
+        else
+        {
+            // If SceneLifecycleManager isn't ready yet, defer the connection
+            CallDeferred(nameof(ConnectToSceneLifecycleManager));
+        }
+
         // Determine recording mode based on current scene
         DetectRecordingMode();
 
@@ -84,7 +95,68 @@ public partial class ReplayRecorder : Node
 
     public override void _ExitTree()
     {
+        // Clean up scene lifecycle connection
+        if (SceneLifecycleManager.Instance != null)
+        {
+            SceneLifecycleManager.SceneReady -= OnSceneReady;
+        }
+        
         if (Instance == this) Instance = null;
+    }
+
+    private void ConnectToSceneLifecycleManager()
+    {
+        if (SceneLifecycleManager.Instance != null)
+        {
+            SceneLifecycleManager.SceneReady += OnSceneReady;
+            Log.Debug("Connected ReplayRecorder to SceneLifecycleManager", "ReplayRecorder");
+        }
+        else
+        {
+            Log.Warning("SceneLifecycleManager not available for ReplayRecorder connection", "ReplayRecorder");
+        }
+    }
+
+    private void OnSceneReady()
+    {
+        Log.Debug("ReplayRecorder: Scene ready event received, reinitializing", "ReplayRecorder");
+        
+        // Re-detect recording mode for the new scene
+        DetectRecordingMode();
+        
+        // Reinitialize with new scene entities
+        CallDeferred(nameof(ReinitializeForNewScene));
+    }
+
+    private void ReinitializeForNewScene()
+    {
+        // Stop current recording if active
+        bool wasRecording = IsRecording;
+        if (IsRecording)
+        {
+            StopRecording();
+        }
+
+        // Clear old cached entities and refresh
+        _cachedPlayer = null;
+        _cachedMonster = null;
+        _playerSprite = null;
+        _playerVisual = null;
+        _monsterSprite = null;
+        _monsterVisual = null;
+
+        // Refresh character cache and restart recording if it was active
+        RefreshCharacterCache();
+        
+        if (wasRecording || _cachedPlayer != null)
+        {
+            StartRecording();
+            Log.Debug("ReplayRecorder reinitialized and recording restarted for new scene", "ReplayRecorder");
+        }
+        else
+        {
+            Log.Debug("ReplayRecorder reinitialized but no player found to record", "ReplayRecorder");
+        }
     }
     #endregion
 

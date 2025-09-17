@@ -1,4 +1,5 @@
 using Godot;
+using System.Collections.Generic;
 
 public partial class PuzzleCrystal : Node2D
 {
@@ -13,6 +14,10 @@ public partial class PuzzleCrystal : Node2D
     #region State Variables
     // Global variable flag to track if the crystal is active
     public bool IsActive { get; private set; } = false;
+
+    // Track which bodies are currently colliding to manage priority
+    private readonly HashSet<Node2D> _collidingBodies = new();
+    private Node2D _currentActivatingBody = null; // The body that is currently activating the crystal
 
     // Node references
     private Area2D area2D;
@@ -55,26 +60,152 @@ public partial class PuzzleCrystal : Node2D
     private void OnBodyEntered(Node2D body)
     {
         // Check if the body is Player or GhostPlayer (by name or type)
-        string bodyName = body.Name.ToString().ToLower();
-        if (bodyName.Contains("player") || bodyName.Contains("characterbody2d") || 
-            body.GetGroups().Contains("player") || body is CharacterBody2D)
+        if (!IsPlayerOrGhost(body))
+            return;
+
+        // Add the body to our collision tracking set
+        _collidingBodies.Add(body);
+
+        // Determine if this is a Player (higher priority) or GhostPlayer
+        bool isPlayer = IsPlayer(body);
+        bool isGhostPlayer = IsGhostPlayer(body);
+
+        GD.Print($"PuzzleCrystal collision entered by: {body.Name} (Type: {body.GetType()}) - IsPlayer: {isPlayer}, IsGhostPlayer: {isGhostPlayer}");
+
+        // Priority logic:
+        // 1. If Player is already activating, GhostPlayer cannot change state
+        // 2. If already active, don't deactivate (both Player and GhostPlayer)
+        
+        if (isPlayer)
         {
-            IsActive = true;
-            GD.Print($"PuzzleCrystal activated by: {body.Name} (Type: {body.GetType()})");
+            // Player has highest priority - always activate
+            if (!IsActive)
+            {
+                IsActive = true;
+                _currentActivatingBody = body;
+                GD.Print($"PuzzleCrystal activated by Player: {body.Name}");
+            }
+            else if (_currentActivatingBody != body)
+            {
+                // Player taking over from GhostPlayer
+                _currentActivatingBody = body;
+                GD.Print($"PuzzleCrystal control taken by Player: {body.Name}");
+            }
+        }
+        else if (isGhostPlayer)
+        {
+            // GhostPlayer can only activate if no Player is currently controlling
+            if (_currentActivatingBody == null || (!IsPlayer(_currentActivatingBody) && !IsActive))
+            {
+                if (!IsActive)
+                {
+                    IsActive = true;
+                    _currentActivatingBody = body;
+                    GD.Print($"PuzzleCrystal activated by GhostPlayer: {body.Name}");
+                }
+            }
+            else
+            {
+                GD.Print($"GhostPlayer {body.Name} cannot change PuzzleCrystal state - Player has priority");
+            }
         }
     }
 
     private void OnBodyExited(Node2D body)
     {
         // Check if the body is Player or GhostPlayer (by name or type)
-        string bodyName = body.Name.ToString().ToLower();
-        if (bodyName.Contains("player") || bodyName.Contains("characterbody2d") || 
-            body.GetGroups().Contains("player") || body is CharacterBody2D)
+        if (!IsPlayerOrGhost(body))
+            return;
+
+        // Remove the body from our collision tracking set
+        _collidingBodies.Remove(body);
+
+        GD.Print($"PuzzleCrystal collision exited by: {body.Name} (Type: {body.GetType()})");
+
+        // Only deactivate if this body was the one currently activating the crystal
+        // and no other bodies are still colliding AND the crystal was activated by collision
+        // (not pre-activated by some other means)
+        if (_currentActivatingBody == body)
         {
-            IsActive = false;
-            GD.Print($"PuzzleCrystal deactivated by: {body.Name} (Type: {body.GetType()})");
+            // Check if any Player is still colliding (highest priority)
+            Node2D remainingPlayer = null;
+            Node2D remainingGhost = null;
+
+            foreach (var collidingBody in _collidingBodies)
+            {
+                if (IsPlayer(collidingBody))
+                {
+                    remainingPlayer = collidingBody;
+                    break; // Player has highest priority
+                }
+                else if (IsGhostPlayer(collidingBody))
+                {
+                    remainingGhost = collidingBody;
+                }
+            }
+
+            if (remainingPlayer != null)
+            {
+                // Another Player is still colliding - transfer control but keep active
+                _currentActivatingBody = remainingPlayer;
+                GD.Print($"PuzzleCrystal control transferred to Player: {remainingPlayer.Name}");
+            }
+            else if (remainingGhost != null)
+            {
+                // No Player, but GhostPlayer is still colliding - keep active under GhostPlayer control
+                _currentActivatingBody = remainingGhost;
+                GD.Print($"PuzzleCrystal control transferred to GhostPlayer: {remainingGhost.Name}");
+            }
+            else if (_collidingBodies.Count == 0)
+            {
+                // No bodies are colliding anymore - deactivate only if it wasn't pre-active
+                // Note: For now, we assume all activation comes from collision
+                // If there are other activation mechanisms, this logic would need to be updated
+                IsActive = false;
+                _currentActivatingBody = null;
+                GD.Print($"PuzzleCrystal deactivated - no colliding bodies remaining");
+            }
+            else
+            {
+                // Bodies are still colliding but crystal should remain active
+                GD.Print($"PuzzleCrystal remains active - {_collidingBodies.Count} bodies still colliding");
+            }
+        }
+        else
+        {
+            GD.Print($"Body {body.Name} exited but was not the activating body - no state change");
         }
     }
+
+    #region Helper Methods
+    private bool IsPlayerOrGhost(Node2D body)
+    {
+        if (body == null) return false;
+        
+        string bodyName = body.Name.ToString().ToLower();
+        return bodyName.Contains("player") || 
+               bodyName.Contains("characterbody2d") || 
+               body.GetGroups().Contains("player") || 
+               body is CharacterBody2D;
+    }
+
+    private bool IsPlayer(Node2D body)
+    {
+        if (body == null) return false;
+        
+        // Player is in "player" group but NOT in "ghost_player" group
+        return body.GetGroups().Contains("player") && 
+               !body.GetGroups().Contains("ghost_player");
+    }
+
+    private bool IsGhostPlayer(Node2D body)
+    {
+        if (body == null) return false;
+        
+        // GhostPlayer is in both "player" and "ghost_player" groups
+        return body.GetGroups().Contains("ghost_player");
+    }
+    #endregion
 
     #region Floating Animation
     private void StartFloatingAnimation()

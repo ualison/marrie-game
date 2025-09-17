@@ -131,8 +131,25 @@ public partial class GameManager : Node
     {
         // Listen to key events for game flow coordination
         GameEventSystem.GameRestart += OnGameRestart;
+        
+        // Listen to scene changes to update scene state
+        SceneLifecycleManager.SceneReady += OnSceneChanged;
 
         Log.System("Event subscriptions active", "GameManager");
+    }
+
+    private void OnSceneChanged()
+    {
+        // Update current scene information
+        DetectCurrentScene();
+        
+        // Notify replay recorder about potential recording mode change
+        if (ReplayRecorder.Instance != null)
+        {
+            var newMode = GetReplayRecordingMode();
+            ReplayRecorder.Instance.ForceSetRecordingMode(newMode);
+            Log.System($"Updated ReplayRecorder mode to: {newMode} for scene: {CurrentSceneName}", "GameManager");
+        }
     }
 
     private void DetectCurrentScene()
@@ -285,6 +302,7 @@ public partial class GameManager : Node
         {
             // Cleanup subscriptions
             GameEventSystem.GameRestart -= OnGameRestart;
+            SceneLifecycleManager.SceneReady -= OnSceneChanged;
 
             // Clear any remaining static subscriptions to avoid memory leaks
             GameEventSystem.ClearAllSubscriptions();
