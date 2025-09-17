@@ -8,15 +8,15 @@
 [ext_resource type="Script" uid="uid://1o447xq10j6e" path="res://Scripts/UI/ManaBar.cs" id="9_ju2da"]
 [ext_resource type="Texture2D" uid="uid://cyqvsavuevs3x" path="res://Art/ManaHeart.png" id="10_bdkk2"]
 [ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="10_dyyws"]
-[ext_resource type="PackedScene" uid="uid://kufqrmkh1vbu" path="res://Prefabs/ReplayGem.tscn" id="10_soofq"]
+[ext_resource type="PackedScene" uid="uid://kufqrmkh1vbu" path="res://Prefabs/ReplayCrystal.tscn" id="10_soofq"]
 [ext_resource type="Texture2D" uid="uid://di3snpkk83b15" path="res://Art/DisabledHeart.png" id="11_l7xff"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="11_oja3w"]
 [ext_resource type="Script" uid="uid://g3qhhrdutgk5" path="res://Scripts/UI/LifeBar.cs" id="12_6mtek"]
 [ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/LifeHeart.png" id="13_tfei0"]
 [ext_resource type="Texture2D" uid="uid://b7iwahfuid08v" path="res://Art/Platform.png" id="14_l7xff"]
 [ext_resource type="Texture2D" uid="uid://8tum5coe2u2v" path="res://Art/Rock.png" id="15_6mtek"]
-[ext_resource type="Texture2D" uid="uid://cppg37y3pvlor" path="res://Art/PuzzleCrystal.png" id="16_tfei0"]
 [ext_resource type="Texture2D" uid="uid://du8wmkhu6j7p1" path="res://Art/DimensionCrystal.png" id="17_6mtek"]
+[ext_resource type="PackedScene" uid="uid://ciuebxrm6y66f" path="res://Prefabs/PuzzleCrystal.tscn" id="17_tfei0"]
 
 [node name="Root" type="Node2D"]
 
@@ -114,17 +114,13 @@ position = Vector2(204.375, -236.25003)
 scale = Vector2(0.03710938, 0.036621034)
 texture = ExtResource("15_6mtek")
 
-[node name="PuzzleCrystal" type="Sprite2D" parent="."]
-position = Vector2(-67, 159.99998)
-scale = Vector2(0.07, 0.07)
-texture = ExtResource("16_tfei0")
-
-[node name="PuzzleCrystal2" type="Sprite2D" parent="."]
-position = Vector2(458, 169)
-scale = Vector2(0.07, 0.07)
-texture = ExtResource("16_tfei0")
-
 [node name="DimensionCrystal" type="Sprite2D" parent="."]
 position = Vector2(-541, 179)
 scale = Vector2(0.07, 0.07)
 texture = ExtResource("17_6mtek")
+
+[node name="PuzzleCrystal1" parent="." instance=ExtResource("17_tfei0")]
+position = Vector2(-10, 183)
+
+[node name="PuzzleCrystal2" parent="." instance=ExtResource("17_tfei0")]
+position = Vector2(428, 194)
