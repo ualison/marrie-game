@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3 uid="uid://djkt6xtpabbyo"]
+[gd_scene load_steps=19 format=3 uid="uid://djkt6xtpabbyo"]
 
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="2_6po3t"]
 [ext_resource type="PackedScene" uid="uid://bfsyt4vafmqr8" path="res://Prefabs/EnvironmentPuzzleDimension.tscn" id="3_2kkwa"]
@@ -14,10 +14,9 @@
 [ext_resource type="Script" uid="uid://g3qhhrdutgk5" path="res://Scripts/UI/LifeBar.cs" id="12_6mtek"]
 [ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/LifeHeart.png" id="13_tfei0"]
 [ext_resource type="PackedScene" uid="uid://6eg7ul4k085w" path="res://Prefabs/PuzzleManager.tscn" id="15_x336q"]
-[ext_resource type="Texture2D" uid="uid://du8wmkhu6j7p1" path="res://Art/DimensionCrystal.png" id="17_6mtek"]
 [ext_resource type="PackedScene" uid="uid://cbtkrlgl6uyx" path="res://Prefabs/MainPlatform.tscn" id="17_dyyws"]
 [ext_resource type="PackedScene" uid="uid://ciuebxrm6y66f" path="res://Prefabs/PuzzleCrystal.tscn" id="17_tfei0"]
-[ext_resource type="PackedScene" uid="uid://ukfdb7esvlix" path="res://Prefabs/RandomPlatform.tscn" id="18_oja3w"]
+[ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="19_dyyws"]
 [ext_resource type="PackedScene" uid="uid://cp2vjmpq32tgk" path="res://Prefabs/Rock.tscn" id="19_x336q"]
 
 [node name="Root" type="Node2D"]
@@ -27,9 +26,9 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = -610.0
-offset_top = 144.00002
+offset_top = -394.0
 offset_right = -390.0
-offset_bottom = 299.0
+offset_bottom = -239.0
 grow_vertical = 0
 scale = Vector2(0.7, 0.7)
 theme_override_constants/separation = 10
@@ -78,10 +77,10 @@ script = null
 [node name="GameEntities" type="Node2D" parent="."]
 
 [node name="Player" parent="GameEntities" instance=ExtResource("4_ju2da")]
-position = Vector2(-241, 117)
+position = Vector2(-550, 128)
 
 [node name="ReplayGem" parent="." instance=ExtResource("10_soofq")]
-position = Vector2(-400, 220)
+position = Vector2(-353, 219)
 
 [node name="GameSystems" type="Node" parent="."]
 
@@ -101,12 +100,6 @@ volume_db = 6.038
 autoplay = true
 script = ExtResource("11_oja3w")
 
-[node name="DimensionCrystal" type="Sprite2D" parent="."]
-z_index = -1
-position = Vector2(-541, 210)
-scale = Vector2(0.08, 0.08)
-texture = ExtResource("17_6mtek")
-
 [node name="PuzzleManager" parent="." instance=ExtResource("15_x336q")]
 position = Vector2(-12, -440)
 
@@ -121,14 +114,12 @@ position = Vector2(464, 650)
 [node name="MainPlatform" parent="PuzzleManager" instance=ExtResource("17_dyyws")]
 position = Vector2(201.99998, 229)
 
-[node name="RandomPlatform1" parent="PuzzleManager" instance=ExtResource("18_oja3w")]
-position = Vector2(-467, 230)
-
-[node name="RandomPlatform2" parent="PuzzleManager" instance=ExtResource("18_oja3w")]
-position = Vector2(-255, 227)
-
 [node name="Rock3" parent="PuzzleManager" instance=ExtResource("19_x336q")]
 position = Vector2(180, 169)
 
 [node name="Rock4" parent="PuzzleManager" instance=ExtResource("19_x336q")]
 position = Vector2(219, 169)
+
+[node name="SceneSwicherCrystal" parent="." instance=ExtResource("19_dyyws")]
+position = Vector2(-541, 223)
+TargetScenePath = "uid://54o6xy0qaoae"

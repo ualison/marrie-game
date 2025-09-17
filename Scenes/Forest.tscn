@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://54o6xy0qaoae"]
+[gd_scene load_steps=13 format=3 uid="uid://54o6xy0qaoae"]
 
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="1_08kc0"]
 [ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="2_djgpu"]
@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://sdqhqn52n3xp" path="res://Scripts/Systems/InfiniteForestManager.cs" id="8_r6l07"]
 [ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="10_e2fbs"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
+[ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="12_wjun0"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
 
@@ -61,3 +62,7 @@ stream = ExtResource("10_e2fbs")
 volume_db = 6.038
 autoplay = true
 script = ExtResource("15_r6l07")
+
+[node name="SceneSwicherCrystal" parent="." instance=ExtResource("12_wjun0")]
+position = Vector2(-184, 232)
+TargetScenePath = "uid://djkt6xtpabbyo"
