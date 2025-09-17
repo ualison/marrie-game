@@ -18,7 +18,7 @@
 [ext_resource type="PackedScene" uid="uid://cbtkrlgl6uyx" path="res://Prefabs/MainPlatform.tscn" id="17_dyyws"]
 [ext_resource type="PackedScene" uid="uid://ciuebxrm6y66f" path="res://Prefabs/PuzzleCrystal.tscn" id="17_tfei0"]
 [ext_resource type="PackedScene" uid="uid://ukfdb7esvlix" path="res://Prefabs/RandomPlatform.tscn" id="18_oja3w"]
-[ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="19_x336q"]
+[ext_resource type="PackedScene" uid="uid://cp2vjmpq32tgk" path="res://Prefabs/Rock.tscn" id="19_x336q"]
 
 [node name="Root" type="Node2D"]
 
@@ -126,8 +126,8 @@ position = Vector2(-467, 230)
 [node name="RandomPlatform2" parent="PuzzleManager" instance=ExtResource("18_oja3w")]
 position = Vector2(-255, 227)
 
-[node name="Rock" parent="PuzzleManager" instance=ExtResource("19_x336q")]
-position = Vector2(184, 206)
+[node name="Rock3" parent="PuzzleManager" instance=ExtResource("19_x336q")]
+position = Vector2(180, 169)
 
-[node name="Rock2" parent="PuzzleManager" instance=ExtResource("19_x336q")]
-position = Vector2(229, 204)
+[node name="Rock4" parent="PuzzleManager" instance=ExtResource("19_x336q")]
+position = Vector2(219, 169)

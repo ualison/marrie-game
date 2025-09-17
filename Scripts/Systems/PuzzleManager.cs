@@ -21,6 +21,11 @@ public partial class PuzzleManager : Node2D
     
     // Track previous state to avoid spam logging
     private int previousActiveCrystals = -1;
+    
+    // Track visibility states to prevent repeated calls
+    private bool rocksVisible = false;
+    private bool mainPlatformsVisible = false;
+    private bool randomPlatformsVisible = false;
     #endregion
 
     public override void _Ready()
@@ -34,7 +39,11 @@ public partial class PuzzleManager : Node2D
 
     public override void _Process(double delta)
     {
-        if (allElementsHidden) return;
+        if (allElementsHidden) 
+        {
+            // In final sequence - no longer manage visibility, let rocks fall naturally
+            return;
+        }
         
         // Check the state of puzzle crystals and manage visibility accordingly
         CheckPuzzleCrystalStates();
@@ -67,19 +76,20 @@ public partial class PuzzleManager : Node2D
             // Check node names or types to categorize objects
             string nodeName = child.Name.ToString().ToLower();
             
-            if (nodeName.Contains("rock") && child is Node2D rock)
+            // Check if this is a Rock class instance (more reliable than name checking)
+            if (child is Rock rock && !rocks.Contains(rock))
             {
                 rocks.Add(rock);
             }
-            else if (nodeName.Contains("mainplatform") && child is Node2D mainPlatform)
+            else if (nodeName.Contains("mainplatform") && child is Node2D mainPlatform && !mainPlatforms.Contains(mainPlatform))
             {
                 mainPlatforms.Add(mainPlatform);
             }
-            else if ((nodeName.Contains("randomplatform") || nodeName.Contains("randompat")) && child is Node2D randomPlatform)
+            else if ((nodeName.Contains("randomplatform") || nodeName.Contains("randompat")) && child is Node2D randomPlatform && !randomPlatforms.Contains(randomPlatform))
             {
                 randomPlatforms.Add(randomPlatform);
             }
-            else if (child is PuzzleCrystal puzzleCrystal)
+            else if (child is PuzzleCrystal puzzleCrystal && !puzzleCrystals.Contains(puzzleCrystal))
             {
                 puzzleCrystals.Add(puzzleCrystal);
             }
@@ -95,6 +105,11 @@ public partial class PuzzleManager : Node2D
         SetObjectsVisibility(rocks, false);
         SetObjectsVisibility(mainPlatforms, false);
         SetObjectsVisibility(randomPlatforms, false);
+        
+        // Track initial states
+        rocksVisible = false;
+        mainPlatformsVisible = false;
+        randomPlatformsVisible = false;
         
         GD.Print("PuzzleManager: Initially hidden rocks, main platforms, and random platforms");
     }
@@ -119,13 +134,26 @@ public partial class PuzzleManager : Node2D
         if (activeCrystals >= 1 && activeCrystals < puzzleCrystals.Count)
         {
             // Show rocks, main platforms, and random platforms when at least one crystal is active (but not all)
-            SetObjectsVisibility(rocks, true);
-            SetObjectsVisibility(mainPlatforms, true);
-            SetObjectsVisibility(randomPlatforms, true);
-            
-            if (activeCrystals != previousActiveCrystals)
+            // Only change visibility if it's different from current state
+            if (!rocksVisible)
             {
-                GD.Print("PuzzleManager: Showing platforms and rocks");
+                SetObjectsVisibility(rocks, true);
+                rocksVisible = true;
+                GD.Print("PuzzleManager: Showing rocks");
+            }
+            
+            if (!mainPlatformsVisible)
+            {
+                SetObjectsVisibility(mainPlatforms, true);
+                mainPlatformsVisible = true;
+                GD.Print("PuzzleManager: Showing main platforms");
+            }
+            
+            if (!randomPlatformsVisible)
+            {
+                SetObjectsVisibility(randomPlatforms, true);
+                randomPlatformsVisible = true;
+                GD.Print("PuzzleManager: Showing random platforms");
             }
             
             // Stop main platform fading if it was happening
@@ -137,13 +165,26 @@ public partial class PuzzleManager : Node2D
         else if (activeCrystals == 0)
         {
             // Hide objects when no crystals are active
-            SetObjectsVisibility(rocks, false);
-            SetObjectsVisibility(mainPlatforms, false);
-            SetObjectsVisibility(randomPlatforms, false);
-            
-            if (activeCrystals != previousActiveCrystals)
+            // Only change visibility if it's different from current state and not in final sequence
+            if (!allElementsHidden && rocksVisible)
             {
-                GD.Print("PuzzleManager: Hiding platforms and rocks (no active crystals)");
+                SetObjectsVisibility(rocks, false);
+                rocksVisible = false;
+                GD.Print("PuzzleManager: Hiding rocks (no active crystals)");
+            }
+            
+            if (!allElementsHidden && mainPlatformsVisible)
+            {
+                SetObjectsVisibility(mainPlatforms, false);
+                mainPlatformsVisible = false;
+                GD.Print("PuzzleManager: Hiding main platforms (no active crystals)");
+            }
+            
+            if (!allElementsHidden && randomPlatformsVisible)
+            {
+                SetObjectsVisibility(randomPlatforms, false);
+                randomPlatformsVisible = false;
+                GD.Print("PuzzleManager: Hiding random platforms (no active crystals)");
             }
             
             // Stop main platform fading if it was happening
@@ -157,6 +198,14 @@ public partial class PuzzleManager : Node2D
             // All crystals are active - start the final sequence
             if (!isMainPlatformFading && !allElementsHidden)
             {
+                // Ensure rocks are visible for the final sequence
+                if (!rocksVisible)
+                {
+                    SetObjectsVisibility(rocks, true);
+                    rocksVisible = true;
+                    GD.Print("PuzzleManager: Ensuring rocks are visible for final sequence");
+                }
+                
                 GD.Print("PuzzleManager: All crystals active - starting final sequence");
                 StartFinalSequence();
             }
@@ -170,6 +219,14 @@ public partial class PuzzleManager : Node2D
             if (obj != null && IsInstanceValid(obj))
             {
                 obj.Visible = visible;
+                
+                // If this is a rock being made visible, re-enable its physics
+                if (visible && obj is Rock rock)
+                {
+                    // Defer physics enabling to next frame to ensure proper initialization
+                    rock.CallDeferred(nameof(rock.ReEnablePhysics));
+                    GD.Print($"PuzzleManager: Re-enabling physics for rock: {rock.Name}");
+                }
             }
         }
     }
@@ -233,16 +290,22 @@ public partial class PuzzleManager : Node2D
 
     private void HideAllElements()
     {
-        GD.Print("PuzzleManager: Hiding all elements");
+        GD.Print("PuzzleManager: Hiding platforms and crystals, but keeping rocks visible to fall");
         
         allElementsHidden = true;
         
-        // Hide all objects in the puzzle manager
-        SetObjectsVisibility(rocks, false);
+        // Hide main platforms and random platforms, but keep rocks visible so they can fall
         SetObjectsVisibility(mainPlatforms, false);
         SetObjectsVisibility(randomPlatforms, false);
         
-        // Also hide puzzle crystals
+        // Update visibility tracking for platforms only
+        mainPlatformsVisible = false;
+        randomPlatformsVisible = false;
+        
+        // Keep rocks visible and ensure they can fall - they should remain rocksVisible = true
+        GD.Print("PuzzleManager: Rocks remain visible and falling due to gravity");
+        
+        // Hide puzzle crystals
         foreach (PuzzleCrystal crystal in puzzleCrystals)
         {
             if (crystal != null && IsInstanceValid(crystal))

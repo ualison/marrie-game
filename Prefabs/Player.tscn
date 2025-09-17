@@ -6,7 +6,7 @@
 [ext_resource type="Script" uid="uid://gp6wfjapkopj" path="res://Scripts/Player/PlayerMana.cs" id="4_mana"]
 [ext_resource type="Script" path="res://Scripts/Systems/Inventory.cs" id="5_inventory"]
 [ext_resource type="Script" path="res://Scripts/Player/RockThrower.cs" id="6_rockthrower"]
-[ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="7_javds"]
+[ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/RockThrowable.tscn" id="7_javds"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_gntrk"]
 size = Vector2(156, 268)
