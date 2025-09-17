@@ -6,10 +6,10 @@
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wqfq0"]
-size = Vector2(314, 415)
+size = Vector2(252, 328)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
-size = Vector2(300, 404)
+size = Vector2(230, 326)
 
 [node name="Root3" type="Node2D"]
 
@@ -33,17 +33,17 @@ position = Vector2(0, -4)
 collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/DamageArea"]
-position = Vector2(-21, -22.5)
+position = Vector2(-50, 21)
 shape = SubResource("RectangleShape2D_wqfq0")
 debug_color = Color(0.764087, 0.04706, 0.125471, 0.42)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]
-position = Vector2(-22, -19)
+position = Vector2(-50, 20)
 shape = SubResource("RectangleShape2D_kyqiw")
 
 [node name="MonsterSprite" type="Sprite2D" parent="CharacterBody2D"]
-position = Vector2(-17, -15)
-scale = Vector2(0.33691403, 0.3359375)
+position = Vector2(-48, 26)
+scale = Vector2(0.271, 0.27)
 texture = ExtResource("4_hp6r8")
 
 [node name="MonsterLifeBar" parent="CharacterBody2D" instance=ExtResource("4_lifebar")]

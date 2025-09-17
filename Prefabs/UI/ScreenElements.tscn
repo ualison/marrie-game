@@ -2,9 +2,9 @@
 
 [ext_resource type="Script" uid="uid://g3qhhrdutgk5" path="res://Scripts/UI/LifeBar.cs" id="1_lifebar"]
 [ext_resource type="Script" uid="uid://1o447xq10j6e" path="res://Scripts/UI/ManaBar.cs" id="4_manabar"]
-[ext_resource type="Texture2D" uid="uid://cyqvsavuevs3x" path="res://Art/B.png" id="4_toh7i"]
-[ext_resource type="Texture2D" uid="uid://di3snpkk83b15" path="res://Art/C.png" id="5_7bvv0"]
-[ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/A.png" id="7_geraf"]
+[ext_resource type="Texture2D" uid="uid://cyqvsavuevs3x" path="res://Art/ManaHeart.png" id="4_toh7i"]
+[ext_resource type="Texture2D" uid="uid://di3snpkk83b15" path="res://Art/DisabledHeart.png" id="5_7bvv0"]
+[ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/LifeHeart.png" id="7_geraf"]
 [ext_resource type="PackedScene" uid="uid://844rfld3y4ee" path="res://Prefabs/UI/RockCount.tscn" id="7_rockcount"]
 [ext_resource type="PackedScene" uid="uid://cld6sntxsh51w" path="res://Prefabs/UI/RespawnDebug.tscn" id="8_respawndebug"]
 

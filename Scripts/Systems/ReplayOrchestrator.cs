@@ -421,6 +421,12 @@ public partial class ReplayOrchestrator : Node
 
     private void RestartRecording()
     {
+        // In PuzzleMode, notify ReplaySystemManager to restart recording fresh
+        if (ReplaySystemManager.Instance != null)
+        {
+            ReplaySystemManager.Instance.RestartRecordingAfterPuzzleReplay();
+        }
+
         if (ReplayRecorder.Instance != null)
         {
             var player = GetTree().GetFirstNodeInGroup("player") as Player;

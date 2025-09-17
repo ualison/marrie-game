@@ -1,9 +1,10 @@
-[gd_scene load_steps=11 format=3 uid="uid://54o6xy0qaoae"]
+[gd_scene load_steps=12 format=3 uid="uid://54o6xy0qaoae"]
 
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="1_08kc0"]
 [ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="2_djgpu"]
 [ext_resource type="PackedScene" uid="uid://bprvmud1sukcc" path="res://Prefabs/Environment.tscn" id="2_wjun0"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
+[ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_e2fbs"]
 [ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="6_8u8ny"]
 [ext_resource type="Script" uid="uid://sdqhqn52n3xp" path="res://Scripts/Systems/InfiniteForestManager.cs" id="8_r6l07"]
 [ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="10_e2fbs"]
@@ -26,6 +27,11 @@ SmoothSpeed = 10.0
 
 [node name="Player" parent="GameEntities" instance=ExtResource("4_e2fbs")]
 position = Vector2(-327, 116)
+
+[node name="Enemies" type="Node2D" parent="GameEntities"]
+
+[node name="Monster" parent="GameEntities/Enemies" instance=ExtResource("5_e2fbs")]
+position = Vector2(286, 68)
 
 [node name="GameSystems" type="Node" parent="."]
 

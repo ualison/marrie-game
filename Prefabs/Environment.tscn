@@ -3,7 +3,7 @@
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="2_opdns"]
 [ext_resource type="Script" uid="uid://s5qg2tiue4f7" path="res://Scripts/Environment/DynamicTreeSpawner.cs" id="4_lrc6l"]
 [ext_resource type="Script" uid="uid://ins52dvulrc1" path="res://Scripts/Environment/SnowTempest.cs" id="4_p64kh"]
-[ext_resource type="Texture2D" uid="uid://c01rp2x53l7vt" path="res://Art/Koch.png" id="5_lrc6l"]
+[ext_resource type="Texture2D" uid="uid://c01rp2x53l7vt" path="res://Art/KochSnowFlake.png" id="5_lrc6l"]
 [ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="5_p64kh"]
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_opdns"]

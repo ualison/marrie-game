@@ -1,4 +1,5 @@
 using Godot;
+using MarrieGame.Core.Enums;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -22,6 +23,7 @@ public partial class ReplaySystemManager : Node
     #region Death Records
     private readonly Dictionary<string, DeathRecord> _deathRecords = new();
     private string _currentDeathId = "";
+    private ReplayRecordingMode _currentRecordingMode = ReplayRecordingMode.DeathMode;
     #endregion
 
     #region Lifecycle
@@ -61,8 +63,23 @@ public partial class ReplaySystemManager : Node
     #endregion
 
     #region Initialization (Simplified)
+    private void DetectRecordingMode()
+    {
+        if (GameManager.Instance != null)
+        {
+            _currentRecordingMode = GameManager.Instance.GetReplayRecordingMode();
+        }
+        else
+        {
+            _currentRecordingMode = ReplayRecordingMode.DeathMode; // Default fallback
+        }
+    }
+
     private void Initialize()
     {
+        // Detect current recording mode
+        DetectRecordingMode();
+
         // Find or create recorder
         _recorder = ReplayRecorder.Instance;
         
@@ -88,7 +105,7 @@ public partial class ReplaySystemManager : Node
         }
         
         // Debug level - system initialization is routine
-        Log.Debug("ReplaySystemManager initialized", "ReplaySystemManager");
+        Log.Debug($"ReplaySystemManager initialized - Mode: {_currentRecordingMode}", "ReplaySystemManager");
     }
     #endregion
 
@@ -221,9 +238,27 @@ public partial class ReplaySystemManager : Node
     #region Public API (for ReplayGem to call)
     public bool HasReplayData()
     {
-        // Only return true if we have previous death records to replay
-        // Current recording data alone doesn't constitute "replayable" data until after death
+        // In PuzzleMode, check if we have current recording data even without death records
+        if (_currentRecordingMode == ReplayRecordingMode.PuzzleMode)
+        {
+            return (_recorder?.HasRecordedData ?? false) || _deathRecords.Count > 0;
+        }
+        
+        // In DeathMode, only return true if we have previous death records to replay
         return _deathRecords.Count > 0;
+    }
+
+    /// <summary>
+    /// Restarts recording after a replay in PuzzleMode
+    /// </summary>
+    public void RestartRecordingAfterPuzzleReplay()
+    {
+        if (_currentRecordingMode == ReplayRecordingMode.PuzzleMode && _recorder != null)
+        {
+            Log.Debug("Restarting recording after PuzzleMode replay", "ReplaySystemManager");
+            _recorder.ClearRecording();
+            _recorder.StartRecording();
+        }
     }
 
     public (int deaths, int totalFrames) GetReplayStats()
@@ -239,6 +274,32 @@ public partial class ReplaySystemManager : Node
 
     public DeathRecord GetLastDeathRecord()
     {
+        // In PuzzleMode, create a virtual death record from current recording data if no real deaths exist
+        if (_currentRecordingMode == ReplayRecordingMode.PuzzleMode && _deathRecords.Count == 0)
+        {
+            if (_recorder != null && _recorder.HasRecordedData)
+            {
+                var (playerFrames, monsterFrames, duration) = _recorder.GetCurrentRecordingData();
+                
+                if (playerFrames.Count > 0)
+                {
+                    // Create a virtual death record for puzzle mode
+                    var virtualRecord = new DeathRecord("puzzle_session", Vector2.Zero, 0)
+                    {
+                        PlayerFrames = playerFrames,
+                        MonsterFrames = monsterFrames
+                    };
+                    
+                    Log.Debug($"Created virtual death record for PuzzleMode with {playerFrames.Count} player frames", "ReplaySystemManager");
+                    return virtualRecord;
+                }
+            }
+            
+            // In puzzle mode, it's normal to have no death records initially
+            Log.Debug("No recording data available for PuzzleMode replay", "ReplaySystemManager");
+            return null;
+        }
+
         // Use death sequence to break timestamp ties, ensuring latest death is selected
         if (_deathRecords.Count > 0)
         {
@@ -250,7 +311,11 @@ public partial class ReplaySystemManager : Node
             return latestRecord;
         }
         
-        Log.Warning("No death records available", "ReplaySystemManager");
+        // Only show warning in DeathMode, as PuzzleMode is expected to not have death records initially
+        if (_currentRecordingMode == ReplayRecordingMode.DeathMode)
+        {
+            Log.Warning("No death records available", "ReplaySystemManager");
+        }
         return null;
     }
     #endregion

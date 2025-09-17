@@ -1,0 +1,130 @@
+[gd_scene load_steps=18 format=3 uid="uid://djkt6xtpabbyo"]
+
+[ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="2_6po3t"]
+[ext_resource type="PackedScene" uid="uid://bfsyt4vafmqr8" path="res://Prefabs/EnvironmentPuzzleDimension.tscn" id="3_2kkwa"]
+[ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_ju2da"]
+[ext_resource type="PackedScene" uid="uid://844rfld3y4ee" path="res://Prefabs/UI/RockCount.tscn" id="8_1wrpf"]
+[ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="8_tfei0"]
+[ext_resource type="Script" uid="uid://1o447xq10j6e" path="res://Scripts/UI/ManaBar.cs" id="9_ju2da"]
+[ext_resource type="Texture2D" uid="uid://cyqvsavuevs3x" path="res://Art/ManaHeart.png" id="10_bdkk2"]
+[ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="10_dyyws"]
+[ext_resource type="PackedScene" uid="uid://kufqrmkh1vbu" path="res://Prefabs/ReplayGem.tscn" id="10_soofq"]
+[ext_resource type="Texture2D" uid="uid://di3snpkk83b15" path="res://Art/DisabledHeart.png" id="11_l7xff"]
+[ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="11_oja3w"]
+[ext_resource type="Script" uid="uid://g3qhhrdutgk5" path="res://Scripts/UI/LifeBar.cs" id="12_6mtek"]
+[ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/LifeHeart.png" id="13_tfei0"]
+[ext_resource type="Texture2D" uid="uid://b7iwahfuid08v" path="res://Art/Platform.png" id="14_l7xff"]
+[ext_resource type="Texture2D" uid="uid://8tum5coe2u2v" path="res://Art/Rock.png" id="15_6mtek"]
+[ext_resource type="Texture2D" uid="uid://cppg37y3pvlor" path="res://Art/PuzzleCrystal.png" id="16_tfei0"]
+[ext_resource type="Texture2D" uid="uid://du8wmkhu6j7p1" path="res://Art/DimensionCrystal.png" id="17_6mtek"]
+
+[node name="Root" type="Node2D"]
+
+[node name="BottomLeftContainer" type="VBoxContainer" parent="."]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -610.0
+offset_top = 144.00002
+offset_right = -390.0
+offset_bottom = 299.0
+grow_vertical = 0
+scale = Vector2(0.7, 0.7)
+theme_override_constants/separation = 10
+
+[node name="RockCount" parent="BottomLeftContainer" instance=ExtResource("8_1wrpf")]
+layout_mode = 2
+
+[node name="ManaBar" type="Control" parent="BottomLeftContainer"]
+custom_minimum_size = Vector2(0, 45)
+layout_mode = 2
+script = ExtResource("9_ju2da")
+FullManaTexture = ExtResource("10_bdkk2")
+EmptyManaTexture = ExtResource("11_l7xff")
+
+[node name="ManaContainer" type="HBoxContainer" parent="BottomLeftContainer/ManaBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="LifeHearts" type="Control" parent="BottomLeftContainer"]
+custom_minimum_size = Vector2(0, 45)
+layout_mode = 2
+script = ExtResource("12_6mtek")
+FullHeartTexture = ExtResource("13_tfei0")
+EmptyHeartTexture = ExtResource("11_l7xff")
+
+[node name="HeartsContainer" type="HBoxContainer" parent="BottomLeftContainer/LifeHearts"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="CameraFollower" parent="." instance=ExtResource("2_6po3t")]
+position = Vector2(-8, -73)
+script = null
+
+[node name="Environment" parent="." instance=ExtResource("3_2kkwa")]
+
+[node name="GameEntities" type="Node2D" parent="."]
+
+[node name="Player" parent="GameEntities" instance=ExtResource("4_ju2da")]
+position = Vector2(-241, 117)
+
+[node name="ReplayGem" parent="." instance=ExtResource("10_soofq")]
+position = Vector2(-421, 187)
+
+[node name="GameSystems" type="Node" parent="."]
+
+[node name="Managers" type="Node" parent="GameSystems"]
+
+[node name="UIManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("8_tfei0")
+
+[node name="AudioSystem" type="Node" parent="GameSystems"]
+
+[node name="AudioSystem" type="Node" parent="."]
+
+[node name="AudioManager" type="AudioStreamPlayer2D" parent="AudioSystem"]
+position = Vector2(-10, -27)
+stream = ExtResource("10_dyyws")
+volume_db = 6.038
+autoplay = true
+script = ExtResource("11_oja3w")
+
+[node name="Platform" type="Sprite2D" parent="."]
+position = Vector2(191.375, -211.25)
+scale = Vector2(0.19336174, 0.21360156)
+texture = ExtResource("14_l7xff")
+
+[node name="Rock" type="Sprite2D" parent="."]
+position = Vector2(168.375, -236.25003)
+scale = Vector2(0.03710938, 0.036621034)
+texture = ExtResource("15_6mtek")
+
+[node name="Rock2" type="Sprite2D" parent="."]
+position = Vector2(204.375, -236.25003)
+scale = Vector2(0.03710938, 0.036621034)
+texture = ExtResource("15_6mtek")
+
+[node name="PuzzleCrystal" type="Sprite2D" parent="."]
+position = Vector2(-67, 159.99998)
+scale = Vector2(0.07, 0.07)
+texture = ExtResource("16_tfei0")
+
+[node name="PuzzleCrystal2" type="Sprite2D" parent="."]
+position = Vector2(458, 169)
+scale = Vector2(0.07, 0.07)
+texture = ExtResource("16_tfei0")
+
+[node name="DimensionCrystal" type="Sprite2D" parent="."]
+position = Vector2(-541, 179)
+scale = Vector2(0.07, 0.07)
+texture = ExtResource("17_6mtek")

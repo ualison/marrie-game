@@ -1,9 +1,9 @@
 [gd_scene load_steps=5 format=3 uid="uid://1ppt7yfvx3tk"]
 
 [ext_resource type="Script" uid="uid://bid67bj7xlptd" path="res://Scripts/UI/MonsterLifeBar.cs" id="1_gwh80"]
-[ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/A.png" id="2_qg012"]
-[ext_resource type="Texture2D" uid="uid://di3snpkk83b15" path="res://Art/C.png" id="3_wcggg"]
-[ext_resource type="Texture2D" uid="uid://cyqvsavuevs3x" path="res://Art/B.png" id="4_qg012"]
+[ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/LifeHeart.png" id="2_qg012"]
+[ext_resource type="Texture2D" uid="uid://di3snpkk83b15" path="res://Art/DisabledHeart.png" id="3_wcggg"]
+[ext_resource type="Texture2D" uid="uid://cyqvsavuevs3x" path="res://Art/ManaHeart.png" id="4_qg012"]
 
 [node name="MonsterLifeBar" type="Control" groups=["monster_life_bar_ui"]]
 layout_mode = 3

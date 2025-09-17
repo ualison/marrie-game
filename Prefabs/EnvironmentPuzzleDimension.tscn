@@ -1,0 +1,57 @@
+[gd_scene load_steps=5 format=3 uid="uid://bfsyt4vafmqr8"]
+
+[ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="1_ix2s4"]
+[ext_resource type="Script" uid="uid://ins52dvulrc1" path="res://Scripts/Environment/SnowTempest.cs" id="4_w6vfh"]
+[ext_resource type="Texture2D" uid="uid://c01rp2x53l7vt" path="res://Art/KochSnowFlake.png" id="5_n7ucl"]
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_opdns"]
+particle_flag_disable_z = true
+gravity = Vector3(0, 98, 0)
+
+[node name="Root" type="Node2D"]
+
+[node name="Left" parent="." instance=ExtResource("1_ix2s4")]
+z_index = 2
+position = Vector2(-641, -265)
+rotation = 1.5707964
+
+[node name="Right" parent="." instance=ExtResource("1_ix2s4")]
+z_index = 2
+position = Vector2(632, -296)
+rotation = -1.5707964
+
+[node name="Ground" parent="." instance=ExtResource("1_ix2s4")]
+z_index = 2
+position = Vector2(6, 294)
+
+[node name="SnowTempestFront" type="GPUParticles2D" parent="."]
+z_index = 10
+position = Vector2(-11, -416)
+scale = Vector2(6.399997, 0.19999987)
+amount = 100
+process_material = SubResource("ParticleProcessMaterial_opdns")
+script = ExtResource("4_w6vfh")
+TempestIntensity = 0.6
+WindDirection = Vector2(0.8, 0.3)
+WindStrength = 20.0
+TextureWeight = 0.09
+TextureHeight = 0.09
+SnowflakeTexture = ExtResource("5_n7ucl")
+GravityVelocity = 12.0
+ParticleLifetime = 20.0
+
+[node name="SnowTempestBack" type="GPUParticles2D" parent="."]
+z_index = -10
+position = Vector2(-11, -416)
+scale = Vector2(6.399997, 0.19999987)
+amount = 100
+process_material = SubResource("ParticleProcessMaterial_opdns")
+script = ExtResource("4_w6vfh")
+TempestIntensity = 0.6
+WindDirection = Vector2(0.8, 0.3)
+WindStrength = 20.0
+TextureWeight = 0.07
+TextureHeight = 0.07
+SnowflakeTexture = ExtResource("5_n7ucl")
+GravityVelocity = 12.0
+ParticleLifetime = 20.0
