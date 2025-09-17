@@ -7,6 +7,8 @@ public partial class PuzzleManager : Node2D
     #region Export Variables
     [Export] public float FadeOutDuration { get; set; } = 3.0f; // Time to wait before hiding all elements
     [Export] public float MainPlatformFadeDuration { get; set; } = 1.0f; // How long the main platform fade takes
+    [Export] public float PlatformFadeInDuration { get; set; } = 0.5f; // How long platforms take to fade in
+    [Export] public float PlatformFadeOutDuration { get; set; } = 0.5f; // How long platforms take to fade out
     #endregion
 
     #region Private Variables
@@ -18,6 +20,8 @@ public partial class PuzzleManager : Node2D
     private bool isMainPlatformFading = false;
     private bool allElementsHidden = false;
     private Tween fadeOutTween;
+    // Per-node tween map for platform fades
+    private Dictionary<Node2D, Tween> nodeTweens = new Dictionary<Node2D, Tween>();
     
     // Track previous state to avoid spam logging
     private int previousActiveCrystals = -1;
@@ -26,6 +30,8 @@ public partial class PuzzleManager : Node2D
     private bool rocksVisible = false;
     private bool mainPlatformsVisible = false;
     private bool randomPlatformsVisible = false;
+    
+    // Removed global platform fading flag; handled per-node via nodeTweens
     #endregion
 
     public override void _Ready()
@@ -137,23 +143,23 @@ public partial class PuzzleManager : Node2D
             // Only change visibility if it's different from current state
             if (!rocksVisible)
             {
-                SetObjectsVisibility(rocks, true);
+                FadePlatformsIn(rocks);
                 rocksVisible = true;
-                GD.Print("PuzzleManager: Showing rocks");
+                GD.Print("PuzzleManager: Fading in rocks");
             }
             
             if (!mainPlatformsVisible)
             {
-                SetObjectsVisibility(mainPlatforms, true);
+                FadePlatformsIn(mainPlatforms);
                 mainPlatformsVisible = true;
-                GD.Print("PuzzleManager: Showing main platforms");
+                GD.Print("PuzzleManager: Fading in main platforms");
             }
             
             if (!randomPlatformsVisible)
             {
-                SetObjectsVisibility(randomPlatforms, true);
+                FadePlatformsIn(randomPlatforms);
                 randomPlatformsVisible = true;
-                GD.Print("PuzzleManager: Showing random platforms");
+                GD.Print("PuzzleManager: Fading in random platforms");
             }
             
             // Stop main platform fading if it was happening
@@ -168,23 +174,23 @@ public partial class PuzzleManager : Node2D
             // Only change visibility if it's different from current state and not in final sequence
             if (!allElementsHidden && rocksVisible)
             {
-                SetObjectsVisibility(rocks, false);
+                FadePlatformsOut(rocks);
                 rocksVisible = false;
-                GD.Print("PuzzleManager: Hiding rocks (no active crystals)");
+                GD.Print("PuzzleManager: Fading out rocks (no active crystals)");
             }
             
             if (!allElementsHidden && mainPlatformsVisible)
             {
-                SetObjectsVisibility(mainPlatforms, false);
+                FadePlatformsOut(mainPlatforms);
                 mainPlatformsVisible = false;
-                GD.Print("PuzzleManager: Hiding main platforms (no active crystals)");
+                GD.Print("PuzzleManager: Fading out main platforms (no active crystals)");
             }
             
             if (!allElementsHidden && randomPlatformsVisible)
             {
-                SetObjectsVisibility(randomPlatforms, false);
+                FadePlatformsOut(randomPlatforms);
                 randomPlatformsVisible = false;
-                GD.Print("PuzzleManager: Hiding random platforms (no active crystals)");
+                GD.Print("PuzzleManager: Fading out random platforms (no active crystals)");
             }
             
             // Stop main platform fading if it was happening
@@ -201,9 +207,9 @@ public partial class PuzzleManager : Node2D
                 // Ensure rocks are visible for the final sequence
                 if (!rocksVisible)
                 {
-                    SetObjectsVisibility(rocks, true);
+                    FadePlatformsIn(rocks);
                     rocksVisible = true;
-                    GD.Print("PuzzleManager: Ensuring rocks are visible for final sequence");
+                    GD.Print("PuzzleManager: Fading in rocks for final sequence");
                 }
                 
                 GD.Print("PuzzleManager: All crystals active - starting final sequence");
@@ -229,6 +235,107 @@ public partial class PuzzleManager : Node2D
                 }
             }
         }
+    }
+
+    private void FadePlatformsIn(List<Node2D> objects)
+    {
+        foreach (Node2D obj in objects)
+        {
+            if (obj == null || !IsInstanceValid(obj)) continue;
+
+            // Stop any existing tween on this node
+            KillNodeTween(obj);
+
+            // Ensure visible and start from transparent
+            obj.Visible = true;
+            var c = obj.Modulate;
+            obj.Modulate = new Color(c.R, c.G, c.B, 0f);
+
+            // Create a tween for this node
+            var tween = CreateTween();
+            nodeTweens[obj] = tween;
+            tween.TweenProperty(obj, "modulate:a", 1.0f, PlatformFadeInDuration);
+
+            // Capture local variable for closure safety
+            var target = obj;
+            tween.Finished += () =>
+            {
+                if (!IsInstanceValid(target)) return;
+                // Only clear if this is still the active tween for this node
+                if (nodeTweens.TryGetValue(target, out var active) && active == tween)
+                {
+                    // Ensure fully visible at end
+                    target.Modulate = Colors.White;
+                    nodeTweens.Remove(target);
+                }
+            };
+
+            // Re-enable physics for rocks when they appear
+            if (obj is Rock rock)
+            {
+                rock.CallDeferred(nameof(rock.ReEnablePhysics));
+                GD.Print($"PuzzleManager: Re-enabling physics for rock: {rock.Name}");
+            }
+        }
+    }
+
+    private void FadePlatformsOut(List<Node2D> objects, System.Action onComplete = null)
+    {
+        // Track completion across multiple nodes
+        int remaining = 0;
+        foreach (var obj in objects)
+        {
+            if (obj != null && IsInstanceValid(obj)) remaining++;
+        }
+        if (remaining == 0)
+        {
+            onComplete?.Invoke();
+            return;
+        }
+
+        void OnOneDone()
+        {
+            remaining--;
+            if (remaining <= 0)
+            {
+                onComplete?.Invoke();
+            }
+        }
+
+        foreach (Node2D obj in objects)
+        {
+            if (obj == null || !IsInstanceValid(obj)) { OnOneDone(); continue; }
+
+            // Stop any existing tween on this node
+            KillNodeTween(obj);
+
+            var tween = CreateTween();
+            nodeTweens[obj] = tween;
+            tween.TweenProperty(obj, "modulate:a", 0.0f, PlatformFadeOutDuration);
+
+            var target = obj;
+            tween.Finished += () =>
+            {
+                if (!IsInstanceValid(target)) { OnOneDone(); return; }
+                if (nodeTweens.TryGetValue(target, out var active) && active == tween)
+                {
+                    target.Visible = false;
+                    target.Modulate = Colors.White; // reset for next time
+                    nodeTweens.Remove(target);
+                }
+                OnOneDone();
+            };
+        }
+    }
+
+    private void KillNodeTween(Node2D node)
+    {
+        if (node == null) return;
+        if (nodeTweens.TryGetValue(node, out var t) && t != null && IsInstanceValid(t))
+        {
+            t.Kill();
+        }
+        nodeTweens.Remove(node);
     }
 
     private void StartFinalSequence()
@@ -262,6 +369,8 @@ public partial class PuzzleManager : Node2D
         {
             if (platform != null && IsInstanceValid(platform))
             {
+                // Ensure no per-node tween is running concurrently
+                KillNodeTween(platform);
                 // Fade out the platform's modulate alpha
                 fadeOutTween.TweenProperty(platform, "modulate:a", 0.0f, MainPlatformFadeDuration);
             }
@@ -276,6 +385,15 @@ public partial class PuzzleManager : Node2D
         {
             fadeOutTween.Kill();
             fadeOutTween = null;
+        }
+        
+        // Stop any per-node tweens on main platforms
+        foreach (var platform in mainPlatforms)
+        {
+            if (platform != null && IsInstanceValid(platform))
+            {
+                KillNodeTween(platform);
+            }
         }
         
         // Reset main platform visibility
@@ -389,5 +507,16 @@ public partial class PuzzleManager : Node2D
             fadeOutTween.Kill();
             fadeOutTween = null;
         }
+
+        // Kill any remaining per-node tweens
+        foreach (var kv in nodeTweens)
+        {
+            var t = kv.Value;
+            if (t != null && IsInstanceValid(t))
+            {
+                t.Kill();
+            }
+        }
+        nodeTweens.Clear();
     }
 }
