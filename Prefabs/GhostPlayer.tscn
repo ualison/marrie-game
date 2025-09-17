@@ -1,17 +1,30 @@
-[gd_scene load_steps=4 format=3 uid="uid://b1tol8dfceoum"]
+[gd_scene load_steps=5 format=3 uid="uid://b1tol8dfceoum"]
 
 [ext_resource type="Script" uid="uid://dakyi6pluqdcf" path="res://Scripts/Player/GhostPlayer.cs" id="1_l3qnp"]
 [ext_resource type="PackedScene" uid="uid://cqfnsp48rsmge" path="res://Prefabs/MarrieStatic.tscn" id="2_ivqar"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
-size = Vector2(147, 258)
+size = Vector2(145, 258)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ivqar"]
+size = Vector2(156, 257)
 
 [node name="GhostPlayer" type="CharacterBody2D"]
+collision_layer = 2
 script = ExtResource("1_l3qnp")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(-9.5, 20)
+position = Vector2(-10.5, 20)
 shape = SubResource("RectangleShape2D_kyqiw")
+
+[node name="Area2D" type="Area2D" parent="."]
+light_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+light_mask = 2
+position = Vector2(-11, 19.5)
+shape = SubResource("RectangleShape2D_ivqar")
+debug_color = Color(0.96413404, 1.732707e-06, 0.4974448, 0.41960785)
 
 [node name="GhostMarrieSprite" parent="." instance=ExtResource("2_ivqar")]
 position = Vector2(-7.9999986, -23)

@@ -36,6 +36,11 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
     // Setup visual appearance and disable physics interactions
         SetupGhostVisuals();
         DisableCollisions();
+        
+        // Add to player group so PuzzleCrystals can detect it
+        AddToGroup("player");
+        AddToGroup("ghost_player");
+        
         Hide();
 
         Log.Replay($"GhostPlayer ready: {Name}, Parent: {GetParent()?.Name}", "GhostPlayer");
@@ -45,6 +50,9 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
     {
         // Called after the ghost is added to scene and sprites are ready
         GlobalPosition = position;
+        
+        // Add to both player groups for detection by PuzzleCrystals and other systems
+        AddToGroup("player");
         AddToGroup("ghost_player");
         
         // Refresh sprite discovery since factory may have added sprites after _Ready
@@ -588,9 +596,13 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
 
     private void DisableCollisions()
     {
-        // Prevent ghost from interfering with physics
-        SetCollisionLayerValue(1, false);
-        SetCollisionMaskValue(1, false);
+        // Disable collision with world geometry (layer 1) but keep layer 2 
+        // so PuzzleCrystals can still detect the ghost player
+        SetCollisionLayerValue(1, false);  // Don't collide with world
+        SetCollisionMaskValue(1, false);   // Don't detect world collisions
+        
+        // Keep collision layer 2 enabled for PuzzleCrystal detection
+        // SetCollisionLayerValue(2, false);  // DON'T disable - PuzzleCrystals need this
     }
 
     // Pooling support
@@ -659,15 +671,19 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
         // Visibility defaults
         Show();
 
-        // Disable collisions while pooled
+        // Disable collisions while pooled, but maintain group membership
         DisableCollisions();
-        RemoveFromGroup("ghost_player");
+        
+        // Ensure it stays in both player groups for consistent detection
+        if (!IsInGroup("player")) AddToGroup("player");
+        if (!IsInGroup("ghost_player")) AddToGroup("ghost_player");
     }
 
     public void OnReleasedToPool()
     {
         // Final cleanup: remove any runtime signals or references
         try { RemoveFromGroup("ghost_player"); } catch { }
+        try { RemoveFromGroup("player"); } catch { }
 
         // Hide and detach any heavy resources
         try { Hide(); } catch { }

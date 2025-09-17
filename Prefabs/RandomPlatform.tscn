@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3 uid="uid://ukfdb7esvlix"]
+
+[ext_resource type="Texture2D" uid="uid://b7iwahfuid08v" path="res://Art/Platform.png" id="1_r5l3d"]
+
+[node name="Root" type="Node2D"]
+
+[node name="Platform" type="Sprite2D" parent="."]
+modulate = Color(1, 0.35000002, 0.35000002, 1)
+scale = Vector2(0.19336174, 0.21360156)
+texture = ExtResource("1_r5l3d")

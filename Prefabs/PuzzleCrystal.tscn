@@ -1,7 +1,7 @@
-[gd_scene load_steps=3 format=3 uid="uid://ciuebxrm6y66f"]
+[gd_scene load_steps=4 format=3 uid="uid://ciuebxrm6y66f"]
 
 [ext_resource type="Texture2D" uid="uid://cppg37y3pvlor" path="res://Art/PuzzleCrystal.png" id="1_lo8mh"]
-[ext_resource type="Script" path="res://Scripts/Items/PuzzleCrystal.cs" id="1_qk8mj"]
+[ext_resource type="Script" uid="uid://bxuhtqy3h0aun" path="res://Scripts/Items/PuzzleCrystal.cs" id="1_qk8mj"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_xrl1k"]
 radius = 39.0
@@ -9,11 +9,12 @@ radius = 39.0
 [node name="Root" type="Node2D"]
 script = ExtResource("1_qk8mj")
 
-[node name="PuzzleCrystal" type="Sprite2D" parent="."]
+[node name="GemSprite" type="Sprite2D" parent="."]
 scale = Vector2(0.07, 0.07)
 texture = ExtResource("1_lo8mh")
 
 [node name="Area2D" type="Area2D" parent="."]
+collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
 position = Vector2(0, -6)

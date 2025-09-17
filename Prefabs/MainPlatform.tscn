@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://cbtkrlgl6uyx"]
+
+[ext_resource type="Texture2D" uid="uid://b7iwahfuid08v" path="res://Art/Platform.png" id="1_jniwy"]
+
+[node name="Root" type="Node2D"]
+
+[node name="Platform" type="Sprite2D" parent="."]
+scale = Vector2(0.19336174, 0.21360156)
+texture = ExtResource("1_jniwy")
