@@ -294,9 +294,24 @@ public partial class PuzzleManager : Node2D
         
         allElementsHidden = true;
         
+        // Ensure any active platform fading stops now that we're finishing
+        if (isMainPlatformFading)
+        {
+            isMainPlatformFading = false;
+            if (fadeOutTween != null)
+            {
+                fadeOutTween.Kill();
+                fadeOutTween = null;
+            }
+        }
+        
         // Hide main platforms and random platforms, but keep rocks visible so they can fall
         SetObjectsVisibility(mainPlatforms, false);
         SetObjectsVisibility(randomPlatforms, false);
+        
+        // Disable collisions for hidden platforms so invisible colliders don't block the player
+        DisableCollisionsForNodes(mainPlatforms);
+        DisableCollisionsForNodes(randomPlatforms);
         
         // Update visibility tracking for platforms only
         mainPlatformsVisible = false;
@@ -311,11 +326,59 @@ public partial class PuzzleManager : Node2D
             if (crystal != null && IsInstanceValid(crystal))
             {
                 crystal.Visible = false;
+                // Disable collisions for crystals as they're no longer interactable/visible
+                DisableCollisionsRecursive(crystal);
             }
         }
         
         // Optionally hide the entire puzzle manager
         // this.Visible = false;
+    }
+
+    /// <summary>
+    /// Disables all collisions for provided nodes and their descendants.
+    /// Keeps rocks untouched by only applying this to platform/crystal lists.
+    /// </summary>
+    /// <param name="nodes">Nodes to recursively disable collisions on</param>
+    private void DisableCollisionsForNodes(List<Node2D> nodes)
+    {
+        foreach (var n in nodes)
+        {
+            if (n != null && IsInstanceValid(n))
+            {
+                DisableCollisionsRecursive(n);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Recursively disables collisions for CollisionObjects and CollisionShapes under a node.
+    /// Uses deferred property setting to avoid mutating physics state mid-step.
+    /// </summary>
+    private void DisableCollisionsRecursive(Node node)
+    {
+        if (node == null || !IsInstanceValid(node)) return;
+
+        if (node is CollisionObject2D co)
+        {
+            // Zero out layers/masks so it no longer participates in collisions
+            co.SetDeferred("collision_layer", 0u);
+            co.SetDeferred("collision_mask", 0u);
+        }
+
+        if (node is CollisionShape2D cs)
+        {
+            cs.SetDeferred("disabled", true);
+        }
+        else if (node is CollisionPolygon2D cp)
+        {
+            cp.SetDeferred("disabled", true);
+        }
+
+        foreach (Node child in node.GetChildren())
+        {
+            DisableCollisionsRecursive(child);
+        }
     }
 
     public override void _ExitTree()

@@ -102,6 +102,7 @@ autoplay = true
 script = ExtResource("11_oja3w")
 
 [node name="DimensionCrystal" type="Sprite2D" parent="."]
+z_index = -1
 position = Vector2(-541, 210)
 scale = Vector2(0.08, 0.08)
 texture = ExtResource("17_6mtek")
