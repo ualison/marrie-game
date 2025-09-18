@@ -8,7 +8,6 @@ size = Vector2(796.4347, 205.00006)
 [node name="Root" type="Node2D"]
 
 [node name="Platform" type="Sprite2D" parent="."]
-modulate = Color(0.19325277, 0.62158066, 1, 1)
 scale = Vector2(0.19336174, 0.21360156)
 texture = ExtResource("1_ojmho")
 

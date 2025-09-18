@@ -13,6 +13,7 @@ public partial class PuzzleManager : Node2D
     [Export] public float MinRandomPlatformDuration { get; set; } = 2.0f; // Minimum time a random platform stays visible
     [Export] public float MaxRandomPlatformDuration { get; set; } = 5.0f; // Maximum time a random platform stays visible
     [Export] public float PlatformOverlapDuration { get; set; } = 1.0f; // Time both platforms are visible (overlap for jumping)
+    [Export] public int RandomCycleCount { get; set; } = 5; // Number of random cycles before showing ordered pattern
     #endregion
 
     #region Private Variables
@@ -40,6 +41,12 @@ public partial class PuzzleManager : Node2D
     private Node2D currentVisibleRandomPlatform = null;
     private Timer randomPlatformTimer;
     private Random random = new Random();
+    
+    // Pattern Recognition System
+    private int currentCycleCount = 0;
+    private bool isShowingOrderedPattern = false;
+    private int orderedPatternIndex = 0;
+    private List<Node2D> orderedPlatforms = new List<Node2D>();
     
     // Removed global platform fading flag; handled per-node via nodeTweens
     #endregion
@@ -582,6 +589,91 @@ public partial class PuzzleManager : Node2D
     #region Random Platform Cycling System
 
     /// <summary>
+    /// Prepares the ordered platform list sorted by numerical values in platform names
+    /// </summary>
+    private void PrepareOrderedPlatforms()
+    {
+        orderedPlatforms.Clear();
+        
+        // Create a list with valid platforms and their extracted numbers
+        var platformsWithNumbers = new List<(Node2D platform, int number)>();
+        
+        foreach (var platform in randomPlatforms)
+        {
+            if (platform != null && IsInstanceValid(platform))
+            {
+                int number = ExtractNumberFromPlatformName(platform.Name.ToString());
+                platformsWithNumbers.Add((platform, number));
+                GD.Print($"PuzzleManager: Platform '{platform.Name}' extracted number: {number}");
+            }
+        }
+        
+        // Sort by number and add to ordered list
+        platformsWithNumbers.Sort((a, b) => a.number.CompareTo(b.number));
+        
+        foreach (var (platform, number) in platformsWithNumbers)
+        {
+            orderedPlatforms.Add(platform);
+        }
+        
+        GD.Print($"PuzzleManager: Prepared ordered platform sequence with {orderedPlatforms.Count} platforms");
+        foreach (var platform in orderedPlatforms)
+        {
+            GD.Print($"  - {platform.Name}");
+        }
+    }
+
+    /// <summary>
+    /// Extracts numerical value from platform name for ordering
+    /// </summary>
+    private int ExtractNumberFromPlatformName(string platformName)
+    {
+        // Try to extract numbers from the platform name
+        string numberStr = "";
+        
+        foreach (char c in platformName)
+        {
+            if (char.IsDigit(c))
+            {
+                numberStr += c;
+            }
+        }
+        
+        // If we found numbers, parse them
+        if (!string.IsNullOrEmpty(numberStr) && int.TryParse(numberStr, out int result))
+        {
+            return result;
+        }
+        
+        // Fallback: use hash code for consistent ordering if no numbers found
+        return Math.Abs(platformName.GetHashCode()) % 1000;
+    }
+
+    /// <summary>
+    /// Selects the next platform in ordered sequence
+    /// </summary>
+    private Node2D SelectNextOrderedPlatform()
+    {
+        if (orderedPlatforms.Count == 0) return null;
+        
+        // Get the next platform in sequence
+        Node2D nextPlatform = orderedPlatforms[orderedPatternIndex];
+        orderedPatternIndex = (orderedPatternIndex + 1) % orderedPlatforms.Count;
+        
+        GD.Print($"PuzzleManager: Selected ordered platform '{nextPlatform.Name}' (index {orderedPatternIndex - 1})");
+        
+        // If we've completed one full cycle of ordered platforms, reset to random mode
+        if (orderedPatternIndex == 0)
+        {
+            isShowingOrderedPattern = false;
+            currentCycleCount = 0;
+            GD.Print("PuzzleManager: Completed ordered pattern, returning to random mode");
+        }
+        
+        return nextPlatform;
+    }
+
+    /// <summary>
     /// Starts the random platform cycling system when at least one crystal is active
     /// </summary>
     private void StartRandomPlatformCycling()
@@ -590,6 +682,12 @@ public partial class PuzzleManager : Node2D
         
         isRandomPlatformCyclingActive = true;
         GD.Print("PuzzleManager: Starting random platform cycling system");
+        
+        // Initialize pattern recognition system
+        currentCycleCount = 0;
+        isShowingOrderedPattern = false;
+        orderedPatternIndex = 0;
+        PrepareOrderedPlatforms();
         
         // Initialize timer if not already created
         if (randomPlatformTimer == null)
@@ -615,6 +713,11 @@ public partial class PuzzleManager : Node2D
         
         isRandomPlatformCyclingActive = false;
         GD.Print("PuzzleManager: Stopping random platform cycling system");
+        
+        // Reset pattern recognition system
+        currentCycleCount = 0;
+        isShowingOrderedPattern = false;
+        orderedPatternIndex = 0;
         
         if (randomPlatformTimer != null)
         {
@@ -652,8 +755,27 @@ public partial class PuzzleManager : Node2D
     {
         if (!isRandomPlatformCyclingActive || randomPlatforms.Count == 0) return;
         
-        // Select a new random platform (different from current)
-        Node2D newPlatform = SelectRandomPlatform();
+        Node2D newPlatform = null;
+        
+        // Check if we should switch to ordered pattern mode
+        if (!isShowingOrderedPattern && currentCycleCount >= RandomCycleCount)
+        {
+            isShowingOrderedPattern = true;
+            orderedPatternIndex = 0;
+            GD.Print($"PuzzleManager: Switching to ordered pattern mode after {currentCycleCount} random cycles");
+        }
+        
+        // Select platform based on current mode
+        if (isShowingOrderedPattern)
+        {
+            newPlatform = SelectNextOrderedPlatform();
+        }
+        else
+        {
+            newPlatform = SelectRandomPlatform();
+            currentCycleCount++;
+            GD.Print($"PuzzleManager: Random cycle count: {currentCycleCount}/{RandomCycleCount}");
+        }
         
         if (newPlatform != null)
         {
@@ -683,7 +805,8 @@ public partial class PuzzleManager : Node2D
             randomPlatformTimer.WaitTime = nextDuration;
             randomPlatformTimer.Start();
             
-            GD.Print($"PuzzleManager: Cycling to platform '{newPlatform.Name}', next cycle in {nextDuration:F2} seconds");
+            string modeText = isShowingOrderedPattern ? "ORDERED" : "RANDOM";
+            GD.Print($"PuzzleManager: Cycling to platform '{newPlatform.Name}' [{modeText}], next cycle in {nextDuration:F2} seconds");
         }
     }
 

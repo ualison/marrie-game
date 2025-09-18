@@ -111,6 +111,7 @@ PlatformFadeOutDuration = 0.4
 MinRandomPlatformDuration = 1.2
 MaxRandomPlatformDuration = 1.8
 PlatformOverlapDuration = 2.0
+RandomCycleCount = 10
 
 [node name="PuzzleCrystal2" parent="PuzzleManager" instance=ExtResource("15_tnd5u")]
 z_index = 1
