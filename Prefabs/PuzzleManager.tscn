@@ -6,3 +6,5 @@
 script = ExtResource("1_qk8mj")
 FadeOutDuration = 0.5
 MainPlatformFadeDuration = 0.5
+MinRandomPlatformDuration = 1.0
+MaxRandomPlatformDuration = 2.0

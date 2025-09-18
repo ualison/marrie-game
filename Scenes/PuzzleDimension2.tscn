@@ -104,6 +104,12 @@ script = ExtResource("13_q1tmw")
 
 [node name="PuzzleManager" parent="." instance=ExtResource("14_x531m")]
 position = Vector2(-12, -440)
+FadeOutDuration = 0.4
+MainPlatformFadeDuration = 0.4
+PlatformFadeInDuration = 0.4
+PlatformFadeOutDuration = 0.4
+MinRandomPlatformDuration = 1.3
+MaxRandomPlatformDuration = 1.8
 
 [node name="PuzzleCrystal2" parent="PuzzleManager" instance=ExtResource("15_tnd5u")]
 z_index = 1

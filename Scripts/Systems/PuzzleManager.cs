@@ -1,4 +1,5 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -9,6 +10,8 @@ public partial class PuzzleManager : Node2D
     [Export] public float MainPlatformFadeDuration { get; set; } = 1.0f; // How long the main platform fade takes
     [Export] public float PlatformFadeInDuration { get; set; } = 0.5f; // How long platforms take to fade in
     [Export] public float PlatformFadeOutDuration { get; set; } = 0.5f; // How long platforms take to fade out
+    [Export] public float MinRandomPlatformDuration { get; set; } = 2.0f; // Minimum time a random platform stays visible
+    [Export] public float MaxRandomPlatformDuration { get; set; } = 5.0f; // Maximum time a random platform stays visible
     #endregion
 
     #region Private Variables
@@ -30,6 +33,12 @@ public partial class PuzzleManager : Node2D
     private bool rocksVisible = false;
     private bool mainPlatformsVisible = false;
     private bool randomPlatformsVisible = false;
+    
+    // Random Platform Cycling System
+    private bool isRandomPlatformCyclingActive = false;
+    private Node2D currentVisibleRandomPlatform = null;
+    private Timer randomPlatformTimer;
+    private Random random = new Random();
     
     // Removed global platform fading flag; handled per-node via nodeTweens
     #endregion
@@ -139,7 +148,7 @@ public partial class PuzzleManager : Node2D
         
         if (activeCrystals >= 1 && activeCrystals < puzzleCrystals.Count)
         {
-            // Show rocks, main platforms, and random platforms when at least one crystal is active (but not all)
+            // Show rocks and main platforms when at least one crystal is active (but not all)
             // Only change visibility if it's different from current state
             if (!rocksVisible)
             {
@@ -155,11 +164,12 @@ public partial class PuzzleManager : Node2D
                 GD.Print("PuzzleManager: Fading in main platforms");
             }
             
-            if (!randomPlatformsVisible)
+            // Start random platform cycling system instead of showing all platforms at once
+            if (!isRandomPlatformCyclingActive)
             {
-                FadePlatformsIn(randomPlatforms);
-                randomPlatformsVisible = true;
-                GD.Print("PuzzleManager: Fading in random platforms");
+                StartRandomPlatformCycling();
+                randomPlatformsVisible = true; // Keep track for state logic
+                GD.Print("PuzzleManager: Starting random platform cycling");
             }
             
             // Stop main platform fading if it was happening
@@ -186,11 +196,12 @@ public partial class PuzzleManager : Node2D
                 GD.Print("PuzzleManager: Fading out main platforms (no active crystals)");
             }
             
-            if (!allElementsHidden && randomPlatformsVisible)
+            // Stop random platform cycling when no crystals are active
+            if (!allElementsHidden && isRandomPlatformCyclingActive)
             {
-                FadePlatformsOut(randomPlatforms);
+                StopRandomPlatformCycling();
                 randomPlatformsVisible = false;
-                GD.Print("PuzzleManager: Fading out random platforms (no active crystals)");
+                GD.Print("PuzzleManager: Stopping random platform cycling (no active crystals)");
             }
             
             // Stop main platform fading if it was happening
@@ -210,6 +221,13 @@ public partial class PuzzleManager : Node2D
                     FadePlatformsIn(rocks);
                     rocksVisible = true;
                     GD.Print("PuzzleManager: Fading in rocks for final sequence");
+                }
+                
+                // Stop random platform cycling during final sequence
+                if (isRandomPlatformCyclingActive)
+                {
+                    StopRandomPlatformCycling();
+                    GD.Print("PuzzleManager: Stopping random platform cycling for final sequence");
                 }
                 
                 GD.Print("PuzzleManager: All crystals active - starting final sequence");
@@ -437,6 +455,12 @@ public partial class PuzzleManager : Node2D
         
         allElementsHidden = true;
         
+        // Stop random platform cycling system
+        if (isRandomPlatformCyclingActive)
+        {
+            StopRandomPlatformCycling();
+        }
+        
         // Ensure any active platform fading stops now that we're finishing
         if (isMainPlatformFading)
         {
@@ -554,8 +578,222 @@ public partial class PuzzleManager : Node2D
         }
     }
 
+    #region Random Platform Cycling System
+
+    /// <summary>
+    /// Starts the random platform cycling system when at least one crystal is active
+    /// </summary>
+    private void StartRandomPlatformCycling()
+    {
+        if (randomPlatforms.Count == 0 || isRandomPlatformCyclingActive) return;
+        
+        isRandomPlatformCyclingActive = true;
+        GD.Print("PuzzleManager: Starting random platform cycling system");
+        
+        // Initialize timer if not already created
+        if (randomPlatformTimer == null)
+        {
+            randomPlatformTimer = new Timer();
+            AddChild(randomPlatformTimer);
+            randomPlatformTimer.Timeout += OnRandomPlatformTimerTimeout;
+        }
+        
+        // Hide all random platforms initially
+        HideAllRandomPlatforms();
+        
+        // Show the first random platform
+        CycleToNextRandomPlatform();
+    }
+
+    /// <summary>
+    /// Stops the random platform cycling system
+    /// </summary>
+    private void StopRandomPlatformCycling()
+    {
+        if (!isRandomPlatformCyclingActive) return;
+        
+        isRandomPlatformCyclingActive = false;
+        GD.Print("PuzzleManager: Stopping random platform cycling system");
+        
+        if (randomPlatformTimer != null)
+        {
+            randomPlatformTimer.Stop();
+        }
+        
+        // Hide all random platforms
+        HideAllRandomPlatforms();
+        currentVisibleRandomPlatform = null;
+    }
+
+    /// <summary>
+    /// Hides all random platforms instantly (for cycling system)
+    /// </summary>
+    private void HideAllRandomPlatforms()
+    {
+        foreach (Node2D platform in randomPlatforms)
+        {
+            if (platform != null && IsInstanceValid(platform))
+            {
+                // Stop any existing tween on this platform
+                KillNodeTween(platform);
+                
+                platform.Visible = false;
+                platform.Modulate = Colors.White; // Reset modulate for next show
+                DisableCollisionsRecursive(platform);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Cycles to the next random platform, hiding the current one and showing a new one
+    /// </summary>
+    private void CycleToNextRandomPlatform()
+    {
+        if (!isRandomPlatformCyclingActive || randomPlatforms.Count == 0) return;
+        
+        // Hide current platform if any
+        if (currentVisibleRandomPlatform != null && IsInstanceValid(currentVisibleRandomPlatform))
+        {
+            FadeOutSinglePlatform(currentVisibleRandomPlatform);
+        }
+        
+        // Select a new random platform (different from current)
+        Node2D newPlatform = SelectRandomPlatform();
+        
+        if (newPlatform != null)
+        {
+            currentVisibleRandomPlatform = newPlatform;
+            FadeInSinglePlatform(newPlatform);
+            
+            // Set timer for next cycle with random duration
+            float nextDuration = (float)(random.NextDouble() * (MaxRandomPlatformDuration - MinRandomPlatformDuration) + MinRandomPlatformDuration);
+            randomPlatformTimer.WaitTime = nextDuration;
+            randomPlatformTimer.Start();
+            
+            GD.Print($"PuzzleManager: Cycling to platform '{newPlatform.Name}', next cycle in {nextDuration:F2} seconds");
+        }
+    }
+
+    /// <summary>
+    /// Selects a random platform from the list, ensuring it's different from the current one
+    /// </summary>
+    private Node2D SelectRandomPlatform()
+    {
+        if (randomPlatforms.Count == 0) return null;
+        
+        // If there's only one platform, return it
+        if (randomPlatforms.Count == 1)
+        {
+            return randomPlatforms[0];
+        }
+        
+        // Select a platform different from the current one
+        List<Node2D> availablePlatforms = randomPlatforms.Where(p => 
+            p != currentVisibleRandomPlatform && p != null && IsInstanceValid(p)).ToList();
+        
+        if (availablePlatforms.Count == 0)
+        {
+            // Fallback to any valid platform
+            availablePlatforms = randomPlatforms.Where(p => p != null && IsInstanceValid(p)).ToList();
+        }
+        
+        if (availablePlatforms.Count == 0) return null;
+        
+        int randomIndex = random.Next(availablePlatforms.Count);
+        return availablePlatforms[randomIndex];
+    }
+
+    /// <summary>
+    /// Fades in a single platform
+    /// </summary>
+    private void FadeInSinglePlatform(Node2D platform)
+    {
+        if (platform == null || !IsInstanceValid(platform)) return;
+
+        // Stop any existing tween on this platform
+        KillNodeTween(platform);
+
+        // Ensure visible and start from transparent
+        platform.Visible = true;
+        var c = platform.Modulate;
+        platform.Modulate = new Color(c.R, c.G, c.B, 0f);
+
+        // Create a tween for this platform
+        var tween = CreateTween();
+        nodeTweens[platform] = tween;
+        tween.TweenProperty(platform, "modulate:a", 1.0f, PlatformFadeInDuration);
+
+        // Capture local variable for closure safety
+        var target = platform;
+        tween.Finished += () =>
+        {
+            if (!IsInstanceValid(target)) return;
+            // Only clear if this is still the active tween for this platform
+            if (nodeTweens.TryGetValue(target, out var active) && active == tween)
+            {
+                // Ensure fully visible at end
+                target.Modulate = Colors.White;
+                nodeTweens.Remove(target);
+                
+                // Enable collisions for the visible platform
+                EnableCollisionsRecursive(target);
+            }
+        };
+    }
+
+    /// <summary>
+    /// Fades out a single platform
+    /// </summary>
+    private void FadeOutSinglePlatform(Node2D platform)
+    {
+        if (platform == null || !IsInstanceValid(platform)) return;
+
+        // Stop any existing tween on this platform
+        KillNodeTween(platform);
+
+        var tween = CreateTween();
+        nodeTweens[platform] = tween;
+        tween.TweenProperty(platform, "modulate:a", 0.0f, PlatformFadeOutDuration);
+
+        var target = platform;
+        tween.Finished += () =>
+        {
+            if (!IsInstanceValid(target)) return;
+            if (nodeTweens.TryGetValue(target, out var active) && active == tween)
+            {
+                target.Visible = false;
+                target.Modulate = Colors.White; // reset for next time
+                nodeTweens.Remove(target);
+                
+                // Disable collisions for the hidden platform
+                DisableCollisionsRecursive(target);
+            }
+        };
+    }
+
+    /// <summary>
+    /// Called when the random platform timer times out
+    /// </summary>
+    private void OnRandomPlatformTimerTimeout()
+    {
+        CycleToNextRandomPlatform();
+    }
+
+    #endregion
+
     public override void _ExitTree()
     {
+        // Clean up random platform timer
+        if (randomPlatformTimer != null)
+        {
+            randomPlatformTimer.Timeout -= OnRandomPlatformTimerTimeout;
+            if (IsInstanceValid(randomPlatformTimer))
+            {
+                randomPlatformTimer.QueueFree();
+            }
+            randomPlatformTimer = null;
+        }
+        
         // Clean up tweens
         if (fadeOutTween != null)
         {
