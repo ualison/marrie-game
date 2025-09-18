@@ -115,29 +115,29 @@ RandomCycleCount = 15
 
 [node name="PuzzleCrystal2" parent="PuzzleManager" instance=ExtResource("15_yj51m")]
 z_index = 1
-position = Vector2(572, 324)
+position = Vector2(563, 271)
 
 [node name="StaticPlatform" parent="PuzzleManager" instance=ExtResource("16_1pot7")]
-position = Vector2(572, 411)
+position = Vector2(559, 316)
 
 [node name="PuzzleCrystal1" parent="PuzzleManager" instance=ExtResource("15_yj51m")]
 z_index = 4
-position = Vector2(270, 668)
+position = Vector2(247, 662)
 
 [node name="MainPlatform" parent="PuzzleManager" instance=ExtResource("17_s1hx7")]
 position = Vector2(-257, 191)
 
 [node name="RandomPlatform1" parent="PuzzleManager" instance=ExtResource("18_dpt62")]
-position = Vector2(-215, 659)
+position = Vector2(-250, 669)
 
 [node name="RandomPlatform2" parent="PuzzleManager" instance=ExtResource("18_dpt62")]
-position = Vector2(-59, 616)
+position = Vector2(-91, 626)
 
 [node name="RandomPlatform3" parent="PuzzleManager" instance=ExtResource("18_dpt62")]
-position = Vector2(99, 575)
+position = Vector2(64, 582)
 
 [node name="RandomPlatform4" parent="PuzzleManager" instance=ExtResource("18_dpt62")]
-position = Vector2(412, 459)
+position = Vector2(400, 358)
 
 [node name="Rock1" parent="PuzzleManager" instance=ExtResource("19_3f6pu")]
 position = Vector2(-297, 143)

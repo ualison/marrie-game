@@ -4,19 +4,19 @@
 /// Core Features:
 /// 1. Priority-based activation system: Player has priority over GhostPlayer
 /// 2. Dynamic Player-GhostPlayer collision management:
-///    - Collision ENABLED when GhostPlayer is activating the crystal (layer 3)
-///    - Collision DISABLED when Player takes control or crystal deactivates
+///    - Collision ENABLED whenever either Player OR GhostPlayer is activating any puzzle crystal (layer 3)
+///    - Collision DISABLED when no crystal is being activated by Player/Ghost (reference-counted across crystals)
 /// 3. Collision tracking for multiple bodies entering/exiting the crystal
 /// 
 /// Collision System:
 /// - Uses collision layer 3 for Player-GhostPlayer interactions
-/// - Only active when GhostPlayer is the controlling/activating entity
-/// - Automatically manages collision states based on activation priority
+/// - Globally toggled using a static reference counter so multiple crystals remain consistent
+/// - Automatically manages collision states based on activation/priority
 /// 
 /// Priority Logic:
 /// - Player: Always takes control when entering, disables Player-Ghost collision
-/// - GhostPlayer: Can only control when no Player is present, enables Player-Ghost collision
-/// - Transfer: Seamless control transfer between Player and GhostPlayer with collision updates
+/// - GhostPlayer: Can only control when no Player is present
+/// - Transfer: Seamless control transfer between Player and GhostPlayer with collision updates (collision stays enabled while any crystal is active)
 /// </summary>
 
 using Godot;
@@ -41,9 +41,10 @@ public partial class PuzzleCrystal : Node2D
     private Node2D _currentActivatingBody = null; // The body that is currently activating the crystal
 
     // Collision management for GhostPlayer-Player interaction
-    private bool _isGhostPlayerActivating = false;
-    private Node2D _currentGhostPlayer = null;
-    private Node2D _currentPlayer = null;
+    // Global request counter ensures correct behavior across multiple crystals.
+    private static int _playerGhostCollisionRequests = 0; // number of crystals requesting Player<->Ghost collision
+    private static bool _isPlayerGhostCollisionGloballyEnabled = false;
+    private bool _thisCrystalRequestsCollision = false; // this crystal's request state
 
     // Node references
     private Area2D area2D;
@@ -81,6 +82,12 @@ public partial class PuzzleCrystal : Node2D
     {
         // Clean up tweens when the node is removed from the scene
         StopFloatingAnimation();
+
+        // If this crystal was requesting collision, release the request to avoid leaks
+        if (_thisCrystalRequestsCollision)
+        {
+            UpdateGlobalCollisionRequest(false);
+        }
     }
 
     private void OnBodyEntered(Node2D body)
@@ -111,21 +118,16 @@ public partial class PuzzleCrystal : Node2D
                 _currentActivatingBody = body;
                 GD.Print($"PuzzleCrystal activated by Player: {body.Name}");
                 
-                // Update collision - Player is not activating crystal, so disable ghost collision
-                UpdatePlayerGhostCollision(false, null, body);
+                // Enable Player<->Ghost collision while any entity is activating a crystal
+                UpdateGlobalCollisionRequest(true);
             }
             else if (_currentActivatingBody != body)
             {
                 // Player taking over from GhostPlayer
-                bool wasGhostActivating = IsGhostPlayer(_currentActivatingBody);
                 _currentActivatingBody = body;
                 GD.Print($"PuzzleCrystal control taken by Player: {body.Name}");
-                
-                // Update collision - Player took over, so disable ghost collision
-                if (wasGhostActivating)
-                {
-                    UpdatePlayerGhostCollision(false, null, body);
-                }
+                // Still activating -> keep collision enabled
+                UpdateGlobalCollisionRequest(true);
             }
         }
         else if (isGhostPlayer)
@@ -139,9 +141,8 @@ public partial class PuzzleCrystal : Node2D
                     _currentActivatingBody = body;
                     GD.Print($"PuzzleCrystal activated by GhostPlayer: {body.Name}");
                     
-                    // Update collision - GhostPlayer is activating, enable collision with Player
-                    Node2D currentPlayer = FindCurrentPlayer();
-                    UpdatePlayerGhostCollision(true, body, currentPlayer);
+                    // Enable Player<->Ghost collision while any entity is activating a crystal
+                    UpdateGlobalCollisionRequest(true);
                 }
             }
             else
@@ -162,16 +163,7 @@ public partial class PuzzleCrystal : Node2D
 
         GD.Print($"PuzzleCrystal collision exited by: {body.Name} (Type: {body.GetType()})");
 
-        // Check if the exiting body is a GhostPlayer that was activating - always disable collision
-        bool isExitingGhostPlayer = IsGhostPlayer(body);
-        bool wasGhostCurrentlyActivating = isExitingGhostPlayer && (_currentActivatingBody == body);
-
-        // If a GhostPlayer that was activating is exiting, disable collision immediately
-        if (wasGhostCurrentlyActivating)
-        {
-            UpdatePlayerGhostCollision(false, null, null);
-            GD.Print($"PuzzleCrystal: GhostPlayer {body.Name} exited - disabled Player collision");
-        }
+        // We won't toggle collision immediately here; we first determine the next controller
 
         // Only deactivate if this body was the one currently activating the crystal
         // and no other bodies are still colliding AND the crystal was activated by collision
@@ -197,12 +189,12 @@ public partial class PuzzleCrystal : Node2D
 
             if (remainingPlayer != null)
             {
-                // Another Player is still colliding - transfer control but keep active
+                // Another Player is still colliding - transfer control and keep active
                 _currentActivatingBody = remainingPlayer;
                 GD.Print($"PuzzleCrystal control transferred to Player: {remainingPlayer.Name}");
                 
-                // Update collision - Player is now controlling, disable ghost collision
-                UpdatePlayerGhostCollision(false, null, remainingPlayer);
+                // Keep collision enabled while activating
+                UpdateGlobalCollisionRequest(true);
             }
             else if (remainingGhost != null)
             {
@@ -210,9 +202,8 @@ public partial class PuzzleCrystal : Node2D
                 _currentActivatingBody = remainingGhost;
                 GD.Print($"PuzzleCrystal control transferred to GhostPlayer: {remainingGhost.Name}");
                 
-                // Update collision - GhostPlayer is now controlling, enable collision
-                Node2D currentPlayer = FindCurrentPlayer();
-                UpdatePlayerGhostCollision(true, remainingGhost, currentPlayer);
+                // Keep collision enabled while activating
+                UpdateGlobalCollisionRequest(true);
             }
             else if (_collidingBodies.Count == 0)
             {
@@ -222,17 +213,16 @@ public partial class PuzzleCrystal : Node2D
                 IsActive = false;
                 _currentActivatingBody = null;
                 GD.Print($"PuzzleCrystal deactivated - no colliding bodies remaining");
-                
-                // Update collision - Crystal is deactivating, disable ghost collision (if not already done)
-                if (!wasGhostCurrentlyActivating && IsGhostPlayer(body))
-                {
-                    UpdatePlayerGhostCollision(false, null, null);
-                }
+
+                // Disable collision if no other crystals are requesting it
+                UpdateGlobalCollisionRequest(false);
             }
             else
             {
                 // Bodies are still colliding but crystal should remain active
                 GD.Print($"PuzzleCrystal remains active - {_collidingBodies.Count} bodies still colliding");
+                // Ensure collision stays enabled while active
+                UpdateGlobalCollisionRequest(true);
             }
         }
         else
@@ -277,16 +267,22 @@ public partial class PuzzleCrystal : Node2D
     /// </summary>
     private void EnablePlayerGhostCollision()
     {
-        if (_currentPlayer is CharacterBody2D player && _currentGhostPlayer is CharacterBody2D ghost)
+        var playerNode = FindCurrentPlayer() as CharacterBody2D;
+        var ghostNode = FindCurrentGhostPlayer() as CharacterBody2D;
+        if (playerNode != null && ghostNode != null)
         {
             // Enable collision on collision layer 3 for Player-GhostPlayer interaction
-            ghost.SetCollisionLayerValue(3, true);
-            ghost.SetCollisionMaskValue(3, true);
+            ghostNode.SetCollisionLayerValue(3, true);
+            ghostNode.SetCollisionMaskValue(3, true);
             
-            player.SetCollisionLayerValue(3, true);
-            player.SetCollisionMaskValue(3, true);
+            playerNode.SetCollisionLayerValue(3, true);
+            playerNode.SetCollisionMaskValue(3, true);
             
-            GD.Print($"PuzzleCrystal: Enabled Player-GhostPlayer collision (Ghost: {ghost.Name}, Player: {player.Name})");
+            GD.Print($"PuzzleCrystal: Enabled Player-GhostPlayer collision (Ghost: {ghostNode.Name}, Player: {playerNode.Name})");
+        }
+        else
+        {
+            GD.Print("PuzzleCrystal: Tried to enable Player-Ghost collision, but Player or Ghost not found.");
         }
     }
 
@@ -295,38 +291,50 @@ public partial class PuzzleCrystal : Node2D
     /// </summary>
     private void DisablePlayerGhostCollision()
     {
-        if (_currentPlayer is CharacterBody2D player && _currentGhostPlayer is CharacterBody2D ghost)
+        var playerNode = FindCurrentPlayer() as CharacterBody2D;
+        var ghostNode = FindCurrentGhostPlayer() as CharacterBody2D;
+        if (playerNode != null && ghostNode != null)
         {
             // Disable collision on collision layer 3 for Player-GhostPlayer interaction
-            ghost.SetCollisionLayerValue(3, false);
-            ghost.SetCollisionMaskValue(3, false);
+            ghostNode.SetCollisionLayerValue(3, false);
+            ghostNode.SetCollisionMaskValue(3, false);
             
-            player.SetCollisionLayerValue(3, false);
-            player.SetCollisionMaskValue(3, false);
+            playerNode.SetCollisionLayerValue(3, false);
+            playerNode.SetCollisionMaskValue(3, false);
             
-            GD.Print($"PuzzleCrystal: Disabled Player-GhostPlayer collision (Ghost: {ghost.Name}, Player: {player.Name})");
+            GD.Print($"PuzzleCrystal: Disabled Player-GhostPlayer collision (Ghost: {ghostNode.Name}, Player: {playerNode.Name})");
+        }
+        else
+        {
+            GD.Print("PuzzleCrystal: Tried to disable Player-Ghost collision, but Player or Ghost not found.");
         }
     }
 
     /// <summary>
     /// Updates the collision state based on GhostPlayer activation status
     /// </summary>
-    private void UpdatePlayerGhostCollision(bool ghostIsActivating, Node2D ghostPlayer, Node2D player)
+    private void UpdateGlobalCollisionRequest(bool enable)
     {
-        bool previousState = _isGhostPlayerActivating;
-        _isGhostPlayerActivating = ghostIsActivating;
-        _currentGhostPlayer = ghostPlayer;
-        _currentPlayer = player;
+        if (_thisCrystalRequestsCollision == enable)
+            return; // no change for this crystal
 
-        if (ghostIsActivating && !previousState)
+        _thisCrystalRequestsCollision = enable;
+        _playerGhostCollisionRequests += enable ? 1 : -1;
+        if (_playerGhostCollisionRequests < 0)
+            _playerGhostCollisionRequests = 0; // safety clamp
+
+        bool shouldBeEnabled = _playerGhostCollisionRequests > 0;
+        if (shouldBeEnabled != _isPlayerGhostCollisionGloballyEnabled)
         {
-            // GhostPlayer just started activating - enable collision
-            EnablePlayerGhostCollision();
-        }
-        else if (!ghostIsActivating && previousState)
-        {
-            // GhostPlayer stopped activating - disable collision
-            DisablePlayerGhostCollision();
+            _isPlayerGhostCollisionGloballyEnabled = shouldBeEnabled;
+            if (shouldBeEnabled)
+            {
+                EnablePlayerGhostCollision();
+            }
+            else
+            {
+                DisablePlayerGhostCollision();
+            }
         }
     }
 
@@ -342,6 +350,22 @@ public partial class PuzzleCrystal : Node2D
             if (node is Node2D playerNode && IsPlayer(playerNode))
             {
                 return playerNode;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Finds the current GhostPlayer in the scene
+    /// </summary>
+    private Node2D FindCurrentGhostPlayer()
+    {
+        var ghosts = GetTree().GetNodesInGroup("ghost_player");
+        foreach (Node node in ghosts)
+        {
+            if (node is Node2D ghostNode && IsGhostPlayer(ghostNode))
+            {
+                return ghostNode;
             }
         }
         return null;
