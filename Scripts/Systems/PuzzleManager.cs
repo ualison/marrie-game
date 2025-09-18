@@ -233,6 +233,19 @@ public partial class PuzzleManager : Node2D
                     rock.CallDeferred(nameof(rock.ReEnablePhysics));
                     GD.Print($"PuzzleManager: Re-enabling physics for rock: {rock.Name}");
                 }
+                
+                // Handle collision management for RandomPlatforms
+                if (randomPlatforms.Contains(obj))
+                {
+                    if (visible)
+                    {
+                        EnableCollisionsRecursive(obj);
+                    }
+                    else
+                    {
+                        DisableCollisionsRecursive(obj);
+                    }
+                }
             }
         }
     }
@@ -267,6 +280,12 @@ public partial class PuzzleManager : Node2D
                     // Ensure fully visible at end
                     target.Modulate = Colors.White;
                     nodeTweens.Remove(target);
+                    
+                    // Re-enable collisions for RandomPlatforms when they become visible
+                    if (randomPlatforms.Contains(target))
+                    {
+                        EnableCollisionsRecursive(target);
+                    }
                 }
             };
 
@@ -322,6 +341,12 @@ public partial class PuzzleManager : Node2D
                     target.Visible = false;
                     target.Modulate = Colors.White; // reset for next time
                     nodeTweens.Remove(target);
+                    
+                    // Disable collisions for RandomPlatforms when they become invisible
+                    if (randomPlatforms.Contains(target))
+                    {
+                        DisableCollisionsRecursive(target);
+                    }
                 }
                 OnOneDone();
             };
@@ -496,6 +521,36 @@ public partial class PuzzleManager : Node2D
         foreach (Node child in node.GetChildren())
         {
             DisableCollisionsRecursive(child);
+        }
+    }
+
+    /// <summary>
+    /// Recursively enables collisions for CollisionObjects and CollisionShapes under a node.
+    /// Uses deferred property setting to avoid mutating physics state mid-step.
+    /// </summary>
+    private void EnableCollisionsRecursive(Node node)
+    {
+        if (node == null || !IsInstanceValid(node)) return;
+
+        if (node is CollisionObject2D co)
+        {
+            // Re-enable with default collision layer/mask values
+            co.SetDeferred("collision_layer", 1u);
+            co.SetDeferred("collision_mask", 1u);
+        }
+
+        if (node is CollisionShape2D cs)
+        {
+            cs.SetDeferred("disabled", false);
+        }
+        else if (node is CollisionPolygon2D cp)
+        {
+            cp.SetDeferred("disabled", false);
+        }
+
+        foreach (Node child in node.GetChildren())
+        {
+            EnableCollisionsRecursive(child);
         }
     }
 
