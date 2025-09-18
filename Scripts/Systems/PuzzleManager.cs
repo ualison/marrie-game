@@ -683,10 +683,21 @@ public partial class PuzzleManager : Node2D
         isRandomPlatformCyclingActive = true;
         GD.Print("PuzzleManager: Starting random platform cycling system");
         
-        // Initialize pattern recognition system
+        // Always reset pattern recognition system to start fresh
+        int previousCycleCount = currentCycleCount;
+        bool wasShowingOrderedPattern = isShowingOrderedPattern;
+        
         currentCycleCount = 0;
         isShowingOrderedPattern = false;
         orderedPatternIndex = 0;
+        
+        // Log the reset for debugging
+        if (previousCycleCount > 0 || wasShowingOrderedPattern)
+        {
+            GD.Print($"PuzzleManager: Resetting pattern system - was at cycle {previousCycleCount}/{RandomCycleCount}, ordered pattern: {wasShowingOrderedPattern}");
+        }
+        GD.Print($"PuzzleManager: Starting fresh with random count at 0/{RandomCycleCount}");
+        
         PrepareOrderedPlatforms();
         
         // Initialize timer if not already created
@@ -734,6 +745,8 @@ public partial class PuzzleManager : Node2D
     /// </summary>
     private void HideAllRandomPlatforms()
     {
+        GD.Print("PuzzleManager: Hiding all random platforms for clean state");
+        
         foreach (Node2D platform in randomPlatforms)
         {
             if (platform != null && IsInstanceValid(platform))
@@ -745,6 +758,12 @@ public partial class PuzzleManager : Node2D
                 platform.Modulate = Colors.White; // Reset modulate for next show
                 DisableCollisionsRecursive(platform);
             }
+        }
+        
+        // Ensure the current platform reference is also cleared
+        if (currentVisibleRandomPlatform != null)
+        {
+            GD.Print($"PuzzleManager: Clearing current visible platform reference: {currentVisibleRandomPlatform.Name}");
         }
     }
 
@@ -773,6 +792,21 @@ public partial class PuzzleManager : Node2D
         else
         {
             newPlatform = SelectRandomPlatform();
+            
+            // If SelectRandomPlatform returned null (to prevent same-platform selection), 
+            // skip this cycle and try again on next timer timeout
+            if (newPlatform == null)
+            {
+                GD.Print("PuzzleManager: Skipping cycle to avoid same-platform blinking");
+                // Don't increment cycle count since we're not actually cycling
+                
+                // Set a shorter timer for the next attempt
+                float retryDuration = 0.5f; // Quick retry
+                randomPlatformTimer.WaitTime = retryDuration;
+                randomPlatformTimer.Start();
+                return; // Exit early without cycling
+            }
+            
             currentCycleCount++;
             GD.Print($"PuzzleManager: Random cycle count: {currentCycleCount}/{RandomCycleCount}");
         }
@@ -784,6 +818,9 @@ public partial class PuzzleManager : Node2D
             
             // Update current platform reference
             currentVisibleRandomPlatform = newPlatform;
+            
+            // Calculate the next cycle duration now
+            float nextDuration = (float)(random.NextDouble() * (MaxRandomPlatformDuration - MinRandomPlatformDuration) + MinRandomPlatformDuration);
             
             // Start fading in the new platform
             FadeInSinglePlatform(newPlatform, () => {
@@ -798,15 +835,18 @@ public partial class PuzzleManager : Node2D
                         }
                     };
                 }
+                
+                // CRITICAL FIX: Start the next cycle timer ONLY after the fade-in is complete
+                // This ensures proper timing and prevents race conditions
+                randomPlatformTimer.WaitTime = nextDuration;
+                randomPlatformTimer.Start();
+                
+                string modeText = isShowingOrderedPattern ? "ORDERED" : "RANDOM";
+                GD.Print($"PuzzleManager: Platform '{newPlatform.Name}' fully visible [{modeText}], next cycle in {nextDuration:F2} seconds");
             });
             
-            // Set timer for next cycle with random duration
-            float nextDuration = (float)(random.NextDouble() * (MaxRandomPlatformDuration - MinRandomPlatformDuration) + MinRandomPlatformDuration);
-            randomPlatformTimer.WaitTime = nextDuration;
-            randomPlatformTimer.Start();
-            
             string modeText = isShowingOrderedPattern ? "ORDERED" : "RANDOM";
-            GD.Print($"PuzzleManager: Cycling to platform '{newPlatform.Name}' [{modeText}], next cycle in {nextDuration:F2} seconds");
+            GD.Print($"PuzzleManager: Starting fade-in for platform '{newPlatform.Name}' [{modeText}]");
         }
     }
 
@@ -817,7 +857,7 @@ public partial class PuzzleManager : Node2D
     {
         if (randomPlatforms.Count == 0) return null;
         
-        // If there's only one platform, return it
+        // If there's only one platform, return it (no choice)
         if (randomPlatforms.Count == 1)
         {
             return randomPlatforms[0];
@@ -834,27 +874,28 @@ public partial class PuzzleManager : Node2D
             }
         }
         
-        // If no different platforms are available (shouldn't happen with multiple platforms), 
-        // fall back to any valid platform except the current one
+        // If no different platforms are available, this is a critical error
         if (availablePlatforms.Count == 0)
         {
-            GD.PrintErr("PuzzleManager: Warning - Could not find different platform, falling back to any valid platform");
+            GD.PrintErr("PuzzleManager: CRITICAL ERROR - No different platforms available for random selection!");
+            GD.PrintErr($"Total platforms: {randomPlatforms.Count}, Current platform: {currentVisibleRandomPlatform?.Name ?? "none"}");
+            
+            // As a last resort, try to find ANY different platform, even if it might not be ideal
             foreach (var platform in randomPlatforms)
             {
-                if (platform != null && IsInstanceValid(platform))
+                if (platform != null && IsInstanceValid(platform) && platform != currentVisibleRandomPlatform)
                 {
-                    availablePlatforms.Add(platform);
+                    GD.PrintErr($"Found fallback platform: {platform.Name}");
+                    return platform;
                 }
             }
-        }
-        
-        if (availablePlatforms.Count == 0) 
-        {
-            GD.PrintErr("PuzzleManager: Error - No valid platforms available");
+            
+            // If we still can't find a different platform, return null to avoid blinking
+            GD.PrintErr("PuzzleManager: Cannot find any different platform - returning null to prevent blinking");
             return null;
         }
         
-        // Select random platform from available ones
+        // Select random platform from available ones (guaranteed to be different from current)
         int randomIndex = random.Next(availablePlatforms.Count);
         var selectedPlatform = availablePlatforms[randomIndex];
         
@@ -939,6 +980,16 @@ public partial class PuzzleManager : Node2D
     /// </summary>
     private void OnRandomPlatformTimerTimeout()
     {
+        // Safety check: Don't cycle if a platform is currently fading in
+        if (currentVisibleRandomPlatform != null && nodeTweens.ContainsKey(currentVisibleRandomPlatform))
+        {
+            GD.Print("PuzzleManager: Delaying cycle - platform is still fading in");
+            // Retry in a short time
+            randomPlatformTimer.WaitTime = 0.2f;
+            randomPlatformTimer.Start();
+            return;
+        }
+        
         CycleToNextRandomPlatform();
     }
 

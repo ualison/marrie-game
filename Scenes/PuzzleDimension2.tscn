@@ -108,10 +108,10 @@ FadeOutDuration = 0.4
 MainPlatformFadeDuration = 0.4
 PlatformFadeInDuration = 0.4
 PlatformFadeOutDuration = 0.4
-MinRandomPlatformDuration = 1.2
-MaxRandomPlatformDuration = 1.8
-PlatformOverlapDuration = 2.0
-RandomCycleCount = 10
+MinRandomPlatformDuration = 0.8
+MaxRandomPlatformDuration = 1.0
+PlatformOverlapDuration = 0.05
+RandomCycleCount = 15
 
 [node name="PuzzleCrystal2" parent="PuzzleManager" instance=ExtResource("15_tnd5u")]
 z_index = 1
@@ -122,7 +122,7 @@ position = Vector2(412, 429)
 
 [node name="PuzzleCrystal1" parent="PuzzleManager" instance=ExtResource("15_tnd5u")]
 z_index = -1
-position = Vector2(554, 655)
+position = Vector2(-284, 659)
 
 [node name="MainPlatform" parent="PuzzleManager" instance=ExtResource("16_k4g4c")]
 position = Vector2(-275, 203)
