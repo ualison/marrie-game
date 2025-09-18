@@ -1,0 +1,153 @@
+[gd_scene load_steps=21 format=3 uid="uid://bnuqff4emdbno"]
+
+[ext_resource type="PackedScene" uid="uid://844rfld3y4ee" path="res://Prefabs/UI/RockCount.tscn" id="1_3i0aq"]
+[ext_resource type="Script" uid="uid://1o447xq10j6e" path="res://Scripts/UI/ManaBar.cs" id="2_njslr"]
+[ext_resource type="Texture2D" uid="uid://cyqvsavuevs3x" path="res://Art/ManaHeart.png" id="3_u1g7b"]
+[ext_resource type="Texture2D" uid="uid://di3snpkk83b15" path="res://Art/DisabledHeart.png" id="4_mr5nb"]
+[ext_resource type="Script" uid="uid://g3qhhrdutgk5" path="res://Scripts/UI/LifeBar.cs" id="5_barey"]
+[ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/LifeHeart.png" id="6_136e7"]
+[ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="7_pb5l6"]
+[ext_resource type="PackedScene" uid="uid://bfsyt4vafmqr8" path="res://Prefabs/EnvironmentPuzzleDimension.tscn" id="8_a0ed6"]
+[ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="9_7ttib"]
+[ext_resource type="PackedScene" uid="uid://kufqrmkh1vbu" path="res://Prefabs/ReplayCrystal.tscn" id="10_48q6r"]
+[ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="11_71u5o"]
+[ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="12_ytjuo"]
+[ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="13_x7cuv"]
+[ext_resource type="PackedScene" uid="uid://6eg7ul4k085w" path="res://Prefabs/PuzzleManager.tscn" id="14_mgd3y"]
+[ext_resource type="PackedScene" uid="uid://ciuebxrm6y66f" path="res://Prefabs/PuzzleCrystal.tscn" id="15_yj51m"]
+[ext_resource type="PackedScene" uid="uid://bsjex3d658h78" path="res://Prefabs/StaticPlatform.tscn" id="16_1pot7"]
+[ext_resource type="PackedScene" uid="uid://cbtkrlgl6uyx" path="res://Prefabs/MainPlatform.tscn" id="17_s1hx7"]
+[ext_resource type="PackedScene" uid="uid://ukfdb7esvlix" path="res://Prefabs/RandomPlatform.tscn" id="18_dpt62"]
+[ext_resource type="PackedScene" uid="uid://cp2vjmpq32tgk" path="res://Prefabs/Rock.tscn" id="19_3f6pu"]
+[ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="20_8sr3y"]
+
+[node name="Root" type="Node2D"]
+
+[node name="BottomLeftContainer" type="VBoxContainer" parent="."]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -610.0
+offset_top = -394.0
+offset_right = -390.0
+offset_bottom = -239.0
+grow_vertical = 0
+scale = Vector2(0.7, 0.7)
+theme_override_constants/separation = 10
+
+[node name="RockCount" parent="BottomLeftContainer" instance=ExtResource("1_3i0aq")]
+layout_mode = 2
+
+[node name="ManaBar" type="Control" parent="BottomLeftContainer"]
+custom_minimum_size = Vector2(0, 45)
+layout_mode = 2
+script = ExtResource("2_njslr")
+FullManaTexture = ExtResource("3_u1g7b")
+EmptyManaTexture = ExtResource("4_mr5nb")
+
+[node name="ManaContainer" type="HBoxContainer" parent="BottomLeftContainer/ManaBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="LifeHearts" type="Control" parent="BottomLeftContainer"]
+custom_minimum_size = Vector2(0, 45)
+layout_mode = 2
+script = ExtResource("5_barey")
+FullHeartTexture = ExtResource("6_136e7")
+EmptyHeartTexture = ExtResource("4_mr5nb")
+
+[node name="HeartsContainer" type="HBoxContainer" parent="BottomLeftContainer/LifeHearts"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="CameraFollower" parent="." instance=ExtResource("7_pb5l6")]
+position = Vector2(-8, -73)
+script = null
+
+[node name="Environment" parent="." instance=ExtResource("8_a0ed6")]
+
+[node name="GameEntities" type="Node2D" parent="."]
+
+[node name="Player" parent="GameEntities" instance=ExtResource("9_7ttib")]
+position = Vector2(-550, 128)
+
+[node name="ReplayGem" parent="." instance=ExtResource("10_48q6r")]
+position = Vector2(-422, 238)
+
+[node name="GameSystems" type="Node" parent="."]
+
+[node name="Managers" type="Node" parent="GameSystems"]
+
+[node name="UIManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("11_71u5o")
+
+[node name="AudioSystem" type="Node" parent="GameSystems"]
+
+[node name="AudioSystem" type="Node" parent="."]
+
+[node name="AudioManager" type="AudioStreamPlayer2D" parent="AudioSystem"]
+position = Vector2(-10, -27)
+stream = ExtResource("12_ytjuo")
+volume_db = 6.038
+autoplay = true
+script = ExtResource("13_x7cuv")
+
+[node name="PuzzleManager" parent="." instance=ExtResource("14_mgd3y")]
+position = Vector2(-12, -440)
+FadeOutDuration = 0.4
+MainPlatformFadeDuration = 0.4
+PlatformFadeInDuration = 0.4
+PlatformFadeOutDuration = 0.4
+MinRandomPlatformDuration = 0.8
+MaxRandomPlatformDuration = 1.0
+PlatformOverlapDuration = 0.05
+RandomCycleCount = 15
+
+[node name="PuzzleCrystal2" parent="PuzzleManager" instance=ExtResource("15_yj51m")]
+z_index = 1
+position = Vector2(572, 324)
+
+[node name="StaticPlatform" parent="PuzzleManager" instance=ExtResource("16_1pot7")]
+position = Vector2(572, 411)
+
+[node name="PuzzleCrystal1" parent="PuzzleManager" instance=ExtResource("15_yj51m")]
+z_index = 4
+position = Vector2(270, 668)
+
+[node name="MainPlatform" parent="PuzzleManager" instance=ExtResource("17_s1hx7")]
+position = Vector2(-257, 191)
+
+[node name="RandomPlatform1" parent="PuzzleManager" instance=ExtResource("18_dpt62")]
+position = Vector2(-215, 659)
+
+[node name="RandomPlatform2" parent="PuzzleManager" instance=ExtResource("18_dpt62")]
+position = Vector2(-59, 616)
+
+[node name="RandomPlatform3" parent="PuzzleManager" instance=ExtResource("18_dpt62")]
+position = Vector2(99, 575)
+
+[node name="RandomPlatform4" parent="PuzzleManager" instance=ExtResource("18_dpt62")]
+position = Vector2(412, 459)
+
+[node name="Rock1" parent="PuzzleManager" instance=ExtResource("19_3f6pu")]
+position = Vector2(-297, 143)
+
+[node name="Rock2" parent="PuzzleManager" instance=ExtResource("19_3f6pu")]
+position = Vector2(-258, 144)
+
+[node name="Rock3" parent="PuzzleManager" instance=ExtResource("19_3f6pu")]
+position = Vector2(-219, 142)
+
+[node name="SceneSwicherCrystal" parent="." instance=ExtResource("20_8sr3y")]
+position = Vector2(-541, 223)
+TargetScenePath = "uid://54o6xy0qaoae"
