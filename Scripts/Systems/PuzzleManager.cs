@@ -12,6 +12,7 @@ public partial class PuzzleManager : Node2D
     [Export] public float PlatformFadeOutDuration { get; set; } = 0.5f; // How long platforms take to fade out
     [Export] public float MinRandomPlatformDuration { get; set; } = 2.0f; // Minimum time a random platform stays visible
     [Export] public float MaxRandomPlatformDuration { get; set; } = 5.0f; // Maximum time a random platform stays visible
+    [Export] public float PlatformOverlapDuration { get; set; } = 1.0f; // Time both platforms are visible (overlap for jumping)
     #endregion
 
     #region Private Variables
@@ -651,19 +652,31 @@ public partial class PuzzleManager : Node2D
     {
         if (!isRandomPlatformCyclingActive || randomPlatforms.Count == 0) return;
         
-        // Hide current platform if any
-        if (currentVisibleRandomPlatform != null && IsInstanceValid(currentVisibleRandomPlatform))
-        {
-            FadeOutSinglePlatform(currentVisibleRandomPlatform);
-        }
-        
         // Select a new random platform (different from current)
         Node2D newPlatform = SelectRandomPlatform();
         
         if (newPlatform != null)
         {
+            // Store reference to the platform that needs to fade out later
+            Node2D platformToFadeOut = currentVisibleRandomPlatform;
+            
+            // Update current platform reference
             currentVisibleRandomPlatform = newPlatform;
-            FadeInSinglePlatform(newPlatform);
+            
+            // Start fading in the new platform
+            FadeInSinglePlatform(newPlatform, () => {
+                // After new platform is fully visible, wait for overlap duration, then fade out old platform
+                if (platformToFadeOut != null && IsInstanceValid(platformToFadeOut))
+                {
+                    var overlapTimer = GetTree().CreateTimer(PlatformOverlapDuration);
+                    overlapTimer.Timeout += () => {
+                        if (IsInstanceValid(platformToFadeOut))
+                        {
+                            FadeOutSinglePlatform(platformToFadeOut);
+                        }
+                    };
+                }
+            });
             
             // Set timer for next cycle with random duration
             float nextDuration = (float)(random.NextDouble() * (MaxRandomPlatformDuration - MinRandomPlatformDuration) + MinRandomPlatformDuration);
@@ -687,26 +700,50 @@ public partial class PuzzleManager : Node2D
             return randomPlatforms[0];
         }
         
-        // Select a platform different from the current one
-        List<Node2D> availablePlatforms = randomPlatforms.Where(p => 
-            p != currentVisibleRandomPlatform && p != null && IsInstanceValid(p)).ToList();
+        // Create list of valid platforms (excluding current one)
+        List<Node2D> availablePlatforms = new List<Node2D>();
         
-        if (availablePlatforms.Count == 0)
+        foreach (var platform in randomPlatforms)
         {
-            // Fallback to any valid platform
-            availablePlatforms = randomPlatforms.Where(p => p != null && IsInstanceValid(p)).ToList();
+            if (platform != null && IsInstanceValid(platform) && platform != currentVisibleRandomPlatform)
+            {
+                availablePlatforms.Add(platform);
+            }
         }
         
-        if (availablePlatforms.Count == 0) return null;
+        // If no different platforms are available (shouldn't happen with multiple platforms), 
+        // fall back to any valid platform except the current one
+        if (availablePlatforms.Count == 0)
+        {
+            GD.PrintErr("PuzzleManager: Warning - Could not find different platform, falling back to any valid platform");
+            foreach (var platform in randomPlatforms)
+            {
+                if (platform != null && IsInstanceValid(platform))
+                {
+                    availablePlatforms.Add(platform);
+                }
+            }
+        }
         
+        if (availablePlatforms.Count == 0) 
+        {
+            GD.PrintErr("PuzzleManager: Error - No valid platforms available");
+            return null;
+        }
+        
+        // Select random platform from available ones
         int randomIndex = random.Next(availablePlatforms.Count);
-        return availablePlatforms[randomIndex];
+        var selectedPlatform = availablePlatforms[randomIndex];
+        
+        GD.Print($"PuzzleManager: Selected platform '{selectedPlatform.Name}' from {availablePlatforms.Count} available platforms (excluding current: {currentVisibleRandomPlatform?.Name ?? "none"})");
+        
+        return selectedPlatform;
     }
 
     /// <summary>
     /// Fades in a single platform
     /// </summary>
-    private void FadeInSinglePlatform(Node2D platform)
+    private void FadeInSinglePlatform(Node2D platform, System.Action onComplete = null)
     {
         if (platform == null || !IsInstanceValid(platform)) return;
 
@@ -737,6 +774,9 @@ public partial class PuzzleManager : Node2D
                 
                 // Enable collisions for the visible platform
                 EnableCollisionsRecursive(target);
+                
+                // Call completion callback if provided
+                onComplete?.Invoke();
             }
         };
     }
