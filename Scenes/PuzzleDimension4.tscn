@@ -18,8 +18,8 @@
 [ext_resource type="PackedScene" uid="uid://bsjex3d658h78" path="res://Prefabs/StaticPlatform.tscn" id="16_e71qo"]
 [ext_resource type="PackedScene" uid="uid://cbtkrlgl6uyx" path="res://Prefabs/MainPlatform.tscn" id="17_g7cyp"]
 [ext_resource type="PackedScene" uid="uid://ukfdb7esvlix" path="res://Prefabs/RandomPlatform.tscn" id="18_ppr41"]
-[ext_resource type="PackedScene" uid="uid://cp2vjmpq32tgk" path="res://Prefabs/Rock.tscn" id="19_2ookr"]
 [ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="20_x4ngy"]
+[ext_resource type="Texture2D" uid="uid://oxtiekbbxqu4" path="res://Art/PuffKey.png" id="21_fjpsf"]
 [ext_resource type="Texture2D" uid="uid://bmean7no3exq7" path="res://Art/Puff.png" id="21_hj2r6"]
 [ext_resource type="Texture2D" uid="uid://3n64dnxhiwpe" path="res://Art/Cage.png" id="22_wiwbh"]
 [ext_resource type="Texture2D" uid="uid://dt0t0gcrwpweu" path="res://Art/floorCage1.png" id="23_7ha7t"]
@@ -120,7 +120,7 @@ RandomCycleCount = 15
 
 [node name="PuzzleCrystal2" parent="PuzzleManager" instance=ExtResource("15_dpo1k")]
 z_index = 1
-position = Vector2(-539, 305)
+position = Vector2(-539, 302)
 
 [node name="StaticPlatform1" parent="PuzzleManager" instance=ExtResource("16_e71qo")]
 position = Vector2(-544, 350)
@@ -128,15 +128,12 @@ position = Vector2(-544, 350)
 [node name="StaticPlatform2" parent="PuzzleManager" instance=ExtResource("16_e71qo")]
 position = Vector2(394, 285)
 
-[node name="StaticPlatform3" parent="PuzzleManager" instance=ExtResource("16_e71qo")]
-position = Vector2(-156, 148)
-
 [node name="PuzzleCrystal1" parent="PuzzleManager" instance=ExtResource("15_dpo1k")]
 z_index = 4
 position = Vector2(-391, 658)
 
 [node name="MainPlatform" parent="PuzzleManager" instance=ExtResource("17_g7cyp")]
-position = Vector2(388, 44)
+position = Vector2(389, 59)
 
 [node name="RandomPlatform1" parent="PuzzleManager" instance=ExtResource("18_ppr41")]
 position = Vector2(43, 562)
@@ -144,19 +141,15 @@ position = Vector2(43, 562)
 [node name="RandomPlatform2" parent="PuzzleManager" instance=ExtResource("18_ppr41")]
 position = Vector2(-166, 527)
 
-[node name="RandomPlatform3" parent="PuzzleManager" instance=ExtResource("18_ppr41")]
-position = Vector2(39, 234)
-
-[node name="Rock1" parent="PuzzleManager" instance=ExtResource("19_2ookr")]
-position = Vector2(-179, 114)
-
-[node name="Rock2" parent="PuzzleManager" instance=ExtResource("19_2ookr")]
-position = Vector2(-136, 114)
-
 [node name="LiftedPlatform" parent="PuzzleManager" instance=ExtResource("25_7ha7t")]
 z_index = -1
-position = Vector2(220, 687)
+position = Vector2(219, 661)
 LiftHeight = 350.0
+
+[node name="PuffKey" type="Sprite2D" parent="PuzzleManager"]
+position = Vector2(387, 38.999996)
+scale = Vector2(0.025716137, 0.029785149)
+texture = ExtResource("21_fjpsf")
 
 [node name="SceneSwicherCrystal" parent="." instance=ExtResource("20_x4ngy")]
 position = Vector2(523, 217)
