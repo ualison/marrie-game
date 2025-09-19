@@ -20,6 +20,7 @@ public partial class PuzzleManager : Node2D
     private List<Node2D> rocks = new List<Node2D>();
     private List<Node2D> mainPlatforms = new List<Node2D>();
     private List<Node2D> randomPlatforms = new List<Node2D>();
+    private List<Node2D> liftedPlatforms = new List<Node2D>();
     private List<PuzzleCrystal> puzzleCrystals = new List<PuzzleCrystal>();
     
     private bool isMainPlatformFading = false;
@@ -35,6 +36,7 @@ public partial class PuzzleManager : Node2D
     private bool rocksVisible = false;
     private bool mainPlatformsVisible = false;
     private bool randomPlatformsVisible = false;
+    private bool liftedPlatformsVisible = false;
     
     // Random Platform Cycling System
     private bool isRandomPlatformCyclingActive = false;
@@ -53,10 +55,16 @@ public partial class PuzzleManager : Node2D
 
     public override void _Ready()
     {
+        // Defer scanning and initialization to ensure all nodes are in the tree
+        CallDeferred(nameof(DeferredInitialize));
+    }
+
+    private void DeferredInitialize()
+    {
         // Scan the scene for the different types of objects
         ScanSceneObjects();
-        
-        // Initially hide rocks, main platforms, and random platforms
+
+        // Initially hide rocks, main platforms, random platforms, and lifted platforms
         InitializeObjectVisibility();
     }
 
@@ -78,17 +86,20 @@ public partial class PuzzleManager : Node2D
         rocks.Clear();
         mainPlatforms.Clear();
         randomPlatforms.Clear();
+        liftedPlatforms.Clear();
         puzzleCrystals.Clear();
 
-        // Recursively scan all children in the scene
-        ScanChildrenRecursively(this);
+        // Recursively scan the entire current scene (not just children of this manager)
+        Node scanRoot = GetTree().CurrentScene ?? (Node)this;
+        ScanChildrenRecursively(scanRoot);
 
-        GD.Print($"PuzzleManager found: {rocks.Count} Rocks, {mainPlatforms.Count} MainPlatforms, {randomPlatforms.Count} RandomPlatforms, {puzzleCrystals.Count} PuzzleCrystals");
+        GD.Print($"PuzzleManager found: {rocks.Count} Rocks, {mainPlatforms.Count} MainPlatforms, {randomPlatforms.Count} RandomPlatforms, {liftedPlatforms.Count} LiftedPlatforms, {puzzleCrystals.Count} PuzzleCrystals");
         
         // Debug: Print names of found objects
         foreach (var rock in rocks) GD.Print($"Found Rock: {rock.Name}");
         foreach (var platform in mainPlatforms) GD.Print($"Found MainPlatform: {platform.Name}");
         foreach (var platform in randomPlatforms) GD.Print($"Found RandomPlatform: {platform.Name}");
+        foreach (var platform in liftedPlatforms) GD.Print($"Found LiftedPlatform: {platform.Name}");
         foreach (var crystal in puzzleCrystals) GD.Print($"Found PuzzleCrystal: {crystal.Name}");
     }
 
@@ -112,6 +123,15 @@ public partial class PuzzleManager : Node2D
             {
                 randomPlatforms.Add(randomPlatform);
             }
+            else if ((nodeName.Contains("liftedplatform") || nodeName.Contains("liftedpat")) && child is Node2D liftedPlatform && !liftedPlatforms.Contains(liftedPlatform))
+            {
+                liftedPlatforms.Add(liftedPlatform);
+            }
+            // Check for LiftedPlatform instances by scene file name pattern
+            else if (child is Node2D node2D && child.SceneFilePath.Contains("LiftedPlatform") && !liftedPlatforms.Contains(node2D))
+            {
+                liftedPlatforms.Add(node2D);
+            }
             else if (child is PuzzleCrystal puzzleCrystal && !puzzleCrystals.Contains(puzzleCrystal))
             {
                 puzzleCrystals.Add(puzzleCrystal);
@@ -124,17 +144,19 @@ public partial class PuzzleManager : Node2D
 
     private void InitializeObjectVisibility()
     {
-        // Initially hide rocks, main platforms, and random platforms
+        // Initially hide rocks, main platforms, random platforms, and lifted platforms
         SetObjectsVisibility(rocks, false);
         SetObjectsVisibility(mainPlatforms, false);
         SetObjectsVisibility(randomPlatforms, false);
+        SetObjectsVisibility(liftedPlatforms, false);
         
         // Track initial states
         rocksVisible = false;
         mainPlatformsVisible = false;
         randomPlatformsVisible = false;
+        liftedPlatformsVisible = false;
         
-        GD.Print("PuzzleManager: Initially hidden rocks, main platforms, and random platforms");
+        GD.Print("PuzzleManager: Initially hidden rocks, main platforms, random platforms, and lifted platforms");
     }
 
     private void CheckPuzzleCrystalStates()
@@ -156,7 +178,7 @@ public partial class PuzzleManager : Node2D
         
         if (activeCrystals >= 1 && activeCrystals < puzzleCrystals.Count)
         {
-            // Show rocks and main platforms when at least one crystal is active (but not all)
+            // Show rocks, main platforms, and lifted platforms when at least one crystal is active (but not all)
             // Only change visibility if it's different from current state
             if (!rocksVisible)
             {
@@ -172,7 +194,15 @@ public partial class PuzzleManager : Node2D
                 GD.Print("PuzzleManager: Fading in main platforms");
             }
             
+            if (!liftedPlatformsVisible)
+            {
+                FadePlatformsIn(liftedPlatforms);
+                liftedPlatformsVisible = true;
+                GD.Print("PuzzleManager: Fading in lifted platforms");
+            }
+            
             // Start random platform cycling system instead of showing all platforms at once
+            // LiftedPlatforms are independent, not part of random cycling
             if (!isRandomPlatformCyclingActive)
             {
                 StartRandomPlatformCycling();
@@ -204,6 +234,13 @@ public partial class PuzzleManager : Node2D
                 GD.Print("PuzzleManager: Fading out main platforms (no active crystals)");
             }
             
+            if (!allElementsHidden && liftedPlatformsVisible)
+            {
+                FadePlatformsOut(liftedPlatforms);
+                liftedPlatformsVisible = false;
+                GD.Print("PuzzleManager: Fading out lifted platforms (no active crystals)");
+            }
+            
             // Stop random platform cycling when no crystals are active
             if (!allElementsHidden && isRandomPlatformCyclingActive)
             {
@@ -223,12 +260,19 @@ public partial class PuzzleManager : Node2D
             // All crystals are active - start the final sequence
             if (!isMainPlatformFading && !allElementsHidden)
             {
-                // Ensure rocks are visible for the final sequence
+                // Ensure rocks and lifted platforms are visible for the final sequence
                 if (!rocksVisible)
                 {
                     FadePlatformsIn(rocks);
                     rocksVisible = true;
                     GD.Print("PuzzleManager: Fading in rocks for final sequence");
+                }
+                
+                if (!liftedPlatformsVisible)
+                {
+                    FadePlatformsIn(liftedPlatforms);
+                    liftedPlatformsVisible = true;
+                    GD.Print("PuzzleManager: Fading in lifted platforms for final sequence");
                 }
                 
                 // Stop random platform cycling during final sequence
@@ -272,6 +316,27 @@ public partial class PuzzleManager : Node2D
                         DisableCollisionsRecursive(obj);
                     }
                 }
+                
+                // Handle LiftedPlatform: always toggle collisions; run animation if the node is actually a LiftedPlatform
+                if (liftedPlatforms.Contains(obj))
+                {
+                    if (visible)
+                    {
+                        EnableCollisionsRecursive(obj);
+                        if (obj is LiftedPlatform lp)
+                        {
+                            lp.StartLifting();
+                        }
+                    }
+                    else
+                    {
+                        DisableCollisionsRecursive(obj);
+                        if (obj is LiftedPlatform lp)
+                        {
+                            lp.StopLifting();
+                        }
+                    }
+                }
             }
         }
     }
@@ -311,6 +376,16 @@ public partial class PuzzleManager : Node2D
                     if (randomPlatforms.Contains(target))
                     {
                         EnableCollisionsRecursive(target);
+                    }
+                    
+                    // Start lifting animation for LiftedPlatforms when they become visible
+                    if (liftedPlatforms.Contains(target))
+                    {
+                        EnableCollisionsRecursive(target);
+                        if (target is LiftedPlatform lp)
+                        {
+                            lp.StartLifting();
+                        }
                     }
                 }
             };
@@ -372,6 +447,16 @@ public partial class PuzzleManager : Node2D
                     if (randomPlatforms.Contains(target))
                     {
                         DisableCollisionsRecursive(target);
+                    }
+                    
+                    // Stop lifting animation for LiftedPlatforms when they become invisible
+                    if (liftedPlatforms.Contains(target))
+                    {
+                        DisableCollisionsRecursive(target);
+                        if (target is LiftedPlatform lp)
+                        {
+                            lp.StopLifting();
+                        }
                     }
                 }
                 OnOneDone();
@@ -483,14 +568,17 @@ public partial class PuzzleManager : Node2D
         // Hide main platforms and random platforms, but keep rocks visible so they can fall
         SetObjectsVisibility(mainPlatforms, false);
         SetObjectsVisibility(randomPlatforms, false);
+        SetObjectsVisibility(liftedPlatforms, false);
         
         // Disable collisions for hidden platforms so invisible colliders don't block the player
         DisableCollisionsForNodes(mainPlatforms);
         DisableCollisionsForNodes(randomPlatforms);
+        DisableCollisionsForNodes(liftedPlatforms);
         
         // Update visibility tracking for platforms only
         mainPlatformsVisible = false;
         randomPlatformsVisible = false;
+        liftedPlatformsVisible = false;
         
         // Keep rocks visible and ensure they can fall - they should remain rocksVisible = true
         GD.Print("PuzzleManager: Rocks remain visible and falling due to gravity");
@@ -541,6 +629,13 @@ public partial class PuzzleManager : Node2D
             co.SetDeferred("collision_mask", 0u);
         }
 
+        // Handle TileMapLayer collisions (Godot 4)
+        if (node is TileMapLayer tml)
+        {
+            tml.SetDeferred("collision_layer", 0u);
+            tml.SetDeferred("collision_mask", 0u);
+        }
+
         if (node is CollisionShape2D cs)
         {
             cs.SetDeferred("disabled", true);
@@ -569,6 +664,13 @@ public partial class PuzzleManager : Node2D
             // Re-enable with default collision layer/mask values
             co.SetDeferred("collision_layer", 1u);
             co.SetDeferred("collision_mask", 1u);
+        }
+
+        // Handle TileMapLayer collisions (Godot 4)
+        if (node is TileMapLayer tml)
+        {
+            tml.SetDeferred("collision_layer", 1u);
+            tml.SetDeferred("collision_mask", 1u);
         }
 
         if (node is CollisionShape2D cs)
@@ -939,6 +1041,12 @@ public partial class PuzzleManager : Node2D
                 // Enable collisions for the visible platform
                 EnableCollisionsRecursive(target);
                 
+                // Start lifting animation for LiftedPlatforms when they become visible
+                if (liftedPlatforms.Contains(target) && target is LiftedPlatform lp)
+                {
+                    lp.StartLifting();
+                }
+                
                 // Call completion callback if provided
                 onComplete?.Invoke();
             }
@@ -971,6 +1079,12 @@ public partial class PuzzleManager : Node2D
                 
                 // Disable collisions for the hidden platform
                 DisableCollisionsRecursive(target);
+                
+                // Stop lifting animation for LiftedPlatforms when they become invisible
+                if (liftedPlatforms.Contains(target) && target is LiftedPlatform lp)
+                {
+                    lp.StopLifting();
+                }
             }
         };
     }
