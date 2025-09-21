@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://dfauk4svx1fjh"]
+
+[ext_resource type="Texture2D" uid="uid://breg64qhs8o35" path="res://Art/PuffNew.png" id="1_daoqv"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_daoqv"]
+size = Vector2(64, 96)
+
+[node name="Puff" type="Node2D"]
+
+[node name="RigidBody2D" type="RigidBody2D" parent="."]
+mass = 2.0
+
+[node name="PuffSprite" type="Sprite2D" parent="RigidBody2D"]
+position = Vector2(0.9999999, 2.3841858e-07)
+rotation = -3.1415925
+scale = Vector2(0.17158453, -0.16220284)
+texture = ExtResource("1_daoqv")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RigidBody2D"]
+position = Vector2(-2, 0)
+shape = SubResource("RectangleShape2D_daoqv")

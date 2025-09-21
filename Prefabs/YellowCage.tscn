@@ -1,5 +1,6 @@
-[gd_scene load_steps=9 format=3 uid="uid://ba2xqtigl0oid"]
+[gd_scene load_steps=11 format=3 uid="uid://ba2xqtigl0oid"]
 
+[ext_resource type="Script" uid="uid://d3iiantkcxes3" path="res://Scripts/Items/YellowCage.cs" id="1_x8k2v"]
 [ext_resource type="Texture2D" uid="uid://3n64dnxhiwpe" path="res://Art/Cage.png" id="2_lqkg8"]
 [ext_resource type="Texture2D" uid="uid://cec0fifq45oxw" path="res://Art/ChainCircle.png" id="3_2hdoc"]
 [ext_resource type="Texture2D" uid="uid://dt0t0gcrwpweu" path="res://Art/floorCage1.png" id="3_w613v"]
@@ -12,6 +13,9 @@
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_gbdih"]
 size = Vector2(174, 278)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_detection"]
+size = Vector2(200, 300)
 
 [node name="Chain" type="Node2D"]
 
@@ -122,14 +126,25 @@ softness = 1.0
 
 [node name="YellowCage" type="RigidBody2D" parent="."]
 position = Vector2(0, 97)
+script = ExtResource("1_x8k2v")
+
+[node name="PromptLabel" type="Label" parent="YellowCage"]
+offset_left = -19.0
+offset_top = 13.0
+offset_right = 20.0
+offset_bottom = 27.0
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 10
+text = "Press E"
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="YellowCage"]
+z_index = -4
 position = Vector2(3, 206)
 shape = SubResource("RectangleShape2D_gbdih")
 
 [node name="CageSprite" type="Sprite2D" parent="YellowCage"]
 modulate = Color(0.85849303, 0.7466902, 0.25180906, 1)
-z_index = 2
+z_index = 1
 position = Vector2(0.9999999, 183)
 rotation = -3.1415925
 scale = Vector2(0.19415781, -0.1921197)
@@ -137,7 +152,6 @@ texture = ExtResource("2_lqkg8")
 
 [node name="FloorCageSpriteBehind" type="Sprite2D" parent="YellowCage"]
 modulate = Color(0.85849303, 0.7466902, 0.25180906, 1)
-z_index = -1
 position = Vector2(-0.18179703, 298.36362)
 rotation = -3.1415925
 scale = Vector2(0.2718807, -0.3021167)
@@ -150,8 +164,15 @@ rotation = -3.1415925
 scale = Vector2(0.27006316, -0.2763489)
 texture = ExtResource("4_f4j6e")
 
-[node name="PuffPrisioner" type="Sprite2D" parent="YellowCage"]
+[node name="PuffPresioner" type="Sprite2D" parent="YellowCage"]
 position = Vector2(6.259201, 258.73553)
 rotation = -3.1415925
 scale = Vector2(0.17158453, -0.16220284)
 texture = ExtResource("5_bjv8d")
+
+[node name="DetectionArea" type="Area2D" parent="YellowCage"]
+
+[node name="DetectionCollision" type="CollisionShape2D" parent="YellowCage/DetectionArea"]
+position = Vector2(3, 206)
+shape = SubResource("RectangleShape2D_detection")
+debug_color = Color(0.5, 0.8, 1, 0.3)
