@@ -20,7 +20,7 @@
 [ext_resource type="PackedScene" uid="uid://ukfdb7esvlix" path="res://Prefabs/RandomPlatform.tscn" id="18_ppr41"]
 [ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="20_x4ngy"]
 [ext_resource type="Texture2D" uid="uid://oxtiekbbxqu4" path="res://Art/PuffKey.png" id="21_fjpsf"]
-[ext_resource type="Texture2D" uid="uid://bmean7no3exq7" path="res://Art/Puff.png" id="21_hj2r6"]
+[ext_resource type="Texture2D" uid="uid://breg64qhs8o35" path="res://Art/PuffNew.png" id="22_7ha7t"]
 [ext_resource type="Texture2D" uid="uid://3n64dnxhiwpe" path="res://Art/Cage.png" id="22_wiwbh"]
 [ext_resource type="Texture2D" uid="uid://dt0t0gcrwpweu" path="res://Art/floorCage1.png" id="23_7ha7t"]
 [ext_resource type="Texture2D" uid="uid://drt3isu2mhh1j" path="res://Art/floorCage2.png" id="24_fjpsf"]
@@ -160,9 +160,9 @@ position = Vector2(546, -255)
 scale = Vector2(0.09717863, 0.10152878)
 
 [node name="Puff" type="Sprite2D" parent="PuffCage"]
-position = Vector2(-41.161198, 59.096546)
-scale = Vector2(-1, 1)
-texture = ExtResource("21_hj2r6")
+position = Vector2(-72.03214, 108.34364)
+scale = Vector2(-1.5113518, 1.4461697)
+texture = ExtResource("22_7ha7t")
 
 [node name="Cage" type="Sprite2D" parent="PuffCage"]
 z_index = 2
