@@ -320,6 +320,48 @@ public partial class YellowCage : RigidBody2D
             Log.Debug("YellowCage: Chain detachment triggered externally but cage is already unlocked", "YellowCage");
         }
     }
+
+    /// <summary>
+    /// Forces chain detachment regardless of current settings or unlock state.
+    /// This is used by the puzzle system when all crystals are active.
+    /// The cage will still require a key to fade out and release the Puff.
+    /// </summary>
+    public void ForceChainDetachment()
+    {
+        if (_isDetachedFromChain)
+        {
+            Log.Debug("YellowCage: Force detachment called but cage is already detached", "YellowCage");
+            return;
+        }
+
+        Log.Debug("YellowCage: Force detachment called by puzzle system", "YellowCage");
+
+        // Remove the chain connection
+        if (_chainConnection != null)
+        {
+            Log.Debug($"YellowCage: Force removing chain connection: {_chainConnection.Name}", "YellowCage");
+            _chainConnection.QueueFree();
+            Log.Debug("YellowCage: Chain connection force removed", "YellowCage");
+        }
+        else
+        {
+            Log.Warning("YellowCage: No chain connection found to force remove", "YellowCage");
+        }
+
+        // Enable gravity and physics if not already enabled
+        GravityScale = 1.0f; // Ensure gravity affects the cage
+        Freeze = false; // Make sure physics are enabled
+        
+        // Add a small random horizontal impulse for more natural falling
+        Vector2 randomImpulse = new Vector2(
+            (float)(GD.Randf() - 0.5f) * 50.0f, // Small random horizontal force
+            0
+        );
+        ApplyImpulse(randomImpulse);
+
+        _isDetachedFromChain = true;
+        Log.Debug("YellowCage: Successfully force detached from chain and falling (puzzle system)", "YellowCage");
+    }
     #endregion
 
     #region Cage Unlock System
@@ -369,7 +411,7 @@ public partial class YellowCage : RigidBody2D
         Log.Debug("YellowCage: Starting unlock sequence", "YellowCage");
         Log.Debug($"YellowCage: DetachFromChainOnUnlock = {DetachFromChainOnUnlock}", "YellowCage");
         
-        // Detach from chain if the flag is enabled
+        // Only detach from chain if the flag is explicitly enabled
         if (DetachFromChainOnUnlock)
         {
             Log.Debug("YellowCage: Detachment enabled - calling DetachFromChain()", "YellowCage");
@@ -377,8 +419,8 @@ public partial class YellowCage : RigidBody2D
         }
         else
         {
-            // Disable physics to prevent further swinging during fade if staying attached
-            Log.Debug("YellowCage: Detachment disabled - keeping cage attached", "YellowCage");
+            // Keep cage attached to chain, just disable physics to prevent swinging during fade
+            Log.Debug("YellowCage: Detachment disabled - cage will fade out while remaining attached", "YellowCage");
             SetCagePhysicsEnabled(false);
         }
         

@@ -127,6 +127,7 @@ softness = 1.0
 [node name="YellowCage" type="RigidBody2D" parent="."]
 position = Vector2(0, 97)
 script = ExtResource("1_x8k2v")
+DetachFromChainOnUnlock = false
 
 [node name="PromptLabel" type="Label" parent="YellowCage"]
 offset_left = -19.0

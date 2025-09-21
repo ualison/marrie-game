@@ -23,6 +23,7 @@ public partial class PuzzleManager : Node2D
     private List<Node2D> liftedPlatforms = new List<Node2D>();
     private List<PuzzleCrystal> puzzleCrystals = new List<PuzzleCrystal>();
     private List<Node2D> puffCageKeys = new List<Node2D>();
+    private List<YellowCage> yellowCages = new List<YellowCage>();
     
     private bool isMainPlatformFading = false;
     private bool allElementsHidden = false;
@@ -39,6 +40,9 @@ public partial class PuzzleManager : Node2D
     private bool randomPlatformsVisible = false;
     private bool liftedPlatformsVisible = false;
     private bool puffCageKeysVisible = false;
+    
+    // YellowCage detachment tracking
+    private bool yellowCagesDetached = false;
     
     // Random Platform Cycling System
     private bool isRandomPlatformCyclingActive = false;
@@ -91,12 +95,13 @@ public partial class PuzzleManager : Node2D
         liftedPlatforms.Clear();
         puzzleCrystals.Clear();
         puffCageKeys.Clear();
+        yellowCages.Clear();
 
         // Recursively scan the entire current scene (not just children of this manager)
         Node scanRoot = GetTree().CurrentScene ?? (Node)this;
         ScanChildrenRecursively(scanRoot);
 
-        GD.Print($"PuzzleManager found: {rocks.Count} Rocks, {mainPlatforms.Count} MainPlatforms, {randomPlatforms.Count} RandomPlatforms, {liftedPlatforms.Count} LiftedPlatforms, {puzzleCrystals.Count} PuzzleCrystals, {puffCageKeys.Count} PuffCageKeys");
+        GD.Print($"PuzzleManager found: {rocks.Count} Rocks, {mainPlatforms.Count} MainPlatforms, {randomPlatforms.Count} RandomPlatforms, {liftedPlatforms.Count} LiftedPlatforms, {puzzleCrystals.Count} PuzzleCrystals, {puffCageKeys.Count} PuffCageKeys, {yellowCages.Count} YellowCages");
         
         // Debug: Print names of found objects
         foreach (var rock in rocks) GD.Print($"Found Rock: {rock.Name}");
@@ -105,6 +110,7 @@ public partial class PuzzleManager : Node2D
         foreach (var platform in liftedPlatforms) GD.Print($"Found LiftedPlatform: {platform.Name}");
         foreach (var crystal in puzzleCrystals) GD.Print($"Found PuzzleCrystal: {crystal.Name}");
         foreach (var key in puffCageKeys) GD.Print($"Found PuffCageKey: {key.Name}");
+        foreach (var cage in yellowCages) GD.Print($"Found YellowCage: {cage.Name}");
     }
 
     private void ScanChildrenRecursively(Node node)
@@ -144,6 +150,11 @@ public partial class PuzzleManager : Node2D
             else if (child is PuzzleCrystal puzzleCrystal && !puzzleCrystals.Contains(puzzleCrystal))
             {
                 puzzleCrystals.Add(puzzleCrystal);
+            }
+            // Check if this is a YellowCage class instance
+            else if (child is YellowCage yellowCage && !yellowCages.Contains(yellowCage))
+            {
+                yellowCages.Add(yellowCage);
             }
             
             // Continue scanning recursively
@@ -305,6 +316,14 @@ public partial class PuzzleManager : Node2D
                     FadePlatformsIn(puffCageKeys);
                     puffCageKeysVisible = true;
                     GD.Print("PuzzleManager: Fading in puff cage keys for final sequence");
+                }
+                
+                // Detach all YellowCages from their chains when all crystals are active
+                if (!yellowCagesDetached && yellowCages.Count > 0)
+                {
+                    DetachAllYellowCages();
+                    yellowCagesDetached = true;
+                    GD.Print($"PuzzleManager: Detached {yellowCages.Count} YellowCages from chains (all crystals active)");
                 }
                 
                 // Stop random platform cycling during final sequence
@@ -1152,6 +1171,46 @@ public partial class PuzzleManager : Node2D
         }
         
         CycleToNextRandomPlatform();
+    }
+
+    #endregion
+
+    #region YellowCage Management System
+
+    /// <summary>
+    /// Detaches all YellowCages from their chains, allowing them to fall under gravity.
+    /// This is called when all puzzle crystals become active.
+    /// </summary>
+    private void DetachAllYellowCages()
+    {
+        if (yellowCages == null || yellowCages.Count == 0)
+        {
+            GD.Print("PuzzleManager: No YellowCages found to detach");
+            return;
+        }
+
+        int detachedCount = 0;
+        
+        foreach (var cage in yellowCages)
+        {
+            if (cage != null && IsInstanceValid(cage))
+            {
+                try
+                {
+                    // Force detachment regardless of cage's settings or unlock state
+                    // This is specifically for when all puzzle crystals are active
+                    cage.ForceChainDetachment();
+                    detachedCount++;
+                    GD.Print($"PuzzleManager: Force detached YellowCage '{cage.Name}' from its chain");
+                }
+                catch (System.Exception ex)
+                {
+                    GD.PrintErr($"PuzzleManager: Failed to detach YellowCage '{cage.Name}': {ex.Message}");
+                }
+            }
+        }
+        
+        GD.Print($"PuzzleManager: Successfully detached {detachedCount} out of {yellowCages.Count} YellowCages");
     }
 
     #endregion
