@@ -22,6 +22,7 @@ public partial class PuzzleManager : Node2D
     private List<Node2D> randomPlatforms = new List<Node2D>();
     private List<Node2D> liftedPlatforms = new List<Node2D>();
     private List<PuzzleCrystal> puzzleCrystals = new List<PuzzleCrystal>();
+    private List<Node2D> puffCageKeys = new List<Node2D>();
     
     private bool isMainPlatformFading = false;
     private bool allElementsHidden = false;
@@ -37,6 +38,7 @@ public partial class PuzzleManager : Node2D
     private bool mainPlatformsVisible = false;
     private bool randomPlatformsVisible = false;
     private bool liftedPlatformsVisible = false;
+    private bool puffCageKeysVisible = false;
     
     // Random Platform Cycling System
     private bool isRandomPlatformCyclingActive = false;
@@ -88,12 +90,13 @@ public partial class PuzzleManager : Node2D
         randomPlatforms.Clear();
         liftedPlatforms.Clear();
         puzzleCrystals.Clear();
+        puffCageKeys.Clear();
 
         // Recursively scan the entire current scene (not just children of this manager)
         Node scanRoot = GetTree().CurrentScene ?? (Node)this;
         ScanChildrenRecursively(scanRoot);
 
-        GD.Print($"PuzzleManager found: {rocks.Count} Rocks, {mainPlatforms.Count} MainPlatforms, {randomPlatforms.Count} RandomPlatforms, {liftedPlatforms.Count} LiftedPlatforms, {puzzleCrystals.Count} PuzzleCrystals");
+        GD.Print($"PuzzleManager found: {rocks.Count} Rocks, {mainPlatforms.Count} MainPlatforms, {randomPlatforms.Count} RandomPlatforms, {liftedPlatforms.Count} LiftedPlatforms, {puzzleCrystals.Count} PuzzleCrystals, {puffCageKeys.Count} PuffCageKeys");
         
         // Debug: Print names of found objects
         foreach (var rock in rocks) GD.Print($"Found Rock: {rock.Name}");
@@ -101,6 +104,7 @@ public partial class PuzzleManager : Node2D
         foreach (var platform in randomPlatforms) GD.Print($"Found RandomPlatform: {platform.Name}");
         foreach (var platform in liftedPlatforms) GD.Print($"Found LiftedPlatform: {platform.Name}");
         foreach (var crystal in puzzleCrystals) GD.Print($"Found PuzzleCrystal: {crystal.Name}");
+        foreach (var key in puffCageKeys) GD.Print($"Found PuffCageKey: {key.Name}");
     }
 
     private void ScanChildrenRecursively(Node node)
@@ -114,6 +118,11 @@ public partial class PuzzleManager : Node2D
             if (child is Rock rock && !rocks.Contains(rock))
             {
                 rocks.Add(rock);
+            }
+            // Check if this is a PuffCageKey class instance
+            else if (child is PuffCageKey puffCageKey && !puffCageKeys.Contains(puffCageKey))
+            {
+                puffCageKeys.Add(puffCageKey);
             }
             else if (nodeName.Contains("mainplatform") && child is Node2D mainPlatform && !mainPlatforms.Contains(mainPlatform))
             {
@@ -144,19 +153,21 @@ public partial class PuzzleManager : Node2D
 
     private void InitializeObjectVisibility()
     {
-        // Initially hide rocks, main platforms, random platforms, and lifted platforms
+        // Initially hide rocks, main platforms, random platforms, lifted platforms, and puff cage keys
         SetObjectsVisibility(rocks, false);
         SetObjectsVisibility(mainPlatforms, false);
         SetObjectsVisibility(randomPlatforms, false);
         SetObjectsVisibility(liftedPlatforms, false);
+        SetObjectsVisibility(puffCageKeys, false);
         
         // Track initial states
         rocksVisible = false;
         mainPlatformsVisible = false;
         randomPlatformsVisible = false;
         liftedPlatformsVisible = false;
+        puffCageKeysVisible = false;
         
-        GD.Print("PuzzleManager: Initially hidden rocks, main platforms, random platforms, and lifted platforms");
+        GD.Print("PuzzleManager: Initially hidden rocks, main platforms, random platforms, lifted platforms, and puff cage keys");
     }
 
     private void CheckPuzzleCrystalStates()
@@ -178,7 +189,7 @@ public partial class PuzzleManager : Node2D
         
         if (activeCrystals >= 1 && activeCrystals < puzzleCrystals.Count)
         {
-            // Show rocks, main platforms, and lifted platforms when at least one crystal is active (but not all)
+            // Show rocks, main platforms, lifted platforms, and puff cage keys when at least one crystal is active (but not all)
             // Only change visibility if it's different from current state
             if (!rocksVisible)
             {
@@ -199,6 +210,13 @@ public partial class PuzzleManager : Node2D
                 FadePlatformsIn(liftedPlatforms);
                 liftedPlatformsVisible = true;
                 GD.Print("PuzzleManager: Fading in lifted platforms");
+            }
+            
+            if (!puffCageKeysVisible)
+            {
+                FadePlatformsIn(puffCageKeys);
+                puffCageKeysVisible = true;
+                GD.Print("PuzzleManager: Fading in puff cage keys");
             }
             
             // Start random platform cycling system instead of showing all platforms at once
@@ -241,6 +259,13 @@ public partial class PuzzleManager : Node2D
                 GD.Print("PuzzleManager: Fading out lifted platforms (no active crystals)");
             }
             
+            if (!allElementsHidden && puffCageKeysVisible)
+            {
+                FadePlatformsOut(puffCageKeys);
+                puffCageKeysVisible = false;
+                GD.Print("PuzzleManager: Fading out puff cage keys (no active crystals)");
+            }
+            
             // Stop random platform cycling when no crystals are active
             if (!allElementsHidden && isRandomPlatformCyclingActive)
             {
@@ -260,7 +285,7 @@ public partial class PuzzleManager : Node2D
             // All crystals are active - start the final sequence
             if (!isMainPlatformFading && !allElementsHidden)
             {
-                // Ensure rocks and lifted platforms are visible for the final sequence
+                // Ensure rocks, lifted platforms, and puff cage keys are visible for the final sequence
                 if (!rocksVisible)
                 {
                     FadePlatformsIn(rocks);
@@ -273,6 +298,13 @@ public partial class PuzzleManager : Node2D
                     FadePlatformsIn(liftedPlatforms);
                     liftedPlatformsVisible = true;
                     GD.Print("PuzzleManager: Fading in lifted platforms for final sequence");
+                }
+                
+                if (!puffCageKeysVisible)
+                {
+                    FadePlatformsIn(puffCageKeys);
+                    puffCageKeysVisible = true;
+                    GD.Print("PuzzleManager: Fading in puff cage keys for final sequence");
                 }
                 
                 // Stop random platform cycling during final sequence
@@ -302,6 +334,14 @@ public partial class PuzzleManager : Node2D
                     // Defer physics enabling to next frame to ensure proper initialization
                     rock.CallDeferred(nameof(rock.ReEnablePhysics));
                     GD.Print($"PuzzleManager: Re-enabling physics for rock: {rock.Name}");
+                }
+                
+                // If this is a puff cage key being made visible, re-enable its physics
+                if (visible && obj is PuffCageKey puffCageKey)
+                {
+                    // Defer physics enabling to next frame to ensure proper initialization
+                    puffCageKey.CallDeferred(nameof(puffCageKey.ReEnablePhysics));
+                    GD.Print($"PuzzleManager: Re-enabling physics for puff cage key: {puffCageKey.Name}");
                 }
                 
                 // Handle collision management for RandomPlatforms
@@ -395,6 +435,13 @@ public partial class PuzzleManager : Node2D
             {
                 rock.CallDeferred(nameof(rock.ReEnablePhysics));
                 GD.Print($"PuzzleManager: Re-enabling physics for rock: {rock.Name}");
+            }
+
+            // Re-enable physics for puff cage keys when they appear
+            if (obj is PuffCageKey puffCageKey)
+            {
+                puffCageKey.CallDeferred(nameof(puffCageKey.ReEnablePhysics));
+                GD.Print($"PuzzleManager: Re-enabling physics for puff cage key: {puffCageKey.Name}");
             }
         }
     }
@@ -544,7 +591,7 @@ public partial class PuzzleManager : Node2D
 
     private void HideAllElements()
     {
-        GD.Print("PuzzleManager: Hiding platforms and crystals, but keeping rocks visible to fall");
+        GD.Print("PuzzleManager: Hiding platforms and crystals, but keeping rocks and puff cage keys visible to fall");
         
         allElementsHidden = true;
         
@@ -565,7 +612,7 @@ public partial class PuzzleManager : Node2D
             }
         }
         
-        // Hide main platforms and random platforms, but keep rocks visible so they can fall
+        // Hide main platforms and random platforms, but keep rocks and puff cage keys visible so they can fall
         SetObjectsVisibility(mainPlatforms, false);
         SetObjectsVisibility(randomPlatforms, false);
         SetObjectsVisibility(liftedPlatforms, false);
@@ -580,8 +627,8 @@ public partial class PuzzleManager : Node2D
         randomPlatformsVisible = false;
         liftedPlatformsVisible = false;
         
-        // Keep rocks visible and ensure they can fall - they should remain rocksVisible = true
-        GD.Print("PuzzleManager: Rocks remain visible and falling due to gravity");
+        // Keep rocks and puff cage keys visible and ensure they can fall - they should remain rocksVisible = true and puffCageKeysVisible = true
+        GD.Print("PuzzleManager: Rocks and puff cage keys remain visible and falling due to gravity");
         
         // Hide puzzle crystals
         foreach (PuzzleCrystal crystal in puzzleCrystals)

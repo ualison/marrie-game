@@ -1,4 +1,4 @@
-[gd_scene load_steps=26 format=3 uid="uid://d18k6sx4a24hy"]
+[gd_scene load_steps=23 format=3 uid="uid://d18k6sx4a24hy"]
 
 [ext_resource type="PackedScene" uid="uid://844rfld3y4ee" path="res://Prefabs/UI/RockCount.tscn" id="1_fiixr"]
 [ext_resource type="Script" uid="uid://1o447xq10j6e" path="res://Scripts/UI/ManaBar.cs" id="2_hj2r6"]
@@ -18,12 +18,9 @@
 [ext_resource type="PackedScene" uid="uid://bsjex3d658h78" path="res://Prefabs/StaticPlatform.tscn" id="16_e71qo"]
 [ext_resource type="PackedScene" uid="uid://cbtkrlgl6uyx" path="res://Prefabs/MainPlatform.tscn" id="17_g7cyp"]
 [ext_resource type="PackedScene" uid="uid://ukfdb7esvlix" path="res://Prefabs/RandomPlatform.tscn" id="18_ppr41"]
+[ext_resource type="PackedScene" uid="uid://bef7hvbq0docy" path="res://Prefabs/PuffCageKey.tscn" id="20_7ha7t"]
 [ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="20_x4ngy"]
-[ext_resource type="Texture2D" uid="uid://oxtiekbbxqu4" path="res://Art/PuffKey.png" id="21_fjpsf"]
-[ext_resource type="Texture2D" uid="uid://breg64qhs8o35" path="res://Art/PuffNew.png" id="22_7ha7t"]
-[ext_resource type="Texture2D" uid="uid://3n64dnxhiwpe" path="res://Art/Cage.png" id="22_wiwbh"]
-[ext_resource type="Texture2D" uid="uid://dt0t0gcrwpweu" path="res://Art/floorCage1.png" id="23_7ha7t"]
-[ext_resource type="Texture2D" uid="uid://drt3isu2mhh1j" path="res://Art/floorCage2.png" id="24_fjpsf"]
+[ext_resource type="PackedScene" uid="uid://ba2xqtigl0oid" path="res://Prefabs/YellowCage.tscn" id="24_ulljr"]
 [ext_resource type="PackedScene" uid="uid://nune5akrdkal" path="res://Prefabs/LiftedPlatform.tscn" id="25_7ha7t"]
 
 [node name="Root" type="Node2D"]
@@ -118,65 +115,44 @@ MaxRandomPlatformDuration = 1.0
 PlatformOverlapDuration = 0.05
 RandomCycleCount = 15
 
-[node name="PuzzleCrystal2" parent="PuzzleManager" instance=ExtResource("15_dpo1k")]
-z_index = 1
-position = Vector2(-539, 302)
-
 [node name="StaticPlatform1" parent="PuzzleManager" instance=ExtResource("16_e71qo")]
-position = Vector2(-544, 350)
+position = Vector2(-534, 319)
 
 [node name="StaticPlatform2" parent="PuzzleManager" instance=ExtResource("16_e71qo")]
-position = Vector2(394, 285)
+position = Vector2(-180, 158)
 
 [node name="PuzzleCrystal1" parent="PuzzleManager" instance=ExtResource("15_dpo1k")]
-z_index = 4
-position = Vector2(-391, 658)
+z_index = -1
+position = Vector2(-377, 655)
+
+[node name="PuzzleCrystal2" parent="PuzzleManager" instance=ExtResource("15_dpo1k")]
+z_index = 1
+position = Vector2(-176, 111)
 
 [node name="MainPlatform" parent="PuzzleManager" instance=ExtResource("17_g7cyp")]
-position = Vector2(389, 59)
+position = Vector2(337, 104)
 
 [node name="RandomPlatform1" parent="PuzzleManager" instance=ExtResource("18_ppr41")]
-position = Vector2(43, 562)
+position = Vector2(177, 661)
 
 [node name="RandomPlatform2" parent="PuzzleManager" instance=ExtResource("18_ppr41")]
-position = Vector2(-166, 527)
+position = Vector2(5, 617)
+
+[node name="RandomPlatform3" parent="PuzzleManager" instance=ExtResource("18_ppr41")]
+position = Vector2(-168, 569)
 
 [node name="LiftedPlatform" parent="PuzzleManager" instance=ExtResource("25_7ha7t")]
 z_index = -1
-position = Vector2(219, 661)
+position = Vector2(-346, 249)
 LiftHeight = 350.0
 
-[node name="PuffKey" type="Sprite2D" parent="PuzzleManager"]
-position = Vector2(387, 38.999996)
-scale = Vector2(0.025716137, 0.029785149)
-texture = ExtResource("21_fjpsf")
+[node name="YellowCage" parent="PuzzleManager" instance=ExtResource("24_ulljr")]
+position = Vector2(538.00006, -57)
+scale = Vector2(0.8, 0.8)
+
+[node name="PuffCageKey" parent="PuzzleManager" instance=ExtResource("20_7ha7t")]
+position = Vector2(338, 48)
 
 [node name="SceneSwicherCrystal" parent="." instance=ExtResource("20_x4ngy")]
 position = Vector2(523, 217)
 TargetScenePath = "uid://54o6xy0qaoae"
-
-[node name="PuffCage" type="Node2D" parent="."]
-position = Vector2(546, -255)
-scale = Vector2(0.09717863, 0.10152878)
-
-[node name="Puff" type="Sprite2D" parent="PuffCage"]
-position = Vector2(-72.03214, 108.34364)
-scale = Vector2(-1.5113518, 1.4461697)
-texture = ExtResource("22_7ha7t")
-
-[node name="Cage" type="Sprite2D" parent="PuffCage"]
-z_index = 2
-position = Vector2(-102.903564, -502.3208)
-scale = Vector2(1.6681587, 1.596684)
-texture = ExtResource("22_wiwbh")
-
-[node name="FloorCage1" type="Sprite2D" parent="PuffCage"]
-z_index = -1
-position = Vector2(-92.61304, 453.0735)
-scale = Vector2(2.3875027, 2.2852068)
-texture = ExtResource("23_7ha7t")
-
-[node name="FloorCage2" type="Sprite2D" parent="PuffCage"]
-position = Vector2(-102.903595, 674.6852)
-scale = Vector2(2.379638, 2.277679)
-texture = ExtResource("24_fjpsf")

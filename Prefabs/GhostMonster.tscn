@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://d0e7xcevrndxm" path="res://Scripts/Enemy/GhostMonster.cs" id="1_uqgqf"]
 [ext_resource type="Script" uid="uid://dq22yqfge47s5" path="res://Scripts/Enemy/GhostMonsterLife.cs" id="4_6ib6h"]
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
-[ext_resource type="Texture2D" uid="uid://dr0ljv8jao60f" path="res://Art/MonsterNew.png" id="4_xqxg4"]
+[ext_resource type="Texture2D" uid="uid://bjltsffihyof5" path="res://Art/MonsterNew2.png" id="4_xqxg4"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_6ib6h"]
 size = Vector2(261, 355)

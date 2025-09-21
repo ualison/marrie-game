@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://c0o15dmumujxy" path="res://Scripts/Enemy/Monster.cs" id="1_x8qak"]
 [ext_resource type="Script" uid="uid://2hx87sinu6t" path="res://Scripts/Enemy/MonsterLife.cs" id="3_monsterlife"]
-[ext_resource type="Texture2D" uid="uid://dr0ljv8jao60f" path="res://Art/MonsterNew.png" id="4_hp6r8"]
+[ext_resource type="Texture2D" uid="uid://bjltsffihyof5" path="res://Art/MonsterNew2.png" id="4_hp6r8"]
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wqfq0"]
