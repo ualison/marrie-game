@@ -70,6 +70,16 @@ public partial class ReplayGem : Node2D
                     Log.Debug("ReplayGem: Ensuring hidden state in PastReality after interaction enabled", "ReplayGem");
                     ForceHideCompletely();
                 }
+                else
+                {
+                    // If we're in CurrentReality and this gem is statically placed, show it
+                    CheckAndShowStaticGem();
+                }
+            }
+            else
+            {
+                // If RealityManager isn't available yet, assume CurrentReality and show static gem
+                CheckAndShowStaticGem();
             }
         };
 
@@ -94,6 +104,20 @@ public partial class ReplayGem : Node2D
             // Retry connection after a short delay
             Log.Debug("RealityManager not available, retrying connection in 0.1s", "ReplayGem");
             GetTree().CreateTimer(0.1f).Timeout += ConnectToRealityManager;
+        }
+    }
+
+    private void CheckAndShowStaticGem()
+    {
+        // Check if this gem is statically placed in scene (not dynamically created)
+        // We can detect this by checking if the gem has a scene file path
+        var sceneFilePath = GetTree().CurrentScene?.SceneFilePath;
+        bool isStaticGem = !string.IsNullOrEmpty(sceneFilePath);
+
+        if (isStaticGem)
+        {
+            Log.Replay($"Detected static ReplayGem in scene {sceneFilePath} - showing gem", "ReplayGem");
+            ShowGem(GlobalPosition);
         }
     }
     private void InitializeComponents()
@@ -208,7 +232,18 @@ public partial class ReplayGem : Node2D
         var deathRecord = GetDeathRecord();
         if (deathRecord == null)
         {
-            Log.Warning("No death record available for replay", "ReplayGem");
+            // In PuzzleMode, missing death records are expected initially
+            var recordingMode = GameManager.Instance?.GetReplayRecordingMode() ?? ReplayRecordingMode.DeathMode;
+            
+            if (recordingMode == ReplayRecordingMode.PuzzleMode)
+            {
+                Log.Debug("No recording data available for PuzzleMode replay", "ReplayGem");
+            }
+            else
+            {
+                Log.Warning("No death record available for replay", "ReplayGem");
+            }
+            
             // Refund mana if replay fails
             playerMana.RestoreMana(1);
             return;

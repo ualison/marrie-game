@@ -32,18 +32,25 @@ public partial class DynamicTreeSpawner : Node2D
     [Export] public float FractalTreeWidth = 200.0f;
     [Export] public float FractalTreeHeight = 300.0f;
     [Export] public float FractalVerticalOffset = 0.0f;
-    // Apple settings
+    
+    [ExportGroup("Apple Settings")]
     [Export] public PackedScene ApplePrefab;
     [Export] public int MinApplesPerTree = 1;
-    [Export] public int MaxApplesPerTree = 3;
-    // Height on the tree where apples are placed (0 = bottom, 1 = top)
-    [Export] public float AppleHeightNormalizedMin = 0.25f;
-    [Export] public float AppleHeightNormalizedMax = 0.75f;
-    // Horizontal spread from center in pixels
-    [Export] public float AppleHorizontalPadding = 40.0f;
-    // Bias controls (lower than 1 biases towards the max end - i.e., higher and more external)
-    [Export] public float AppleVerticalBiasExponent = 0.5f;
-    [Export] public float AppleHorizontalBiasExponent = 0.5f;
+    [Export] public int MaxApplesPerTree = 4;
+    // Constrained region for apple placement within the tree crown
+    [Export] public float ApplePlacementRadius = 50.0f;    // Base radius of region where apples can be placed (reduced for tighter placement)
+    [Export] public float ApplePlacementOffsetY = -120.0f; // Y offset from tree base to center of apple region (moved up into crown)
+    [Export] public float AppleMinSpacing = 20.0f;         // Minimum distance between apples
+    [Export] public float BranchAttachmentRadius = 8.0f;   // How close apple must be to a branch pixel (tighter requirement)
+    [Export] public int MaxApplePlacementAttempts = 100;   // Max attempts to find valid apple position (increased for better coverage)
+
+    [ExportGroup("Apple Allowed Region")]
+    // The allowed region targets the dense branching area of the tree crown
+    [Export] public float AppleArcStartDeg = 200.0f;       // Start angle (targeting upper-left crown region)
+    [Export] public float AppleArcEndDeg = 340.0f;         // End angle (targeting upper-right crown region)
+    [Export] public float AppleInnerRadiusRatio = 0.3f;    // 0..1, inner radius as fraction of ApplePlacementRadius (closer to center)
+    [Export] public float AppleOuterRadiusRatio = 0.8f;    // 0..1, outer radius as fraction of ApplePlacementRadius (not at the very edge)
+    [Export] public float AppleEllipseYScale = 0.8f;       // Vertical squash of placement ellipse (less squashed for crown area)
     
     // Optimized data structures
     private readonly Dictionary<int, ChunkData> _chunks = new Dictionary<int, ChunkData>();
@@ -78,6 +85,19 @@ public partial class DynamicTreeSpawner : Node2D
         }
     }
     
+    // Structure to hold apple position data
+    private struct ApplePosition
+    {
+        public Vector2 LocalPosition;
+        public bool IsValid;
+        
+        public ApplePosition(Vector2 pos, bool valid)
+        {
+            LocalPosition = pos;
+            IsValid = valid;
+        }
+    }
+    
     public override void _Ready()
     {
         Initialize();
@@ -100,8 +120,6 @@ public partial class DynamicTreeSpawner : Node2D
         
         GD.Print($"Initialized with {_fractalTextures.Count} fractal textures");
     }
-
-    // No fallback loader: FractalsExports is assumed to always contain textures
     
     private void LoadFractalTextures()
     {
@@ -202,7 +220,9 @@ public partial class DynamicTreeSpawner : Node2D
         int capacity = chunk.Positions != null ? chunk.Positions.Length : MaxTreesPerChunk;
         int minCount = Mathf.Clamp(MinTreesPerChunk, 0, capacity);
         int maxCount = Mathf.Clamp(MaxTreesPerChunk, minCount, capacity);
-        int targetCount = _rng.RandiRange(minCount, maxCount);
+        
+        // Safe RandiRange call
+        int targetCount = maxCount > minCount ? _rng.RandiRange(minCount, maxCount) : minCount;
         int posCount = 0;
         int maxAttempts = targetCount * 10;
         
@@ -341,8 +361,15 @@ public partial class DynamicTreeSpawner : Node2D
             var root = new Node2D { Name = "FractalTree" };
             var sprite = new Sprite2D { Name = "Sprite2D" };
             
-            // Pick random fractal texture
-            int textureIdx = _rng.RandiRange(0, _fractalTextures.Count - 1);
+            // Pick random fractal texture with proper bounds checking
+            if (_fractalTextures.Count == 0)
+            {
+                GD.PrintErr("No fractal textures available");
+                return null;
+            }
+            
+            int maxIdx = _fractalTextures.Count - 1;
+            int textureIdx = maxIdx > 0 ? _rng.RandiRange(0, maxIdx) : 0;
             var texture = _fractalTextures[textureIdx];
             sprite.Texture = texture;
             
@@ -373,7 +400,7 @@ public partial class DynamicTreeSpawner : Node2D
             root.AddChild(sprite);
 
             // Spawn apples as children of the fractal root (positioned relative to the tree)
-            TrySpawnApples(root, sprite, texture);
+            TrySpawnApplesInCrown(root, sprite, texture);
             return root;
         }
         catch (System.Exception ex)
@@ -383,45 +410,184 @@ public partial class DynamicTreeSpawner : Node2D
         }
     }
 
-    private void TrySpawnApples(Node2D treeRoot, Sprite2D treeSprite, Texture2D texture)
+    private void TrySpawnApplesInCrown(Node2D treeRoot, Sprite2D treeSprite, Texture2D texture)
     {
-        if (ApplePrefab == null) return;
-        if (texture == null) return;
-
-        int appleCount = Mathf.Clamp(_rng.RandiRange(MinApplesPerTree, MaxApplesPerTree), MinApplesPerTree, MaxApplesPerTree);
-
-        float texW = texture.GetWidth();
-        float texH = texture.GetHeight();
-
-        for (int i = 0; i < appleCount; i++)
+        if (ApplePrefab == null || texture == null) 
         {
-            var inst = ApplePrefab.Instantiate() as Node2D;
-            if (inst == null) continue;
+            GD.Print("Warning: ApplePrefab or texture is null");
+            return;
+        }
 
-            // pick a normalized height along the trunk/branches biased towards the top (external branches)
-            float t = _rng.Randf();
-            float skewedT = Mathf.Pow(t, Mathf.Max(0.0001f, AppleVerticalBiasExponent));
-            float hNorm = Mathf.Lerp(AppleHeightNormalizedMin, AppleHeightNormalizedMax, skewedT);
+        // Determine how many apples to spawn
+        int minApples = Mathf.Max(0, MinApplesPerTree);
+        int maxApples = Mathf.Max(minApples, MaxApplesPerTree);
+        
+        int targetAppleCount = maxApples > minApples ? 
+            _rng.RandiRange(minApples, maxApples) : minApples;
+        
+        if (targetAppleCount <= 0) 
+        {
+            GD.Print("Warning: targetAppleCount is 0");
+            return;
+        }
 
-            // convert normalized height to local y; note sprite is centered and we've positioned it so y=baseOffset
-            float localY = (0.5f - hNorm) * texH * treeSprite.Scale.Y + treeSprite.Position.Y;
+        // Get texture data for branch detection
+        var image = texture.GetImage();
+        if (image == null) 
+        {
+            GD.Print("Warning: Could not get image from texture");
+            return;
+        }
 
-            // horizontal spread biased to be more external (further from center)
-            float r = _rng.Randf();
-            float mag = Mathf.Pow(r, Mathf.Max(0.0001f, AppleHorizontalBiasExponent)) * AppleHorizontalPadding;
-            // bias magnitude slightly by height so higher apples sit further out
-            float heightNormRemap = (hNorm - AppleHeightNormalizedMin) / Mathf.Max(0.0001f, (AppleHeightNormalizedMax - AppleHeightNormalizedMin));
-            mag *= Mathf.Lerp(0.9f, 1.4f, Mathf.Clamp(heightNormRemap, 0f, 1f));
-            float sign = _rng.Randf() < 0.5f ? -1f : 1f;
-            float localX = sign * mag;
+        var placedApples = new List<Vector2>();
+        int successfullyPlaced = 0;
 
-            inst.Position = new Vector2(localX, localY);
-            treeRoot.AddChild(inst);
+        // Elliptical arc band placement approach (restricted to the underside of the crown)
+        // Position the apple placement center relative to the tree sprite center (crown area)
+        Vector2 circleCenter = new Vector2(0f, treeSprite.Position.Y + ApplePlacementOffsetY);
+        
+        for (int attempt = 0; attempt < MaxApplePlacementAttempts && successfullyPlaced < targetAppleCount; attempt++)
+        {
+            // Generate random position within the allowed elliptical arc band
+            float angle = RandomAngleInAllowedArc();
+            // Clamp ratios first, then scale to world units to avoid min>max errors
+            float innerRatio = Mathf.Clamp(AppleInnerRadiusRatio, 0f, 1f);
+            float outerRatio = Mathf.Clamp(AppleOuterRadiusRatio, innerRatio, 1f);
+            float rMin = innerRatio * ApplePlacementRadius;
+            float rMax = outerRatio * ApplePlacementRadius;
+            float distance = _rng.RandfRange(rMin, rMax);
+
+            Vector2 candidatePos = circleCenter + new Vector2(
+                Mathf.Cos(angle) * distance,
+                Mathf.Sin(angle) * distance * AppleEllipseYScale // Elliptical flattening
+            );
+
+            // Check spacing with existing apples
+            bool hasGoodSpacing = true;
+            foreach (var existingPos in placedApples)
+            {
+                if (candidatePos.DistanceTo(existingPos) < AppleMinSpacing)
+                {
+                    hasGoodSpacing = false;
+                    break;
+                }
+            }
+            if (!hasGoodSpacing) continue;
+
+            // Check if position is near branch pixels (simplified)
+            if (IsNearBranchSimple(image, candidatePos, treeSprite, texture))
+            {
+                var inst = ApplePrefab.Instantiate() as Node2D;
+                if (inst != null)
+                {
+                    inst.Position = candidatePos;
+                    treeRoot.AddChild(inst);
+                    placedApples.Add(candidatePos);
+                    successfullyPlaced++;
+                }
+            }
+        }
+
+        // Always log apple placement results
+        GD.Print($"Tree: Placed {successfullyPlaced}/{targetAppleCount} apples");
+    }
+
+    // Returns a random angle (in radians) inside the configured [AppleArcStartDeg, AppleArcEndDeg] range.
+    // Angles follow unit circle with 0° at +X, increasing clockwise; since Y grows downward in screen space,
+    // 90° points down. Defaults (20°..160°) target the underside of the crown, avoiding the top region.
+    private float RandomAngleInAllowedArc()
+    {
+        float start = NormalizeDeg(AppleArcStartDeg);
+        float end = NormalizeDeg(AppleArcEndDeg);
+
+        // If the arc wraps past 360°, split it into two ranges proportionally
+        if (start <= end)
+        {
+            return Mathf.DegToRad(_rng.RandfRange(start, end));
+        }
+        else
+        {
+            float rangeA = 360f - start;
+            float rangeB = end;
+            float total = rangeA + rangeB;
+            if (total <= 0.0001f)
+                return Mathf.DegToRad(start); // degenerate case
+            bool pickA = _rng.Randf() < (rangeA / total);
+            float deg = pickA ? _rng.RandfRange(start, 360f) : _rng.RandfRange(0f, end);
+            return Mathf.DegToRad(deg);
         }
     }
-    
-    // Placeholder tree method removed: fractal textures are expected to always be present.
-    
+
+    private float NormalizeDeg(float deg)
+    {
+        float d = deg % 360f;
+        if (d < 0f) d += 360f;
+        return d;
+    }
+
+    private bool IsNearBranchSimple(Image image, Vector2 localPos, Sprite2D sprite, Texture2D texture)
+    {
+        // Convert local position to texture coordinates
+        // Account for sprite position offset and scaling
+        Vector2 spriteRelative = localPos - sprite.Position;
+        float texW = texture.GetWidth();
+        float texH = texture.GetHeight();
+        
+        // Account for sprite scaling and centering
+        // Since sprite is centered, we need to account for this in our coordinate transformation
+        float texX = (spriteRelative.X / sprite.Scale.X) + (texW * 0.5f);
+        float texY = (spriteRelative.Y / sprite.Scale.Y) + (texH * 0.5f);
+        
+        int centerX = Mathf.RoundToInt(Mathf.Clamp(texX, 0, texW - 1));
+        int centerY = Mathf.RoundToInt(Mathf.Clamp(texY, 0, texH - 1));
+        
+        // Check for non-transparent pixels (branches) within attachment radius
+        // Scale the search radius based on sprite scale for consistency
+        int searchRadius = Mathf.RoundToInt(BranchAttachmentRadius / Mathf.Max(sprite.Scale.X, sprite.Scale.Y));
+        searchRadius = Mathf.Max(1, searchRadius); // Ensure minimum search radius
+        
+        // First, check if the center position itself is on a branch
+        Color centerPixel = image.GetPixel(centerX, centerY);
+        bool foundBranch = centerPixel.A > 0.2f; // Higher threshold for more selective placement
+        
+        // If center isn't on a branch, check nearby pixels
+        if (!foundBranch)
+        {
+            int nearbyFound = 0;
+            int totalChecked = 0;
+            
+            for (int dx = -searchRadius; dx <= searchRadius; dx++)
+            {
+                for (int dy = -searchRadius; dy <= searchRadius; dy++)
+                {
+                    int pixelX = centerX + dx;
+                    int pixelY = centerY + dy;
+                    
+                    // Check bounds
+                    if (pixelX < 0 || pixelX >= texW || pixelY < 0 || pixelY >= texH) continue;
+                    
+                    // Check distance
+                    if (dx * dx + dy * dy > searchRadius * searchRadius) continue;
+                    
+                    totalChecked++;
+                    
+                    // Check if pixel is part of tree (non-transparent)
+                    Color pixel = image.GetPixel(pixelX, pixelY);
+                    if (pixel.A > 0.2f) // Higher threshold for branch detection
+                    {
+                        nearbyFound++;
+                    }
+                }
+            }
+            
+            // Require a minimum density of branch pixels in the area
+            float branchDensity = totalChecked > 0 ? (float)nearbyFound / totalChecked : 0f;
+            foundBranch = branchDensity > 0.3f; // At least 30% of nearby pixels should be branches
+        }
+        
+        return foundBranch;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void ConfigureTree(Node2D tree, float x, int zLayer)
     {
@@ -474,6 +640,8 @@ public partial class DynamicTreeSpawner : Node2D
         GD.Print($"Fractal probability: {FractalTreeProbability}");
         GD.Print($"Natural spacing: {UseNaturalSpacing}");
         GD.Print($"Chunks loaded: {_chunks.Count}");
+        GD.Print($"Apple placement: Radius={ApplePlacementRadius}, OffsetY={ApplePlacementOffsetY}, MinSpacing={AppleMinSpacing}");
+        GD.Print($"Apple allowed arc: {AppleArcStartDeg}°..{AppleArcEndDeg}°, band={AppleInnerRadiusRatio:P0}-{AppleOuterRadiusRatio:P0}, yScale={AppleEllipseYScale}");
     }
     
     public void SetNaturalSpacing(bool enabled)

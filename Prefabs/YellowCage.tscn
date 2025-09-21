@@ -1,0 +1,179 @@
+[gd_scene load_steps=11 format=3 uid="uid://ba2xqtigl0oid"]
+
+[ext_resource type="Script" uid="uid://d3iiantkcxes3" path="res://Scripts/Items/YellowCage.cs" id="1_x8k2v"]
+[ext_resource type="Texture2D" uid="uid://3n64dnxhiwpe" path="res://Art/Cage.png" id="2_lqkg8"]
+[ext_resource type="Texture2D" uid="uid://cec0fifq45oxw" path="res://Art/ChainCircle.png" id="3_2hdoc"]
+[ext_resource type="Texture2D" uid="uid://dt0t0gcrwpweu" path="res://Art/floorCage1.png" id="3_w613v"]
+[ext_resource type="Texture2D" uid="uid://drt3isu2mhh1j" path="res://Art/floorCage2.png" id="4_f4j6e"]
+[ext_resource type="Texture2D" uid="uid://breg64qhs8o35" path="res://Art/PuffNew.png" id="5_bjv8d"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_q2nko"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_lqkg8"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_gbdih"]
+size = Vector2(174, 278)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_detection"]
+size = Vector2(200, 300)
+
+[node name="Chain" type="Node2D"]
+
+[node name="ChainAnchor" type="StaticBody2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ChainAnchor"]
+shape = SubResource("CapsuleShape2D_q2nko")
+
+[node name="PinJoint2D-1" type="PinJoint2D" parent="."]
+position = Vector2(0, 15)
+node_a = NodePath("../ChainAnchor")
+node_b = NodePath("../Segment")
+softness = 1.0
+
+[node name="Segment" type="RigidBody2D" parent="."]
+z_index = 5
+position = Vector2(0, -3)
+
+[node name="SingleChainSprite" type="Sprite2D" parent="Segment"]
+position = Vector2(-0.20000096, 28.999994)
+scale = Vector2(0.024519231, 0.023397436)
+texture = ExtResource("3_2hdoc")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Segment"]
+position = Vector2(0, 29)
+shape = SubResource("CapsuleShape2D_lqkg8")
+
+[node name="PinJoint2D-2" type="PinJoint2D" parent="."]
+position = Vector2(0, 43)
+node_a = NodePath("../Segment")
+node_b = NodePath("../Segment2")
+softness = 1.0
+
+[node name="Segment2" type="RigidBody2D" parent="."]
+z_index = 4
+position = Vector2(0, 22)
+
+[node name="SingleChainSprite" type="Sprite2D" parent="Segment2"]
+position = Vector2(-0.20000096, 28.999994)
+scale = Vector2(0.024519231, 0.023397436)
+texture = ExtResource("3_2hdoc")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Segment2"]
+position = Vector2(0, 29)
+shape = SubResource("CapsuleShape2D_lqkg8")
+
+[node name="PinJoint2D-3" type="PinJoint2D" parent="."]
+position = Vector2(0, 71)
+node_a = NodePath("../Segment2")
+node_b = NodePath("../Segment3")
+softness = 1.0
+
+[node name="Segment3" type="RigidBody2D" parent="."]
+z_index = 3
+position = Vector2(0, 46)
+
+[node name="SingleChainSprite" type="Sprite2D" parent="Segment3"]
+position = Vector2(-0.20000096, 28.999994)
+scale = Vector2(0.024519231, 0.023397436)
+texture = ExtResource("3_2hdoc")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Segment3"]
+position = Vector2(0, 29)
+shape = SubResource("CapsuleShape2D_lqkg8")
+
+[node name="PinJoint2D-4" type="PinJoint2D" parent="."]
+position = Vector2(0, 95)
+node_a = NodePath("../Segment3")
+node_b = NodePath("../Segment4")
+softness = 1.0
+
+[node name="Segment4" type="RigidBody2D" parent="."]
+z_index = 1
+position = Vector2(0, 71)
+
+[node name="SingleChainSprite" type="Sprite2D" parent="Segment4"]
+position = Vector2(-0.20000096, 28.999994)
+scale = Vector2(0.024519231, 0.023397436)
+texture = ExtResource("3_2hdoc")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Segment4"]
+position = Vector2(0, 29)
+shape = SubResource("CapsuleShape2D_lqkg8")
+
+[node name="PinJoint2D-5" type="PinJoint2D" parent="."]
+position = Vector2(0, 121)
+node_a = NodePath("../Segment4")
+node_b = NodePath("../Segment5")
+softness = 1.0
+
+[node name="Segment5" type="RigidBody2D" parent="."]
+position = Vector2(0, 96)
+
+[node name="SingleChainSprite" type="Sprite2D" parent="Segment5"]
+position = Vector2(-0.20000096, 28.999994)
+scale = Vector2(0.024519231, 0.023397436)
+texture = ExtResource("3_2hdoc")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Segment5"]
+position = Vector2(0, 29)
+shape = SubResource("CapsuleShape2D_lqkg8")
+
+[node name="PinJoint2D-6" type="PinJoint2D" parent="."]
+position = Vector2(0, 121)
+node_a = NodePath("../Segment5")
+node_b = NodePath("../YellowCage")
+softness = 1.0
+
+[node name="YellowCage" type="RigidBody2D" parent="."]
+position = Vector2(0, 97)
+script = ExtResource("1_x8k2v")
+DetachFromChainOnUnlock = false
+
+[node name="PromptLabel" type="Label" parent="YellowCage"]
+offset_left = -19.0
+offset_top = 13.0
+offset_right = 20.0
+offset_bottom = 27.0
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 10
+text = "Press E"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="YellowCage"]
+z_index = -4
+position = Vector2(3, 206)
+shape = SubResource("RectangleShape2D_gbdih")
+
+[node name="CageSprite" type="Sprite2D" parent="YellowCage"]
+modulate = Color(0.85849303, 0.7466902, 0.25180906, 1)
+z_index = 1
+position = Vector2(0.9999999, 183)
+rotation = -3.1415925
+scale = Vector2(0.19415781, -0.1921197)
+texture = ExtResource("2_lqkg8")
+
+[node name="FloorCageSpriteBehind" type="Sprite2D" parent="YellowCage"]
+modulate = Color(0.85849303, 0.7466902, 0.25180906, 1)
+position = Vector2(-0.18179703, 298.36362)
+rotation = -3.1415925
+scale = Vector2(0.2718807, -0.3021167)
+texture = ExtResource("3_w613v")
+
+[node name="FloorCageSpriteFront" type="Sprite2D" parent="YellowCage"]
+modulate = Color(0.85849303, 0.7466902, 0.25180906, 1)
+position = Vector2(0.22891256, 323.5783)
+rotation = -3.1415925
+scale = Vector2(0.27006316, -0.2763489)
+texture = ExtResource("4_f4j6e")
+
+[node name="PuffPresioner" type="Sprite2D" parent="YellowCage"]
+position = Vector2(6.259201, 258.73553)
+rotation = -3.1415925
+scale = Vector2(0.17158453, -0.16220284)
+texture = ExtResource("5_bjv8d")
+
+[node name="DetectionArea" type="Area2D" parent="YellowCage"]
+
+[node name="DetectionCollision" type="CollisionShape2D" parent="YellowCage/DetectionArea"]
+position = Vector2(3, 206)
+shape = SubResource("RectangleShape2D_detection")
+debug_color = Color(0.5, 0.8, 1, 0.3)

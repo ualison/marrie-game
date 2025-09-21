@@ -1,0 +1,44 @@
+[gd_scene load_steps=5 format=3 uid="uid://bef7hvbq0docy"]
+
+[ext_resource type="Script" uid="uid://w8jf5hkua3tm" path="res://Scripts/Items/PuffCageKey.cs" id="1_0h8y4"]
+[ext_resource type="Texture2D" uid="uid://oxtiekbbxqu4" path="res://Art/PuffKey.png" id="1_cgj86"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_cgj86"]
+size = Vector2(87, 36)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_mgqww"]
+size = Vector2(94, 39)
+
+[node name="PuffCageKey" type="Node2D"]
+script = ExtResource("1_0h8y4")
+
+[node name="RigidBody2D" type="RigidBody2D" parent="."]
+
+[node name="PromptLabel" type="Label" parent="RigidBody2D"]
+offset_left = -21.0
+offset_top = -43.0
+offset_right = 18.0
+offset_bottom = -29.0
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 10
+text = "Press E"
+
+[node name="KeySprite" type="Sprite2D" parent="RigidBody2D"]
+position = Vector2(-0.49999678, 0.4374919)
+scale = Vector2(0.055338543, 0.057739273)
+texture = ExtResource("1_cgj86")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RigidBody2D"]
+position = Vector2(-2, -2)
+shape = SubResource("RectangleShape2D_cgj86")
+
+[node name="DetectionArea" type="Area2D" parent="RigidBody2D"]
+collision_layer = 0
+collision_mask = 2
+monitoring = true
+monitorable = false
+
+[node name="DetectionCollision" type="CollisionShape2D" parent="RigidBody2D/DetectionArea"]
+position = Vector2(-2, -3.5)
+shape = SubResource("RectangleShape2D_mgqww")
+debug_color = Color(0.9408318, 0.219434, 0.28519142, 0.41960785)

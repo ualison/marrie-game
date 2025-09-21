@@ -1,11 +1,10 @@
-[gd_scene load_steps=9 format=3 uid="uid://dxvamghbt08mr"]
+[gd_scene load_steps=8 format=3 uid="uid://dxvamghbt08mr"]
 
 [ext_resource type="Script" uid="uid://g3qhhrdutgk5" path="res://Scripts/UI/LifeBar.cs" id="1_lifebar"]
-[ext_resource type="Texture2D" uid="uid://c8u1u42hhwaci" path="res://Art/FullLifeHeart.png" id="2_fulllife"]
-[ext_resource type="Texture2D" uid="uid://bw6408wklaekv" path="res://Art/EmptyLifeHeart.png" id="3_emptylife"]
 [ext_resource type="Script" uid="uid://1o447xq10j6e" path="res://Scripts/UI/ManaBar.cs" id="4_manabar"]
-[ext_resource type="Texture2D" uid="uid://c4jx5vo5jcqtn" path="res://Art/FullManaHeart.png" id="5_fullmana"]
-[ext_resource type="Texture2D" uid="uid://cj0t7aq24040y" path="res://Art/EmptyManaHeart.png" id="6_emptymana"]
+[ext_resource type="Texture2D" uid="uid://cyqvsavuevs3x" path="res://Art/ManaHeart.png" id="4_toh7i"]
+[ext_resource type="Texture2D" uid="uid://di3snpkk83b15" path="res://Art/DisabledHeart.png" id="5_7bvv0"]
+[ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/LifeHeart.png" id="7_geraf"]
 [ext_resource type="PackedScene" uid="uid://844rfld3y4ee" path="res://Prefabs/UI/RockCount.tscn" id="7_rockcount"]
 [ext_resource type="PackedScene" uid="uid://cld6sntxsh51w" path="res://Prefabs/UI/RespawnDebug.tscn" id="8_respawndebug"]
 
@@ -20,7 +19,7 @@ mouse_filter = 2
 
 [node name="RespawnDebug" parent="." instance=ExtResource("8_respawndebug")]
 custom_minimum_size = Vector2(0, 0)
-layout_mode = 2
+layout_mode = 0
 anchors_preset = 0
 anchor_right = 0.0
 anchor_bottom = 0.0
@@ -48,8 +47,8 @@ layout_mode = 2
 custom_minimum_size = Vector2(0, 45)
 layout_mode = 2
 script = ExtResource("4_manabar")
-FullManaTexture = ExtResource("5_fullmana")
-EmptyManaTexture = ExtResource("6_emptymana")
+FullManaTexture = ExtResource("4_toh7i")
+EmptyManaTexture = ExtResource("5_7bvv0")
 
 [node name="ManaContainer" type="HBoxContainer" parent="BottomLeftContainer/ManaBar"]
 layout_mode = 1
@@ -64,8 +63,8 @@ theme_override_constants/separation = 5
 custom_minimum_size = Vector2(0, 45)
 layout_mode = 2
 script = ExtResource("1_lifebar")
-FullHeartTexture = ExtResource("2_fulllife")
-EmptyHeartTexture = ExtResource("3_emptylife")
+FullHeartTexture = ExtResource("7_geraf")
+EmptyHeartTexture = ExtResource("5_7bvv0")
 
 [node name="HeartsContainer" type="HBoxContainer" parent="BottomLeftContainer/LifeHearts"]
 layout_mode = 1

@@ -1,5 +1,6 @@
 using Godot;
 using MarrieGame.Core.Utils;
+using MarrieGame.Core.Enums;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -23,6 +24,7 @@ public partial class ReplayRecorder : Node
     private bool _lastMonsterRecordingState = false;
     public bool IsRecording { get; private set; }
     public bool IsPausedForReplay { get; private set; }
+    public ReplayRecordingMode CurrentRecordingMode { get; private set; } = ReplayRecordingMode.DeathMode;
     // Include the small prebuffer in the recorded-data check to avoid losing fast deaths
     private const int PREBUFFER_CAPACITY = 64;
     private readonly Queue<ReplayFrame> _playerPreBuffer = new();
@@ -60,6 +62,20 @@ public partial class ReplayRecorder : Node
         ProcessMode = ProcessModeEnum.Always;
         AddToGroup("replay_recorder");
 
+        // Listen to scene changes to reinitialize on scene transitions
+        if (SceneLifecycleManager.Instance != null)
+        {
+            SceneLifecycleManager.SceneReady += OnSceneReady;
+        }
+        else
+        {
+            // If SceneLifecycleManager isn't ready yet, defer the connection
+            CallDeferred(nameof(ConnectToSceneLifecycleManager));
+        }
+
+        // Determine recording mode based on current scene
+        DetectRecordingMode();
+
         CallDeferred(nameof(Initialize));
     }
 
@@ -79,11 +95,118 @@ public partial class ReplayRecorder : Node
 
     public override void _ExitTree()
     {
+        // Clean up scene lifecycle connection
+        if (SceneLifecycleManager.Instance != null)
+        {
+            SceneLifecycleManager.SceneReady -= OnSceneReady;
+        }
+        
         if (Instance == this) Instance = null;
+    }
+
+    private void ConnectToSceneLifecycleManager()
+    {
+        if (SceneLifecycleManager.Instance != null)
+        {
+            SceneLifecycleManager.SceneReady += OnSceneReady;
+            Log.Debug("Connected ReplayRecorder to SceneLifecycleManager", "ReplayRecorder");
+        }
+        else
+        {
+            Log.Warning("SceneLifecycleManager not available for ReplayRecorder connection", "ReplayRecorder");
+        }
+    }
+
+    private void OnSceneReady()
+    {
+        Log.Debug("ReplayRecorder: Scene ready event received, reinitializing", "ReplayRecorder");
+        
+        // Re-detect recording mode for the new scene
+        DetectRecordingMode();
+        
+        // Reinitialize with new scene entities
+        CallDeferred(nameof(ReinitializeForNewScene));
+    }
+
+    private void ReinitializeForNewScene()
+    {
+        // Stop current recording if active
+        bool wasRecording = IsRecording;
+        if (IsRecording)
+        {
+            StopRecording();
+        }
+
+        // Clear old cached entities and refresh
+        _cachedPlayer = null;
+        _cachedMonster = null;
+        _playerSprite = null;
+        _playerVisual = null;
+        _monsterSprite = null;
+        _monsterVisual = null;
+
+        // Refresh character cache and restart recording if it was active
+        RefreshCharacterCache();
+        
+        if (wasRecording || _cachedPlayer != null)
+        {
+            StartRecording();
+            Log.Debug("ReplayRecorder reinitialized and recording restarted for new scene", "ReplayRecorder");
+        }
+        else
+        {
+            Log.Debug("ReplayRecorder reinitialized but no player found to record", "ReplayRecorder");
+        }
     }
     #endregion
 
     #region Initialization (Simplified)
+
+    private void DetectRecordingMode()
+    {
+        // Get recording mode from GameManager if available
+        if (GameManager.Instance != null)
+        {
+            CurrentRecordingMode = GameManager.Instance.GetReplayRecordingMode();
+        }
+        else
+        {
+            // Fallback: try to detect based on scene name
+            var currentScene = GetTree().CurrentScene;
+            if (currentScene != null)
+            {
+                var sceneName = currentScene.Name.ToString();
+                var sceneFilePath = currentScene.SceneFilePath;
+                
+                if (!string.IsNullOrEmpty(sceneFilePath))
+                {
+                    var fileName = sceneFilePath.GetFile().GetBaseName();
+                    if (!string.IsNullOrEmpty(fileName))
+                    {
+                        sceneName = fileName;
+                    }
+                }
+
+                if (sceneName.Contains("PuzzleDimension"))
+                {
+                    CurrentRecordingMode = ReplayRecordingMode.PuzzleMode;
+                }
+                else
+                {
+                    CurrentRecordingMode = ReplayRecordingMode.DeathMode;
+                }
+            }
+        }
+
+        Log.Debug($"Recording mode set to: {CurrentRecordingMode}", "ReplayRecorder");
+    }
+
+    // Allow external systems to force the mode when scenes change
+    public void ForceSetRecordingMode(ReplayRecordingMode mode)
+    {
+        CurrentRecordingMode = mode;
+        Log.Debug($"Recording mode forcibly set to: {CurrentRecordingMode}", "ReplayRecorder");
+    }
 
     // NEW METHOD: Called by EnemyManager when monster visibility changes
     public void OnMonsterVisibilityChanged(Monster monster, bool isVisible)
@@ -148,6 +271,14 @@ public partial class ReplayRecorder : Node
             if (_playerSprite == null && _playerVisual == null)
             {
                 Log.Warning($"No visual component (AnimatedSprite2D or Sprite2D) found for player {_cachedPlayer.Name}", "ReplayRecorder");
+                // Debug: Log available children to help identify the structure
+                Log.Debug($"Player children: {string.Join(", ", _cachedPlayer.GetChildren().Select(c => $"{c.Name}({c.GetType().Name})"))}", "ReplayRecorder");
+            }
+            else
+            {
+                var visualType = _playerSprite?.GetType().Name ?? _playerVisual?.GetType().Name ?? "Unknown";
+                var visualName = _playerSprite?.Name ?? _playerVisual?.Name ?? "Unknown";
+                Log.Debug($"Found player visual component: {visualName} ({visualType})", "ReplayRecorder");
             }
         }
 
@@ -171,6 +302,16 @@ public partial class ReplayRecorder : Node
 
         if (node != null) return node;
 
+        // Also check if MarrieSprite or similar containers have AnimatedSprite2D children
+        var container = NodeHelpers.GetNodeOrNull<Node2D>(character, null, "MarrieSprite")
+                     ?? NodeHelpers.GetNodeOrNull<Node2D>(character, null, "GhostMarrieSprite");
+        
+        if (container != null)
+        {
+            var childAnimSprite = NodeHelpers.FindChildOfType<AnimatedSprite2D>(container);
+            if (childAnimSprite != null) return childAnimSprite;
+        }
+
         // Fallback: search direct children for a sprite-like node
         var found = NodeHelpers.FindChildOfType<AnimatedSprite2D>(character);
         return found;
@@ -178,12 +319,20 @@ public partial class ReplayRecorder : Node
 
     private Node2D FindVisualInCharacter(Node2D character)
     {
-        var node = NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "Sprite2D")
+        // First try to find Sprite2D nodes
+        var spriteNode = NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "Sprite2D")
                ?? NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "MonsterSprite")
                ?? NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "MarrieSprite")
                ?? NodeHelpers.GetNodeOrNull<Sprite2D>(character, null, "GhostMarrieSprite");
 
-        if (node != null) return node as Node2D;
+        if (spriteNode != null) return spriteNode as Node2D;
+
+        // Also try to find Node2D containers that might hold sprites (like MarrieSprite)
+        var containerNode = NodeHelpers.GetNodeOrNull<Node2D>(character, null, "MarrieSprite")
+                         ?? NodeHelpers.GetNodeOrNull<Node2D>(character, null, "GhostMarrieSprite")
+                         ?? NodeHelpers.GetNodeOrNull<Node2D>(character, null, "MonsterSprite");
+
+        if (containerNode != null) return containerNode;
 
         // Fallback: find first Sprite2D child
         var found = NodeHelpers.FindChildOfType<Sprite2D>(character);
@@ -282,8 +431,9 @@ public partial class ReplayRecorder : Node
             _lastPlayerPos = _cachedPlayer.GlobalPosition;
         }
 
-        // BUG FIX: Only record monster frames when monster is not hidden
-        if (_cachedMonster != null && ShouldRecordMonster())
+        // In PuzzleMode, don't record monster frames as puzzles typically don't have monsters to replay
+        // In DeathMode, record monster frames when monster is not hidden
+        if (CurrentRecordingMode == ReplayRecordingMode.DeathMode && _cachedMonster != null && ShouldRecordMonster())
         {
             var frame = CreateMonsterFrame();
             _monsterFrames.Add(frame);
@@ -505,6 +655,23 @@ public partial class ReplayRecorder : Node
     public (int playerFrames, int monsterFrames, float duration) GetStats()
     {
         return (_playerFrames.Count, _monsterFrames.Count, _elapsedTime);
+    }
+
+    /// <summary>
+    /// Gets current recording data for puzzle mode replay (doesn't require death)
+    /// </summary>
+    public (List<ReplayFrame> playerFrames, List<ReplayFrame> monsterFrames, float duration) GetCurrentRecordingData()
+    {
+        var playerFrames = new List<ReplayFrame>(_playerFrames);
+        var monsterFrames = new List<ReplayFrame>(_monsterFrames);
+        
+        // Include prebuffer data if main recording is small
+        if (_playerFrames.Count == 0 && _playerPreBuffer.Count > 0)
+        {
+            playerFrames.AddRange(_playerPreBuffer);
+        }
+        
+        return (playerFrames, monsterFrames, _elapsedTime);
     }
     #endregion
 }

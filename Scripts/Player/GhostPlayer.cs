@@ -36,6 +36,11 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
     // Setup visual appearance and disable physics interactions
         SetupGhostVisuals();
         DisableCollisions();
+        
+        // Add to player group so PuzzleCrystals can detect it
+        AddToGroup("player");
+        AddToGroup("ghost_player");
+        
         Hide();
 
         Log.Replay($"GhostPlayer ready: {Name}, Parent: {GetParent()?.Name}", "GhostPlayer");
@@ -45,6 +50,9 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
     {
         // Called after the ghost is added to scene and sprites are ready
         GlobalPosition = position;
+        
+        // Add to both player groups for detection by PuzzleCrystals and other systems
+        AddToGroup("player");
         AddToGroup("ghost_player");
         
         // Refresh sprite discovery since factory may have added sprites after _Ready
@@ -298,6 +306,12 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
         // Apply rotation from frame data
         GlobalRotation = frame.Rotation;
 
+        // DEBUG: Log flip state for debugging
+        if (frame.SpriteFlip)
+        {
+            Log.Debug($"Applying flip to ghost - SpriteFlip: {frame.SpriteFlip}", "GhostPlayer");
+        }
+
         // Apply sprite flip state with enhanced debugging
         if (_activeSprite != null)
         {
@@ -312,6 +326,40 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
             {
                 // Apply FlipH property directly for more accurate reproduction
                 _animatedSprite.FlipH = frame.SpriteFlip;
+            }
+
+            // FIXED: Apply flip to ALL sprites in GhostMarrieSprite container with proper position mirroring
+            var ghostContainer = GetNodeOrNull("GhostMarrieSprite");
+            if (ghostContainer != null)
+            {
+                foreach (Node child in ghostContainer.GetChildren())
+                {
+                    if (child is Sprite2D sprite)
+                    {
+                        var spriteScale = sprite.Scale;
+                        var spriteNewScaleX = frame.SpriteFlip ? -Mathf.Abs(spriteScale.X) : Mathf.Abs(spriteScale.X);
+                        sprite.Scale = new Vector2(spriteNewScaleX, spriteScale.Y);
+
+                        // FIXED: Mirror positions for body parts when flipping
+                        ApplyPositionMirroringForBodyPart(sprite, frame.SpriteFlip);
+                    }
+                    else if (child is AnimatedSprite2D animSprite)
+                    {
+                        animSprite.FlipH = frame.SpriteFlip;
+                        var animScale = animSprite.Scale;
+                        var animNewScaleX = frame.SpriteFlip ? -Mathf.Abs(animScale.X) : Mathf.Abs(animScale.X);
+                        animSprite.Scale = new Vector2(animNewScaleX, animScale.Y);
+
+                        // FIXED: Mirror positions for body parts when flipping
+                        ApplyPositionMirroringForBodyPart(animSprite, frame.SpriteFlip);
+                    }
+                }
+                
+                // DEBUG: Log applied flip state
+                if (frame.SpriteFlip)
+                {
+                    Log.Debug($"Applied flip to all {ghostContainer.GetChildCount()} sprites in container", "GhostPlayer");
+                }
             }
         }
         else
@@ -333,6 +381,34 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
             {
                 _animatedSprite.FlipH = frame.SpriteFlip;
             }
+
+            // FIXED: Also apply to container sprites after rediscovery
+            var ghostContainer = GetNodeOrNull("GhostMarrieSprite");
+            if (ghostContainer != null)
+            {
+                foreach (Node child in ghostContainer.GetChildren())
+                {
+                    if (child is Sprite2D sprite)
+                    {
+                        var spriteScale = sprite.Scale;
+                        var spriteNewScaleX = frame.SpriteFlip ? -Mathf.Abs(spriteScale.X) : Mathf.Abs(spriteScale.X);
+                        sprite.Scale = new Vector2(spriteNewScaleX, spriteScale.Y);
+
+                        // FIXED: Mirror positions for body parts when flipping
+                        ApplyPositionMirroringForBodyPart(sprite, frame.SpriteFlip);
+                    }
+                    else if (child is AnimatedSprite2D animSprite)
+                    {
+                        animSprite.FlipH = frame.SpriteFlip;
+                        var animScale = animSprite.Scale;
+                        var animNewScaleX = frame.SpriteFlip ? -Mathf.Abs(animScale.X) : Mathf.Abs(animScale.X);
+                        animSprite.Scale = new Vector2(animNewScaleX, animScale.Y);
+
+                        // FIXED: Mirror positions for body parts when flipping
+                        ApplyPositionMirroringForBodyPart(animSprite, frame.SpriteFlip);
+                    }
+                }
+            }
         }
 
         // Apply visibility state
@@ -341,8 +417,30 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
             _activeSprite.Visible = frame.IsVisible;
             if (Mathf.Abs(frame.Alpha - _activeSprite.Modulate.A) > 0.01f)
             {
-                var currentColor = _activeSprite.Modulate;
-                _activeSprite.Modulate = new Color(currentColor.R, currentColor.G, currentColor.B, frame.Alpha * GHOST_TINT.A);
+                // FIXED: Maintain purple ghost tint while applying frame alpha
+                var newAlpha = frame.Alpha * GHOST_TINT.A;
+                
+                // Apply to the main active sprite
+                _activeSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, newAlpha);
+                
+                // FIXED: Also apply alpha to all sprites in GhostMarrieSprite container
+                var ghostContainer = GetNodeOrNull("GhostMarrieSprite");
+                if (ghostContainer != null)
+                {
+                    foreach (Node child in ghostContainer.GetChildren())
+                    {
+                        if (child is Sprite2D sprite)
+                        {
+                            sprite.Visible = frame.IsVisible;
+                            sprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, newAlpha);
+                        }
+                        else if (child is AnimatedSprite2D animSprite)
+                        {
+                            animSprite.Visible = frame.IsVisible;
+                            animSprite.Modulate = new Color(GHOST_TINT.R, GHOST_TINT.G, GHOST_TINT.B, newAlpha);
+                        }
+                    }
+                }
             }
         }
 
@@ -371,7 +469,7 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
 
     private void DiscoverSpriteComponents()
     {
-        // Use NodeHelpers to discover sprites with consistent fallbacks
+        // FIXED: First try to find AnimatedSprite2D components
         _animatedSprite = NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(this, null, "AnimatedSprite2D");
         if (_animatedSprite != null)
         {
@@ -379,8 +477,8 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
             return;
         }
 
+        // FIXED: Look for direct Sprite2D children first
         _sprite = NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "Sprite2D")
-            ?? NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "GhostMarrieSprite")
             ?? NodeHelpers.GetNodeOrNull<Sprite2D>(this, null, "MarrieSprite");
 
         if (_sprite != null)
@@ -389,6 +487,36 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
             return;
         }
 
+        // FIXED: Look for GhostMarrieSprite container and find any Sprite2D inside it
+        var ghostContainer = GetNodeOrNull("GhostMarrieSprite");
+        if (ghostContainer != null)
+        {
+            // Find any Sprite2D component within the ghost container (MarrieStatic has multiple Sprite2D children)
+            foreach (Node child in ghostContainer.GetChildren())
+            {
+                if (child is Sprite2D sprite2D)
+                {
+                    _sprite = sprite2D;
+                    _activeSprite = _sprite;
+                    Log.Replay($"Found sprite in GhostMarrieSprite container: {_sprite.Name}", "GhostPlayer");
+                    return;
+                }
+            }
+
+            // Also check for AnimatedSprite2D in the container
+            foreach (Node child in ghostContainer.GetChildren())
+            {
+                if (child is AnimatedSprite2D animSprite)
+                {
+                    _animatedSprite = animSprite;
+                    _activeSprite = _animatedSprite;
+                    Log.Replay($"Found animated sprite in GhostMarrieSprite container: {_animatedSprite.Name}", "GhostPlayer");
+                    return;
+                }
+            }
+        }
+
+        // FIXED: As fallback, try to find AnimatedSprite2D with common names
         _animatedSprite = NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(this, null, "GhostMarrieSprite")
             ?? NodeHelpers.GetNodeOrNull<AnimatedSprite2D>(this, null, "MarrieSprite");
 
@@ -406,11 +534,39 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
 
     private void ApplyGhostEffect()
     {
-        // Apply semi-transparent blue tint for ghost appearance
+        // FIXED: Apply purple tint to all sprite components, not just the active one
         if (_activeSprite != null)
         {
+            // Apply to the main active sprite
             _activeSprite.Modulate = GHOST_TINT;
             _activeSprite.Show();
+
+            // FIXED: If we found a sprite inside GhostMarrieSprite container, 
+            // apply the ghost effect to ALL sprites in the container for complete purple tint
+            var ghostContainer = GetNodeOrNull("GhostMarrieSprite");
+            if (ghostContainer != null)
+            {
+                foreach (Node child in ghostContainer.GetChildren())
+                {
+                    if (child is Sprite2D sprite)
+                    {
+                        sprite.Modulate = GHOST_TINT;
+                        sprite.Show();
+
+                        // FIXED: Ensure original positions are set correctly
+                        ApplyPositionMirroringForBodyPart(sprite, false);
+                    }
+                    else if (child is AnimatedSprite2D animSprite)
+                    {
+                        animSprite.Modulate = GHOST_TINT;
+                        animSprite.Show();
+
+                        // FIXED: Ensure original positions are set correctly
+                        ApplyPositionMirroringForBodyPart(animSprite, false);
+                    }
+                }
+                Log.Replay($"Applied ghost effect to all sprites in GhostMarrieSprite container", "GhostPlayer");
+            }
         }
         else
         {
@@ -440,9 +596,13 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
 
     private void DisableCollisions()
     {
-        // Prevent ghost from interfering with physics
-        SetCollisionLayerValue(1, false);
-        SetCollisionMaskValue(1, false);
+        // Disable collision with world geometry (layer 1) but keep layer 2 
+        // so PuzzleCrystals can still detect the ghost player
+        SetCollisionLayerValue(1, false);  // Don't collide with world
+        SetCollisionMaskValue(1, false);   // Don't detect world collisions
+        
+        // Keep collision layer 2 enabled for PuzzleCrystal detection
+        // SetCollisionLayerValue(2, false);  // DON'T disable - PuzzleCrystals need this
     }
 
     // Pooling support
@@ -471,6 +631,39 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
             _animatedSprite.FlipH = false;
         }
 
+        // FIXED: Reset all sprites in GhostMarrieSprite container
+        var ghostContainer = GetNodeOrNull("GhostMarrieSprite");
+        if (ghostContainer != null)
+        {
+            foreach (Node child in ghostContainer.GetChildren())
+            {
+                if (child is Sprite2D sprite)
+                {
+                    sprite.Show();
+                    sprite.Modulate = GHOST_TINT;
+                    // FIXED: Reset scale properly without flipping
+                    var scale = sprite.Scale;
+                    sprite.Scale = new Vector2(Mathf.Abs(scale.X), scale.Y);
+
+                    // FIXED: Reset position to original
+                    ApplyPositionMirroringForBodyPart(sprite, false);
+                }
+                else if (child is AnimatedSprite2D animSprite)
+                {
+                    try { animSprite.Stop(); } catch { }
+                    animSprite.FlipH = false;
+                    animSprite.Show();
+                    animSprite.Modulate = GHOST_TINT;
+                    // FIXED: Reset scale properly without flipping
+                    var scale = animSprite.Scale;
+                    animSprite.Scale = new Vector2(Mathf.Abs(scale.X), scale.Y);
+
+                    // FIXED: Reset position to original
+                    ApplyPositionMirroringForBodyPart(animSprite, false);
+                }
+            }
+        }
+
         // Reset movement smoothing
         _currentPosition = Vector2.Zero;
         _targetPosition = Vector2.Zero;
@@ -478,15 +671,19 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
         // Visibility defaults
         Show();
 
-        // Disable collisions while pooled
+        // Disable collisions while pooled, but maintain group membership
         DisableCollisions();
-        RemoveFromGroup("ghost_player");
+        
+        // Ensure it stays in both player groups for consistent detection
+        if (!IsInGroup("player")) AddToGroup("player");
+        if (!IsInGroup("ghost_player")) AddToGroup("ghost_player");
     }
 
     public void OnReleasedToPool()
     {
         // Final cleanup: remove any runtime signals or references
         try { RemoveFromGroup("ghost_player"); } catch { }
+        try { RemoveFromGroup("player"); } catch { }
 
         // Hide and detach any heavy resources
         try { Hide(); } catch { }
@@ -504,6 +701,41 @@ public partial class GhostPlayer : CharacterBody2D, IPoolable
             Log.Debug($"  - {child.Name} ({child.GetType().Name})", "GhostPlayer");
         }
 #endif
+    }
+
+    // FIXED: Store original positions for proper mirroring
+    private readonly Dictionary<string, Vector2> _originalBodyPartPositions = new()
+    {
+        { "RightHand", new Vector2(37.000004f, 33.000008f) },
+        { "RightHandBasket", new Vector2(-49f, 68f) },
+        { "LeftFoot", new Vector2(23.000002f, 171f) },
+        { "RightFoot", new Vector2(-13f, 172f) },
+        { "HairWithoutHead", new Vector2(-7f, 0f) },
+        { "Skirt", new Vector2(-2f, 104.00001f) },
+        { "Torso", new Vector2(0f, 0f) },
+        { "FaceV2", new Vector2(-1.9999998f, -63f) }
+    };
+
+    private void ApplyPositionMirroringForBodyPart(Node2D sprite, bool isFlipped)
+    {
+        // FIXED: Apply proper position mirroring for body parts when flipping
+        var spriteName = sprite.Name;
+        
+        if (_originalBodyPartPositions.TryGetValue(spriteName, out var originalPos))
+        {
+            if (isFlipped)
+            {
+                // Mirror the X position around the center (0,0)
+                var mirroredX = -originalPos.X;
+                sprite.Position = new Vector2(mirroredX, originalPos.Y);
+            }
+            else
+            {
+                // Restore original position
+                sprite.Position = originalPos;
+            }
+        }
+        // If it's not a known body part, don't change its position
     }
     #endregion
 }

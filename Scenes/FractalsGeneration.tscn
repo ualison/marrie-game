@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://c0abacw7aimd0"]
 
-[ext_resource type="Script" uid="uid://qbroyuxfpv76" path="res://Scripts/Environment/NewFractals/FractalTree.cs" id="1_2lb8r"]
+[ext_resource type="Script" uid="uid://qbroyuxfpv76" path="res://Scripts/Environment/NewFractals/FractalTree.cs" id="1_heqb1"]
 
 [node name="Main" type="Node2D"]
 
@@ -9,15 +9,16 @@ position = Vector2(0, -133)
 
 [node name="NewFractalTree" type="Node2D" parent="."]
 position = Vector2(0, 248)
-script = ExtResource("1_2lb8r")
-MaxDepth = 20
+script = ExtResource("1_heqb1")
+MaxDepth = 21
 InitialLength = 250.0
 LengthReduction = 0.75
 AngleVariation = 30.0
 MinAngle = 30.0
 MaxAngle = 30.0
 MinBranches = 3
+InitialThickness = 10.0
 TrunkColor = Color(0, 0, 0, 1)
-LeafColor = Color(0.3283769, 0.010033721, 0.29472324, 1)
+LeafColor = Color(1, 1, 1, 1)
 AutoSaveAfterGeneration = true
 ExportFolderName = "FractalsExports"

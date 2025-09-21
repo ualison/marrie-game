@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3 uid="uid://6eg7ul4k085w"]
+
+[ext_resource type="Script" uid="uid://bmq6pnq1l0sow" path="res://Scripts/Systems/PuzzleManager.cs" id="1_qk8mj"]
+
+[node name="Root" type="Node2D"]
+script = ExtResource("1_qk8mj")
+FadeOutDuration = 0.5
+MainPlatformFadeDuration = 0.5
+MinRandomPlatformDuration = 1.0
+MaxRandomPlatformDuration = 2.0

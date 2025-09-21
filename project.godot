@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Marrie"
-run/main_scene="uid://bnv528gs1hngu"
+run/main_scene="uid://54o6xy0qaoae"
 config/features=PackedStringArray("4.5", "C#", "GL Compatibility")
 config/icon="res://icon.svg"
 
@@ -70,6 +70,7 @@ interact={
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.09239707, 0.09239706, 0.09239706, 1)
 
 [user_data]
 

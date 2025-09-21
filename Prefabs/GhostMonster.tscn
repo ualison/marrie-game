@@ -1,15 +1,15 @@
 [gd_scene load_steps=7 format=3 uid="uid://bqj7y8lk5uq60"]
 
 [ext_resource type="Script" uid="uid://d0e7xcevrndxm" path="res://Scripts/Enemy/GhostMonster.cs" id="1_uqgqf"]
-[ext_resource type="Texture2D" uid="uid://xaif04xg1b71" path="res://Art/Monster.png" id="2_6ib6h"]
 [ext_resource type="Script" uid="uid://dq22yqfge47s5" path="res://Scripts/Enemy/GhostMonsterLife.cs" id="4_6ib6h"]
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
+[ext_resource type="Texture2D" uid="uid://bjltsffihyof5" path="res://Art/MonsterNew2.png" id="4_xqxg4"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_6ib6h"]
-size = Vector2(308, 387)
+size = Vector2(261, 355)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kyqiw"]
-size = Vector2(290, 381)
+size = Vector2(243, 348)
 
 [node name="Root" type="Node2D"]
 
@@ -21,18 +21,13 @@ position = Vector2(0, -4)
 collision_layer = 16
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D/DamageArea"]
-position = Vector2(-7, 0.5)
+position = Vector2(-19.5, 27.5)
 shape = SubResource("RectangleShape2D_6ib6h")
 debug_color = Color(0.764087, 0.04706, 0.125471, 0.42)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]
-position = Vector2(-8, 3.5)
+position = Vector2(-19.5, 29)
 shape = SubResource("RectangleShape2D_kyqiw")
-
-[node name="GhostMonsterSprite" type="Sprite2D" parent="CharacterBody2D"]
-position = Vector2(-1, 1)
-scale = Vector2(0.321, 0.306)
-texture = ExtResource("2_6ib6h")
 
 [node name="GhostMonsterLifeBar" parent="CharacterBody2D" instance=ExtResource("4_lifebar")]
 offset_left = -53.0
@@ -46,3 +41,8 @@ RequiredReality = 1
 position = Vector2(-2, -221)
 script = ExtResource("4_6ib6h")
 MaxPurple = 2
+
+[node name="GhostMonsterSprite" type="Sprite2D" parent="CharacterBody2D"]
+position = Vector2(-3.9999905, 59.000004)
+scale = Vector2(0.385, 0.39)
+texture = ExtResource("4_xqxg4")

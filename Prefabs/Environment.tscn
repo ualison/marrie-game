@@ -1,8 +1,14 @@
-[gd_scene load_steps=4 format=3 uid="uid://bprvmud1sukcc"]
+[gd_scene load_steps=7 format=3 uid="uid://bprvmud1sukcc"]
 
 [ext_resource type="PackedScene" uid="uid://c2dkq2wcjk8i7" path="res://Prefabs/ForestGround.tscn" id="2_opdns"]
 [ext_resource type="Script" uid="uid://s5qg2tiue4f7" path="res://Scripts/Environment/DynamicTreeSpawner.cs" id="4_lrc6l"]
+[ext_resource type="Script" uid="uid://ins52dvulrc1" path="res://Scripts/Environment/SnowTempest.cs" id="4_p64kh"]
+[ext_resource type="Texture2D" uid="uid://c01rp2x53l7vt" path="res://Art/KochSnowFlake.png" id="5_lrc6l"]
 [ext_resource type="PackedScene" uid="uid://dx0uy3xgtdtry" path="res://Prefabs/Apple.tscn" id="5_p64kh"]
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_opdns"]
+particle_flag_disable_z = true
+gravity = Vector3(0, 98, 0)
 
 [node name="Environment" type="Node2D"]
 
@@ -23,5 +29,40 @@ FractalTreeWidth = 1024.0
 FractalTreeHeight = 1024.0
 FractalVerticalOffset = 100.0
 ApplePrefab = ExtResource("5_p64kh")
-MinApplesPerTree = 2
-MaxApplesPerTree = 4
+MinApplesPerTree = 4
+ApplePlacementRadius = 60.0
+ApplePlacementOffsetY = -150.0
+AppleMinSpacing = 60.0
+BranchAttachmentRadius = 50.0
+
+[node name="SnowTempestFront" type="GPUParticles2D" parent="."]
+z_index = 10
+position = Vector2(-11, -416)
+scale = Vector2(6.399997, 0.19999987)
+amount = 100
+process_material = SubResource("ParticleProcessMaterial_opdns")
+script = ExtResource("4_p64kh")
+TempestIntensity = 0.6
+WindDirection = Vector2(0.8, 0.3)
+WindStrength = 20.0
+TextureWeight = 0.09
+TextureHeight = 0.09
+SnowflakeTexture = ExtResource("5_lrc6l")
+GravityVelocity = 12.0
+ParticleLifetime = 20.0
+
+[node name="SnowTempestBack" type="GPUParticles2D" parent="."]
+z_index = -10
+position = Vector2(-11, -416)
+scale = Vector2(6.399997, 0.19999987)
+amount = 100
+process_material = SubResource("ParticleProcessMaterial_opdns")
+script = ExtResource("4_p64kh")
+TempestIntensity = 0.6
+WindDirection = Vector2(0.8, 0.3)
+WindStrength = 20.0
+TextureWeight = 0.07
+TextureHeight = 0.07
+SnowflakeTexture = ExtResource("5_lrc6l")
+GravityVelocity = 12.0
+ParticleLifetime = 20.0

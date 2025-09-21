@@ -1,12 +1,13 @@
 using Godot;
 using Core.Enums;
 using MarrieGame.Core.Utils;
+using System.Linq;
 
 /// <summary>
-/// Apple item with different state cycles for tree vs fallen apples:
+/// Apple item with different state cycles that change randomly:
 /// 
-/// Tree Cycle: RedLife → GrayKnockable → PurpleMana → RedLife (repeats)
-/// Fallen Cycle: RedLife → GrayNotCollectible → PurpleMana → RedLife (repeats)
+/// Tree States: RedLife, GrayKnockable, PurpleMana (selected randomly)
+/// Fallen States: RedLife, GrayNotCollectible, PurpleMana (selected randomly)
 /// 
 /// States:
 /// - RedLife: Red color, Life phase (collectible when fallen, restores health)
@@ -15,12 +16,15 @@ using MarrieGame.Core.Utils;
 /// - GrayNotCollectible: Dark gray color, Non-collectible phase (fallen only, not collectible)
 /// 
 /// Only RedLife and PurpleMana phases are collectible, and only when apple is on the ground
+/// Transition times are randomly selected within configurable ranges
 /// </summary>
 public partial class Apple : Node2D
 {
     #region Exported Properties
-    [Export] public float TransitionTime { get; set; } = 3.0f; // Time between color transitions
-    [Export] public float NeutralPhaseTime { get; set; } = 2.5f; // Time spent in neutral/collectible phases
+    [Export] public float MinTransitionTime { get; set; } = 2.0f; // Minimum time between color transitions
+    [Export] public float MaxTransitionTime { get; set; } = 5.0f; // Maximum time between color transitions
+    [Export] public float MinNeutralPhaseTime { get; set; } = 1.5f; // Minimum time spent in neutral/collectible phases
+    [Export] public float MaxNeutralPhaseTime { get; set; } = 4.0f; // Maximum time spent in neutral/collectible phases
     [Export] public int LifeRestoreAmount { get; set; } = 1; // Life restored by red apple
     [Export] public int ManaRestoreAmount { get; set; } = 2; // Mana restored by purple apple
     [Export] public Texture2D RedAppleTexture { get; set; }
@@ -122,22 +126,60 @@ public partial class Apple : Node2D
 
     private float GetCurrentPhaseTime()
     {
-        // GrayKnockable phase lasts longer (transition phase)
-        return (_currentState == AppleState.GrayKnockable) 
-            ? NeutralPhaseTime 
-            : TransitionTime;
+        // Get random time based on current state
+        if (_currentState == AppleState.GrayKnockable || _currentState == AppleState.GrayNotCollectible)
+        {
+            // Neutral phases use neutral phase time range
+            return (float)GD.RandRange(MinNeutralPhaseTime, MaxNeutralPhaseTime);
+        }
+        else
+        {
+            // Collectible phases use transition time range
+            return (float)GD.RandRange(MinTransitionTime, MaxTransitionTime);
+        }
     }
 
     private void SetInitialState()
     {
-        _currentState = AppleState.RedLife;
-        if (RedAppleTexture != null)
+        // Randomly select initial state based on apple position
+        if (_currentPosition == ApplePosition.OnTree)
         {
-            _appleSprite.Texture = RedAppleTexture;
+            // Tree apples can start with any tree state
+            AppleState[] treeStates = { AppleState.RedLife, AppleState.GrayKnockable, AppleState.PurpleMana };
+            int randomIndex = GD.RandRange(0, treeStates.Length - 1);
+            _currentState = treeStates[randomIndex];
+        }
+        else
+        {
+            // Ground apples can start with any ground state
+            AppleState[] groundStates = { AppleState.RedLife, AppleState.GrayNotCollectible, AppleState.PurpleMana };
+            int randomIndex = GD.RandRange(0, groundStates.Length - 1);
+            _currentState = groundStates[randomIndex];
+        }
+
+        // Set the appropriate texture based on the random initial state
+        Texture2D initialTexture = _currentState switch
+        {
+            AppleState.RedLife => RedAppleTexture,
+            AppleState.GrayKnockable => NeutralAppleTexture,
+            AppleState.PurpleMana => PurpleAppleTexture,
+            AppleState.GrayNotCollectible => NeutralAppleTexture,
+            _ => RedAppleTexture
+        };
+
+        if (initialTexture != null && _appleSprite != null)
+        {
+            _appleSprite.Texture = initialTexture;
         }
         
+        // Apply initial state visual effects
+        ApplyStateVisualEffects();
+        
         // Store the original scale for smooth transitions
-        _originalScale = _appleSprite.Scale;
+        if (_appleSprite != null)
+        {
+            _originalScale = _appleSprite.Scale;
+        }
     }
 
     private void EnableInputProcessing()
@@ -263,29 +305,40 @@ public partial class Apple : Node2D
 
     private void SwitchTexture()
     {
-        // Different cycles based on apple position
+        // Random state selection based on apple position
         if (_currentPosition == ApplePosition.OnGround)
         {
-            // Ground apple cycle: RedLife → GrayNotCollectible → PurpleMana → RedLife
-            _currentState = _currentState switch
+            // Ground apple: choose randomly from RedLife, GrayNotCollectible, PurpleMana
+            AppleState[] groundStates = { AppleState.RedLife, AppleState.GrayNotCollectible, AppleState.PurpleMana };
+            
+            // If transitioning from tree to ground, start with GrayNotCollectible
+            if (_currentState == AppleState.GrayKnockable)
             {
-                AppleState.RedLife => AppleState.GrayNotCollectible,
-                AppleState.GrayNotCollectible => AppleState.PurpleMana,
-                AppleState.PurpleMana => AppleState.RedLife,
-                AppleState.GrayKnockable => AppleState.GrayNotCollectible, // Transition from tree to ground
-                _ => AppleState.RedLife
-            };
+                _currentState = AppleState.GrayNotCollectible;
+            }
+            else
+            {
+                // Get available states (excluding current state to ensure change)
+                var availableStates = groundStates.Where(state => state != _currentState).ToArray();
+                if (availableStates.Length > 0)
+                {
+                    int randomIndex = GD.RandRange(0, availableStates.Length - 1);
+                    _currentState = availableStates[randomIndex];
+                }
+            }
         }
         else // ApplePosition.OnTree
         {
-            // Tree apple cycle: RedLife → GrayKnockable → PurpleMana → RedLife
-            _currentState = _currentState switch
+            // Tree apple: choose randomly from RedLife, GrayKnockable, PurpleMana
+            AppleState[] treeStates = { AppleState.RedLife, AppleState.GrayKnockable, AppleState.PurpleMana };
+            
+            // Get available states (excluding current state to ensure change)
+            var availableStates = treeStates.Where(state => state != _currentState).ToArray();
+            if (availableStates.Length > 0)
             {
-                AppleState.RedLife => AppleState.GrayKnockable,
-                AppleState.GrayKnockable => AppleState.PurpleMana,
-                AppleState.PurpleMana => AppleState.RedLife,
-                _ => AppleState.RedLife
-            };
+                int randomIndex = GD.RandRange(0, availableStates.Length - 1);
+                _currentState = availableStates[randomIndex];
+            }
         }
         
         // Update texture based on current state
@@ -306,8 +359,9 @@ public partial class Apple : Node2D
             ApplyStateVisualEffects();
         }
 
-        // Update timer for the new phase
+        // Update timer for the new phase with random timing
         _transitionTimer.WaitTime = GetCurrentPhaseTime();
+        _transitionTimer.Start(); // Restart the timer
     }
 
     private void ApplyStateVisualEffects()
@@ -461,21 +515,25 @@ public partial class Apple : Node2D
     #endregion
 
     #region Public API
-    public void SetTransitionTime(float time)
+    public void SetTransitionTimeRange(float minTime, float maxTime)
     {
-        TransitionTime = time;
+        MinTransitionTime = minTime;
+        MaxTransitionTime = maxTime;
+        // Restart timer with new random time if currently in a transition phase
         if (_transitionTimer != null && (_currentState == AppleState.RedLife || _currentState == AppleState.PurpleMana))
         {
-            _transitionTimer.WaitTime = time;
+            _transitionTimer.WaitTime = GetCurrentPhaseTime();
         }
     }
 
-    public void SetNeutralPhaseTime(float time)
+    public void SetNeutralPhaseTimeRange(float minTime, float maxTime)
     {
-        NeutralPhaseTime = time;
-        if (_transitionTimer != null && (_currentState == AppleState.GrayKnockable))
+        MinNeutralPhaseTime = minTime;
+        MaxNeutralPhaseTime = maxTime;
+        // Restart timer with new random time if currently in a neutral phase
+        if (_transitionTimer != null && (_currentState == AppleState.GrayKnockable || _currentState == AppleState.GrayNotCollectible))
         {
-            _transitionTimer.WaitTime = time;
+            _transitionTimer.WaitTime = GetCurrentPhaseTime();
         }
     }
 

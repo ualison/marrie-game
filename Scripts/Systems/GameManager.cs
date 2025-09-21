@@ -1,6 +1,7 @@
 using Godot;
 using System.Linq;
 using MarrieGame.Core.Logging;
+using MarrieGame.Core.Enums;
 
 /// <summary>
 /// Main game orchestrator following Single Responsibility Principle
@@ -19,6 +20,9 @@ public partial class GameManager : Node
     #region Game State
     public bool IsGameActive { get; private set; } = true;
     public bool IsPaused { get; private set; }
+    public string CurrentSceneName { get; private set; } = "";
+    public bool IsPuzzleDimensionScene => CurrentSceneName.Contains("PuzzleDimension");
+    public bool IsForestScene => CurrentSceneName.Contains("Forest");
     #endregion
 
     public override void _Ready()
@@ -27,6 +31,9 @@ public partial class GameManager : Node
         {
             Instance = this;
             ProcessMode = ProcessModeEnum.Always;
+
+            // Detect current scene
+            DetectCurrentScene();
 
             // Initialize logging system first
             InitializeLoggingSystem();
@@ -37,7 +44,7 @@ public partial class GameManager : Node
             // Subscribe to events for coordination
             SubscribeToEvents();
 
-            Log.System("Game orchestration active", "GameManager");
+            Log.System($"Game orchestration active - Scene: {CurrentSceneName}", "GameManager");
         }
         else
         {
@@ -124,8 +131,52 @@ public partial class GameManager : Node
     {
         // Listen to key events for game flow coordination
         GameEventSystem.GameRestart += OnGameRestart;
+        
+        // Listen to scene changes to update scene state
+        SceneLifecycleManager.SceneReady += OnSceneChanged;
 
         Log.System("Event subscriptions active", "GameManager");
+    }
+
+    private void OnSceneChanged()
+    {
+        // Update current scene information
+        DetectCurrentScene();
+        
+        // Notify replay recorder about potential recording mode change
+        if (ReplayRecorder.Instance != null)
+        {
+            var newMode = GetReplayRecordingMode();
+            ReplayRecorder.Instance.ForceSetRecordingMode(newMode);
+            Log.System($"Updated ReplayRecorder mode to: {newMode} for scene: {CurrentSceneName}", "GameManager");
+        }
+    }
+
+    private void DetectCurrentScene()
+    {
+        var currentScene = GetTree().CurrentScene;
+        if (currentScene != null)
+        {
+            CurrentSceneName = currentScene.Name;
+            
+            // Also try to get the scene file name if Name is not descriptive enough
+            var sceneFilePath = currentScene.SceneFilePath;
+            if (!string.IsNullOrEmpty(sceneFilePath))
+            {
+                var sceneName = sceneFilePath.GetFile().GetBaseName(); // Gets filename without extension
+                if (!string.IsNullOrEmpty(sceneName))
+                {
+                    CurrentSceneName = sceneName;
+                }
+            }
+            
+            Log.System($"Detected scene: {CurrentSceneName} (IsPuzzleDimension: {IsPuzzleDimensionScene}, IsForest: {IsForestScene})", "GameManager");
+        }
+        else
+        {
+            CurrentSceneName = "Unknown";
+            Log.Warning("Could not detect current scene", "GameManager");
+        }
     }
 
     private void OnPlayerDied(MarrieGame.Core.Models.PlayerDeath death)
@@ -209,6 +260,26 @@ public partial class GameManager : Node
     {
         return IsGameActive && !IsPaused;
     }
+
+    /// <summary>
+    /// Gets the appropriate replay recording mode for the current scene
+    /// </summary>
+    public ReplayRecordingMode GetReplayRecordingMode()
+    {
+        if (IsPuzzleDimensionScene)
+        {
+            return ReplayRecordingMode.PuzzleMode; // Player only, single session until gem press
+        }
+        else if (IsForestScene)
+        {
+            return ReplayRecordingMode.DeathMode; // Current behavior, record until death
+        }
+        else
+        {
+            // Default fallback behavior
+            return ReplayRecordingMode.DeathMode;
+        }
+    }
     #endregion
 
     #region Input Handling
@@ -231,6 +302,7 @@ public partial class GameManager : Node
         {
             // Cleanup subscriptions
             GameEventSystem.GameRestart -= OnGameRestart;
+            SceneLifecycleManager.SceneReady -= OnSceneChanged;
 
             // Clear any remaining static subscriptions to avoid memory leaks
             GameEventSystem.ClearAllSubscriptions();

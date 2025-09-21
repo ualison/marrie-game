@@ -155,6 +155,13 @@ public partial class Monster : CharacterBody2D, IPoolable
             if (_monsterLifeBar == null) return;
         }
 
+        // Guard against disposed UI elements during scene switches
+        if (!IsInstanceValid(_monsterLifeBar))
+        {
+            Log.Warning("Monster.ApplyRealityToLifeBar called but life bar is disposed/invalid - skipping", "Monster");
+            return;
+        }
+
         // Monster life bar should be visible in CurrentReality when monster has red hearts
         if (reality == Reality.CurrentReality)
         {
@@ -180,20 +187,38 @@ public partial class Monster : CharacterBody2D, IPoolable
             }
             else
             {
-                _monsterLifeBar.Hide();
+                if (IsInstanceValid(_monsterLifeBar))
+                    _monsterLifeBar.Hide();
                 Log.Debug($"Monster life bar hidden (visible: {_isVisible}, redHearts: {hasRedHearts}, dead: {_monsterLife?.IsDead})", "Monster");
             }
         }
         else if (reality == Reality.PastReality)
         {
             // Hide in past reality
-            _monsterLifeBar.ConnectToLifeSystem(null);
-            _monsterLifeBar.Hide();
-            _monsterLifeBar.SetFollowMonster(false);
-            var mbMod = _monsterLifeBar.Modulate;
-            _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, 0.0f);
+            if (IsInstanceValid(_monsterLifeBar))
+            {
+                _monsterLifeBar.ConnectToLifeSystem(null);
+                _monsterLifeBar.Hide();
+                _monsterLifeBar.SetFollowMonster(false);
+                var mbMod = _monsterLifeBar.Modulate;
+                _monsterLifeBar.Modulate = new Color(mbMod.R, mbMod.G, mbMod.B, 0.0f);
+            }
             Log.Debug("Monster life bar hidden in PastReality", "Monster");
         }
+    }
+
+    public override void _ExitTree()
+    {
+        // Unsubscribe from RealityManager to avoid callbacks on disposed objects
+        try
+        {
+            if (_realityConnected && RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+            {
+                RealityManager.Instance.RealityChangedEvent -= OnRealityChanged;
+            }
+        }
+        catch {}
+        _realityConnected = false;
     }
 
 

@@ -6,7 +6,7 @@
 [ext_resource type="Script" uid="uid://gp6wfjapkopj" path="res://Scripts/Player/PlayerMana.cs" id="4_mana"]
 [ext_resource type="Script" path="res://Scripts/Systems/Inventory.cs" id="5_inventory"]
 [ext_resource type="Script" path="res://Scripts/Player/RockThrower.cs" id="6_rockthrower"]
-[ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/Rock.tscn" id="7_javds"]
+[ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/RockThrowable.tscn" id="7_javds"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_gntrk"]
 size = Vector2(156, 268)
@@ -21,6 +21,8 @@ position = Vector2(0, 4)
 collision_layer = 2
 collision_mask = 17
 script = ExtResource("2_kyqiw")
+Speed = 130.0
+JumpHeight = 150.0
 
 [node name="HurtBox" type="Area2D" parent="CharacterBody2D"]
 collision_layer = 2

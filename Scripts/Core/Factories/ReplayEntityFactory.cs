@@ -13,7 +13,7 @@ public static class ReplayEntityFactory
     {
         if (_replayGemScene == null)
         {
-            string path = "res://Prefabs/ReplayGem.tscn";
+            string path = "res://Prefabs/ReplayCrystal.tscn";
 
             try
             {
@@ -22,7 +22,7 @@ public static class ReplayEntityFactory
                     _replayGemScene = GD.Load<PackedScene>(path);
                     if (_replayGemScene != null)
                     {
-                        Log.Debug($"ReplayEntityFactory: Loaded ReplayGem scene from {path}", "ReplayEntityFactory");
+                        Log.Debug($"ReplayEntityFactory: Loaded ReplayCrystal scene from {path}", "ReplayEntityFactory");
                     }
                 }
             }

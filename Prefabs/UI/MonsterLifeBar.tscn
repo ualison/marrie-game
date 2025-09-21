@@ -1,10 +1,9 @@
-[gd_scene load_steps=6 format=3 uid="uid://1ppt7yfvx3tk"]
+[gd_scene load_steps=5 format=3 uid="uid://1ppt7yfvx3tk"]
 
 [ext_resource type="Script" uid="uid://bid67bj7xlptd" path="res://Scripts/UI/MonsterLifeBar.cs" id="1_gwh80"]
-[ext_resource type="Texture2D" uid="uid://c8u1u42hhwaci" path="res://Art/FullLifeHeart.png" id="2_gknlv"]
-[ext_resource type="Texture2D" uid="uid://bw6408wklaekv" path="res://Art/EmptyLifeHeart.png" id="3_mydo5"]
-[ext_resource type="Texture2D" uid="uid://c4jx5vo5jcqtn" path="res://Art/FullManaHeart.png" id="4_purple_full"]
-[ext_resource type="Texture2D" uid="uid://cj0t7aq24040y" path="res://Art/EmptyManaHeart.png" id="5_purple_empty"]
+[ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/LifeHeart.png" id="2_qg012"]
+[ext_resource type="Texture2D" uid="uid://di3snpkk83b15" path="res://Art/DisabledHeart.png" id="3_wcggg"]
+[ext_resource type="Texture2D" uid="uid://cyqvsavuevs3x" path="res://Art/ManaHeart.png" id="4_qg012"]
 
 [node name="MonsterLifeBar" type="Control" groups=["monster_life_bar_ui"]]
 layout_mode = 3
@@ -14,10 +13,10 @@ offset_top = -25.0
 offset_right = 50.0
 offset_bottom = 25.0
 script = ExtResource("1_gwh80")
-FullRedHeartTexture = ExtResource("2_gknlv")
-EmptyRedHeartTexture = ExtResource("3_mydo5")
-FullPurpleHeartTexture = ExtResource("4_purple_full")
-EmptyPurpleHeartTexture = ExtResource("5_purple_empty")
+FullRedHeartTexture = ExtResource("2_qg012")
+EmptyRedHeartTexture = ExtResource("3_wcggg")
+FullPurpleHeartTexture = ExtResource("4_qg012")
+EmptyPurpleHeartTexture = ExtResource("3_wcggg")
 
 [node name="HeartsContainer" type="HBoxContainer" parent="."]
 custom_minimum_size = Vector2(100, 32)

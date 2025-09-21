@@ -13,7 +13,7 @@
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/Monster.mp3" id="11_sa6d1"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="12_48pvr"]
 
-[node name="ForestScene" type="Node2D"]
+[node name="Root" type="Node2D"]
 
 [node name="CameraFollower" parent="." instance=ExtResource("1_ebsfv")]
 FollowOffset = Vector2(0, -165)
