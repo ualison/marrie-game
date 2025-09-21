@@ -67,6 +67,7 @@ namespace MarrieGame.AI
         private Node2D _currentTarget;
         private bool _canAttack = true;
         private bool _initialized = false;
+        private bool _isFollowingEnabled = true; // New: tracks R key toggle state
         #endregion
 
         #region Signals
@@ -92,9 +93,9 @@ namespace MarrieGame.AI
             // Ensure Puff starts following the player after initialization is complete
             if (_player != null)
             {
-                ChangeState(PuffState.Following);
+                ReturnToAppropriateState();
                 _initialized = true;
-                Log.System("PuffAI initialized and started following", "PuffAI");
+                Log.System("PuffAI initialized and started with appropriate state", "PuffAI");
             }
             else
             {
@@ -179,13 +180,26 @@ namespace MarrieGame.AI
                 _player = GetTree().GetFirstNodeInGroup("player") as Node2D;
                 if (_player != null)
                 {
-                    Log.System("PuffAI: Player found on retry - starting to follow", "PuffAI");
-                    ChangeState(PuffState.Following);
+                    Log.System("PuffAI: Player found on retry - starting with appropriate state", "PuffAI");
+                    ReturnToAppropriateState();
                     _initialized = true;
                 }
             }
             
             if (IsDead || _player == null || !_initialized) return;
+
+            // Safety check: prevent Puff from going too far from player
+            if (_player != null)
+            {
+                float distanceFromPlayer = GlobalPosition.DistanceTo(_player.GlobalPosition);
+                if (distanceFromPlayer > 1000.0f) // If Puff is more than 1000 units away
+                {
+                    Log.Warning($"PuffAI: Too far from player ({distanceFromPlayer:F1}), teleporting back", "PuffAI");
+                    GlobalPosition = _player.GlobalPosition + Vector2.Left * FollowDistance;
+                    Velocity = Vector2.Zero;
+                    ReturnToAppropriateState();
+                }
+            }
 
             HandleInput();
             UpdateState(delta);
@@ -204,13 +218,32 @@ namespace MarrieGame.AI
         #region Input Handling
         private void HandleInput()
         {
-            // Only attack if player explicitly commands it with Q key
-            if (Input.IsActionJustPressed("puff_attack") && _canAttack && _currentState == PuffState.Following)
+            // Handle R key toggle between following and idle
+            if (Input.IsActionJustPressed("puff_toggle"))
             {
+                _isFollowingEnabled = !_isFollowingEnabled;
+                
+                if (_isFollowingEnabled)
+                {
+                    Log.System("PuffAI: R pressed - Following enabled, switching to Following state", "PuffAI");
+                    ChangeState(PuffState.Following);
+                }
+                else
+                {
+                    Log.System("PuffAI: R pressed - Following disabled, switching to Idle state", "PuffAI");
+                    ChangeState(PuffState.Idle);
+                    Velocity = Vector2.Zero; // Stop movement immediately
+                }
+            }
+
+            // Only process attack if following is enabled and in Following state
+            if (Input.IsActionJustPressed("puff_attack") && _canAttack && _currentState == PuffState.Following && _isFollowingEnabled)
+            {
+                Log.System("PuffAI: Q key pressed - attempting to find and attack monster", "PuffAI");
                 var nearestMonster = FindNearestMonster();
                 if (nearestMonster != null)
                 {
-                    Log.System("PuffAI: Player commanded attack - engaging monster", "PuffAI");
+                    Log.System($"PuffAI: Player commanded attack - engaging monster {nearestMonster.Name}", "PuffAI");
                     ChangeState(PuffState.Attack);
                     _currentTarget = nearestMonster;
                 }
@@ -218,6 +251,18 @@ namespace MarrieGame.AI
                 {
                     Log.Debug("PuffAI: Player commanded attack but no monsters in range", "PuffAI");
                 }
+            }
+            else if (Input.IsActionJustPressed("puff_attack") && !_canAttack)
+            {
+                Log.Debug("PuffAI: Q pressed but attack on cooldown", "PuffAI");
+            }
+            else if (Input.IsActionJustPressed("puff_attack") && _currentState != PuffState.Following)
+            {
+                Log.Debug($"PuffAI: Q pressed but not in Following state (current: {_currentState})", "PuffAI");
+            }
+            else if (Input.IsActionJustPressed("puff_attack") && !_isFollowingEnabled)
+            {
+                Log.Debug("PuffAI: Q pressed but following is disabled", "PuffAI");
             }
         }
         #endregion
@@ -272,6 +317,13 @@ namespace MarrieGame.AI
 
         private void UpdateState(double delta)
         {
+            // If following is disabled, force Idle state (except during attacks)
+            if (!_isFollowingEnabled && _currentState == PuffState.Following)
+            {
+                ChangeState(PuffState.Idle);
+                return;
+            }
+
             switch (_currentState)
             {
                 case PuffState.Following:
@@ -284,7 +336,7 @@ namespace MarrieGame.AI
                     UpdateJumpBehavior();
                     break;
                 case PuffState.Idle:
-                    // Stay idle
+                    UpdateIdleBehavior();
                     break;
             }
         }
@@ -304,7 +356,7 @@ namespace MarrieGame.AI
             // If too close to player, don't move toward them
             if (distanceToPlayer <= MinFollowDistance)
             {
-                // But still check for monster avoidance even when close to player
+                // But still check for monster avoidance even when close to player (only in Following state)
                 Vector2 avoidanceVector = CalculateMonsterAvoidance();
                 if (avoidanceVector != Vector2.Zero)
                 {
@@ -329,7 +381,7 @@ namespace MarrieGame.AI
                 moveDirection = (targetPos - GlobalPosition).Normalized() * FollowSpeed;
             }
 
-            // Apply monster avoidance - this takes priority over following
+            // Apply monster avoidance - but only in Following state (not during attacks)
             Vector2 avoidanceForce = CalculateMonsterAvoidance();
             if (avoidanceForce != Vector2.Zero)
             {
@@ -398,7 +450,7 @@ namespace MarrieGame.AI
         private Vector2 CalculateMonsterAvoidance()
         {
             Vector2 avoidanceForce = Vector2.Zero;
-            var monsters = GetTree().GetNodesInGroup("enemy");
+            var monsters = GetTree().GetNodesInGroup("enemies"); // Fixed: was "enemy", should be "enemies"
             bool foundNearbyMonster = false;
 
             foreach (Node2D monster in monsters)
@@ -447,73 +499,208 @@ namespace MarrieGame.AI
         {
             if (_currentTarget == null || !IsInstanceValid(_currentTarget))
             {
-                ChangeState(PuffState.Following);
+                Log.Debug("PuffAI: Attack target lost, returning to appropriate state", "PuffAI");
+                ReturnToAppropriateState();
                 return;
             }
 
             float distanceToTarget = GlobalPosition.DistanceTo(_currentTarget.GlobalPosition);
             
+            // If target is too far away, give up and return to appropriate state
+            if (distanceToTarget > AttackRange * 4)
+            {
+                Log.Debug($"PuffAI: Target too far away ({distanceToTarget:F1}), giving up attack", "PuffAI");
+                ReturnToAppropriateState();
+                return;
+            }
+            
+            // Safety check: if we're too far from player while attacking, abort
+            if (_player != null)
+            {
+                float distanceFromPlayer = GlobalPosition.DistanceTo(_player.GlobalPosition);
+                if (distanceFromPlayer > 500.0f)
+                {
+                    Log.Warning($"PuffAI: Too far from player during attack ({distanceFromPlayer:F1}), aborting", "PuffAI");
+                    ReturnToAppropriateState();
+                    return;
+                }
+            }
+            
+            // If close enough to attack
             if (distanceToTarget <= AttackRange)
             {
                 // Attack the target
                 AttackTarget(_currentTarget);
-                ChangeState(PuffState.Following);
+                Log.System($"PuffAI: Successfully attacked {_currentTarget.Name}, returning to appropriate state", "PuffAI");
+                ReturnToAppropriateState();
             }
             else
             {
-                // Move toward target
+                // Chase toward target (ignore monster avoidance while attacking)
                 Vector2 direction = (_currentTarget.GlobalPosition - GlobalPosition).Normalized();
                 Velocity = new Vector2(direction.X * AttackSpeed, Velocity.Y);
+                
+                // Check if we need to jump over obstacles while chasing
+                if (IsObstacleInFront() && IsOnFloor())
+                {
+                    PerformJump();
+                }
+                
+                Log.Debug($"PuffAI: Chasing target, distance: {distanceToTarget:F1}", "PuffAI");
             }
         }
 
         private void AttackTarget(Node2D target)
         {
             Log.System($"PuffAI: Attacking {target.Name}", "PuffAI");
+            bool damageDealt = false;
             
-            // Try to damage the target
-            if (target.HasMethod("TakeDamage"))
+            // Try the specific Monster damage methods first (based on code analysis)
+            if (target.HasMethod("TakePhysicalDamage"))
+            {
+                var result = target.Call("TakePhysicalDamage", AttackDamage);
+                if (result.AsBool())
+                {
+                    damageDealt = true;
+                    Log.System("PuffAI: Successfully dealt physical damage to monster", "PuffAI");
+                }
+            }
+            else if (target.HasMethod("TakeRockDamage"))
+            {
+                var result = target.Call("TakeRockDamage", AttackDamage);
+                if (result.AsBool())
+                {
+                    damageDealt = true;
+                    Log.System("PuffAI: Successfully dealt rock damage to monster", "PuffAI");
+                }
+            }
+            // Try standard damage methods
+            else if (target.HasMethod("TakeDamage"))
             {
                 target.Call("TakeDamage", AttackDamage);
+                damageDealt = true;
+                Log.Debug("PuffAI: Direct TakeDamage call made", "PuffAI");
             }
-            else if (target.IsInGroup("enemy"))
+            
+            // If direct damage didn't work, try through children
+            if (!damageDealt && target.IsInGroup("enemies"))
             {
-                // Try to find health system on enemy
-                Node healthSystem = null;
                 foreach (Node child in target.GetChildren())
                 {
                     if (child.HasMethod("TakeDamage"))
                     {
-                        healthSystem = child;
+                        child.Call("TakeDamage", AttackDamage);
+                        damageDealt = true;
+                        Log.Debug("PuffAI: Child TakeDamage call made", "PuffAI");
                         break;
                     }
                 }
-                
-                if (healthSystem != null)
+            }
+            
+            // Also try common health system interfaces
+            if (!damageDealt)
+            {
+                // Try calling Hurt method (some enemies might use this)
+                if (target.HasMethod("Hurt"))
                 {
-                    healthSystem.Call("TakeDamage", AttackDamage);
+                    target.Call("Hurt", AttackDamage);
+                    damageDealt = true;
+                    Log.Debug("PuffAI: Used Hurt method", "PuffAI");
                 }
+                // Try calling Hit method
+                else if (target.HasMethod("Hit"))
+                {
+                    target.Call("Hit", AttackDamage);
+                    damageDealt = true;
+                    Log.Debug("PuffAI: Used Hit method", "PuffAI");
+                }
+            }
+
+            // The Monster class has a built-in PlayDamageEffect method, so try to use it
+            if (target.HasMethod("PlayDamageEffect"))
+            {
+                target.Call("PlayDamageEffect", Colors.Red);
+                Log.Debug("PuffAI: Triggered monster's built-in damage effect", "PuffAI");
+            }
+            else
+            {
+                // Create our own red blink effect if monster doesn't have one
+                CreateHitEffect(target);
+            }
+
+            if (damageDealt)
+            {
+                Log.System($"PuffAI: Successfully attacked {target.Name}", "PuffAI");
+            }
+            else
+            {
+                Log.Warning($"PuffAI: Could not damage {target.Name} - no valid damage method found", "PuffAI");
             }
 
             StartAttackCooldown();
         }
 
+        private void CreateHitEffect(Node2D target)
+        {
+            // Create a red blink effect for the monster - try different sprite types
+            Node spriteNode = target.GetNodeOrNull<Sprite2D>("Sprite2D") 
+                           ?? target.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D")
+                           ?? target.GetNodeOrNull<Sprite2D>("MonsterSprite")
+                           ?? (Node)target.GetNodeOrNull<AnimatedSprite2D>("MonsterAnimatedSprite");
+
+            if (spriteNode != null)
+            {
+                Color originalModulate = Colors.White;
+                var tween = target.CreateTween();
+                
+                // Get the current modulate color
+                if (spriteNode.HasMethod("get_modulate"))
+                {
+                    originalModulate = spriteNode.Get("modulate").AsColor();
+                }
+                
+                // Flash red briefly
+                tween.TweenProperty(spriteNode, "modulate", Colors.Red, 0.1f);
+                tween.TweenProperty(spriteNode, "modulate", originalModulate, 0.1f);
+                tween.TweenProperty(spriteNode, "modulate", Colors.Red, 0.1f);
+                tween.TweenProperty(spriteNode, "modulate", originalModulate, 0.1f);
+                
+                Log.Debug("PuffAI: Created custom red blink effect", "PuffAI");
+            }
+            else
+            {
+                Log.Warning("PuffAI: Could not find sprite to apply hit effect", "PuffAI");
+            }
+        }
+
         private Node2D FindNearestMonster()
         {
-            var monsters = GetTree().GetNodesInGroup("enemy");
+            var monsters = GetTree().GetNodesInGroup("enemies"); // Fixed: was "enemy", should be "enemies"
             Node2D nearest = null;
             float nearestDistance = float.MaxValue;
+
+            Log.Debug($"PuffAI: Searching for monsters - found {monsters.Count} in 'enemies' group", "PuffAI");
 
             foreach (Node2D monster in monsters)
             {
                 if (!IsInstanceValid(monster)) continue;
                 
                 float distance = GlobalPosition.DistanceTo(monster.GlobalPosition);
-                if (distance < nearestDistance && distance <= AttackRange * 2) // Extended search range
+                // Extended search range for attack command - look further than normal attack range
+                if (distance < nearestDistance && distance <= AttackRange * 3) 
                 {
                     nearestDistance = distance;
                     nearest = monster;
                 }
+            }
+
+            if (nearest != null)
+            {
+                Log.System($"PuffAI: Found nearest monster {nearest.Name} at distance {nearestDistance:F1}", "PuffAI");
+            }
+            else
+            {
+                Log.Debug("PuffAI: No monsters found within extended range", "PuffAI");
             }
 
             return nearest;
@@ -537,7 +724,7 @@ namespace MarrieGame.AI
             // Jump state ends when we land on the ground
             if (IsOnFloor())
             {
-                ChangeState(PuffState.Following);
+                ReturnToAppropriateState();
             }
         }
 
@@ -548,6 +735,17 @@ namespace MarrieGame.AI
                 Velocity = new Vector2(Velocity.X, _jumpVelocity);
                 Log.Debug("PuffAI: Jumping", "PuffAI");
             }
+        }
+        #endregion
+
+        #region Idle Behavior
+        private void UpdateIdleBehavior()
+        {
+            // Stay completely still when in idle state
+            Velocity = new Vector2(0, Velocity.Y); // Keep Y velocity for gravity
+            
+            // Still collect apples and take damage if needed, but don't move
+            // The only way out of idle is through the R key toggle
         }
         #endregion
 
@@ -629,7 +827,7 @@ namespace MarrieGame.AI
             IsInvulnerable = false;
             _currentTarget = null;
             _canAttack = true;
-            ChangeState(PuffState.Following);
+            ReturnToAppropriateState();
             
             if (_puffSprite != null)
             {
@@ -650,7 +848,7 @@ namespace MarrieGame.AI
                 CheckAndConsumeApple(body);
             }
             // Only take damage from enemies if Puff failed to avoid them (shouldn't happen often now)
-            else if (body.IsInGroup("enemy"))
+            else if (body.IsInGroup("enemies")) // Fixed: was "enemy", should be "enemies"
             {
                 TakeDamage(1);
                 Log.Debug($"PuffAI: Failed to avoid enemy {body.Name} - took damage", "PuffAI");
@@ -668,7 +866,7 @@ namespace MarrieGame.AI
                     CheckAndConsumeApple(parent);
                 }
                 // Handle enemy damage only if avoidance failed
-                else if (parent.IsInGroup("enemy"))
+                else if (parent.IsInGroup("enemies")) // Fixed: was "enemy", should be "enemies"
                 {
                     TakeDamage(1);
                     Log.Debug($"PuffAI: Failed to avoid enemy area {area.Name} - took damage", "PuffAI");
@@ -705,6 +903,21 @@ namespace MarrieGame.AI
                 _facingRight = shouldFaceRight;
                 var scale = _puffSprite.Scale;
                 _puffSprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
+            }
+        }
+        
+        /// <summary>
+        /// Returns to the appropriate state based on whether following is enabled
+        /// </summary>
+        private void ReturnToAppropriateState()
+        {
+            if (_isFollowingEnabled)
+            {
+                ChangeState(PuffState.Following);
+            }
+            else
+            {
+                ChangeState(PuffState.Idle);
             }
         }
         #endregion
