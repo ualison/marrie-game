@@ -129,7 +129,7 @@ z_index = 1
 position = Vector2(180, 162)
 
 [node name="MainPlatform" parent="PuzzleManager" instance=ExtResource("17_g7cyp")]
-position = Vector2(372, 103)
+position = Vector2(359, 103)
 
 [node name="RandomPlatform1" parent="PuzzleManager" instance=ExtResource("18_ppr41")]
 position = Vector2(6, 636)
@@ -144,11 +144,11 @@ position = Vector2(-175, 244)
 position = Vector2(-4, 208)
 
 [node name="YellowCage" parent="PuzzleManager" instance=ExtResource("24_ulljr")]
-position = Vector2(540, -4.000004)
+position = Vector2(528, -69)
 scale = Vector2(0.8, 0.8)
 
 [node name="PuffCageKey" parent="PuzzleManager" instance=ExtResource("20_7ha7t")]
-position = Vector2(374, 61)
+position = Vector2(361, 61)
 
 [node name="KeyZ" parent="PuzzleManager" instance=ExtResource("20_7ha7t")]
 position = Vector2(224, 401)

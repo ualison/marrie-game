@@ -1,6 +1,7 @@
 using Godot;
 using MarrieGame.Core.Logging;
 using MarrieGame.Core.Interfaces;
+using MarrieGame.Core.Enums;
 
 namespace MarrieGame.AI
 {
@@ -236,33 +237,40 @@ namespace MarrieGame.AI
                 }
             }
 
-            // Only process attack if following is enabled and in Following state
-            if (Input.IsActionJustPressed("puff_attack") && _canAttack && _currentState == PuffState.Following && _isFollowingEnabled)
+            // Handle Q key attack - works from both Following and Idle states
+            if (Input.IsActionJustPressed("puff_attack") && _canAttack)
             {
-                Log.System("PuffAI: Q key pressed - attempting to find and attack monster", "PuffAI");
-                var nearestMonster = FindNearestMonster();
-                if (nearestMonster != null)
+                // Can attack from Following state (if following enabled) or from Idle state
+                if ((_currentState == PuffState.Following && _isFollowingEnabled) || _currentState == PuffState.Idle)
                 {
-                    Log.System($"PuffAI: Player commanded attack - engaging monster {nearestMonster.Name}", "PuffAI");
-                    ChangeState(PuffState.Attack);
-                    _currentTarget = nearestMonster;
+                    Log.System("PuffAI: Q key pressed - attempting to find and attack monster", "PuffAI");
+                    var nearestMonster = FindNearestMonster();
+                    if (nearestMonster != null)
+                    {
+                        // If attacking from Idle state, enable following so we return to Following after attack
+                        if (_currentState == PuffState.Idle)
+                        {
+                            _isFollowingEnabled = true;
+                            Log.System($"PuffAI: Attacking from Idle - enabling following for post-attack state", "PuffAI");
+                        }
+                        
+                        Log.System($"PuffAI: Player commanded attack - engaging monster {nearestMonster.Name}", "PuffAI");
+                        ChangeState(PuffState.Attack);
+                        _currentTarget = nearestMonster;
+                    }
+                    else
+                    {
+                        Log.Debug("PuffAI: Player commanded attack but no monsters in range", "PuffAI");
+                    }
                 }
                 else
                 {
-                    Log.Debug("PuffAI: Player commanded attack but no monsters in range", "PuffAI");
+                    Log.Debug($"PuffAI: Q pressed but attack not available from current state ({_currentState}) or following disabled", "PuffAI");
                 }
             }
             else if (Input.IsActionJustPressed("puff_attack") && !_canAttack)
             {
                 Log.Debug("PuffAI: Q pressed but attack on cooldown", "PuffAI");
-            }
-            else if (Input.IsActionJustPressed("puff_attack") && _currentState != PuffState.Following)
-            {
-                Log.Debug($"PuffAI: Q pressed but not in Following state (current: {_currentState})", "PuffAI");
-            }
-            else if (Input.IsActionJustPressed("puff_attack") && !_isFollowingEnabled)
-            {
-                Log.Debug("PuffAI: Q pressed but following is disabled", "PuffAI");
             }
         }
         #endregion
@@ -502,6 +510,18 @@ namespace MarrieGame.AI
                 Log.Debug("PuffAI: Attack target lost, returning to appropriate state", "PuffAI");
                 ReturnToAppropriateState();
                 return;
+            }
+
+            // Check if target monster is in Hidden state - abort attack if so
+            if (_currentTarget.HasMethod("GetCurrentState"))
+            {
+                var targetState = _currentTarget.Call("GetCurrentState");
+                if (targetState.AsInt32() == (int)MonsterState.Hidden)
+                {
+                    Log.Debug($"PuffAI: Target {_currentTarget.Name} is Hidden, aborting attack", "PuffAI");
+                    ReturnToAppropriateState();
+                    return;
+                }
             }
 
             float distanceToTarget = GlobalPosition.DistanceTo(_currentTarget.GlobalPosition);
@@ -839,6 +859,34 @@ namespace MarrieGame.AI
         }
         #endregion
 
+        #region Collision Logic
+        /// <summary>
+        /// Determines if Puff should take damage from monsters based on current state
+        /// </summary>
+        private bool ShouldTakeDamageFromMonster()
+        {
+            // Following and Idle states: Never take damage from monsters
+            if (_currentState == PuffState.Following || _currentState == PuffState.Idle)
+            {
+                return false;
+            }
+            
+            // Attack state: Only take damage when jumping (falling through the air)
+            if (_currentState == PuffState.Attack)
+            {
+                return false; // Don't take damage during attack chase/combat
+            }
+            
+            // Jump state: Take damage (this includes jumping during attacks)
+            if (_currentState == PuffState.Jump)
+            {
+                return true;
+            }
+            
+            return false; // Default: no damage
+        }
+        #endregion
+
         #region Signal Handlers
         private void OnHurtBoxBodyEntered(Node2D body)
         {
@@ -847,11 +895,18 @@ namespace MarrieGame.AI
             {
                 CheckAndConsumeApple(body);
             }
-            // Only take damage from enemies if Puff failed to avoid them (shouldn't happen often now)
-            else if (body.IsInGroup("enemies")) // Fixed: was "enemy", should be "enemies"
+            // Only take damage from enemies in specific states (Jump state only)
+            else if (body.IsInGroup("enemies"))
             {
-                TakeDamage(1);
-                Log.Debug($"PuffAI: Failed to avoid enemy {body.Name} - took damage", "PuffAI");
+                if (ShouldTakeDamageFromMonster())
+                {
+                    TakeDamage(1);
+                    Log.Debug($"PuffAI: Hit by enemy {body.Name} while in {_currentState} state - took damage", "PuffAI");
+                }
+                else
+                {
+                    Log.Debug($"PuffAI: Hit by enemy {body.Name} while in {_currentState} state - ignoring damage", "PuffAI");
+                }
             }
         }
 
@@ -865,11 +920,18 @@ namespace MarrieGame.AI
                 {
                     CheckAndConsumeApple(parent);
                 }
-                // Handle enemy damage only if avoidance failed
-                else if (parent.IsInGroup("enemies")) // Fixed: was "enemy", should be "enemies"
+                // Handle enemy damage only in specific states (Jump state only)
+                else if (parent.IsInGroup("enemies"))
                 {
-                    TakeDamage(1);
-                    Log.Debug($"PuffAI: Failed to avoid enemy area {area.Name} - took damage", "PuffAI");
+                    if (ShouldTakeDamageFromMonster())
+                    {
+                        TakeDamage(1);
+                        Log.Debug($"PuffAI: Hit by enemy area {area.Name} while in {_currentState} state - took damage", "PuffAI");
+                    }
+                    else
+                    {
+                        Log.Debug($"PuffAI: Hit by enemy area {area.Name} while in {_currentState} state - ignoring damage", "PuffAI");
+                    }
                 }
             }
         }

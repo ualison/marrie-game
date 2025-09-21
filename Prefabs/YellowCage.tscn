@@ -166,9 +166,9 @@ scale = Vector2(0.27006316, -0.2763489)
 texture = ExtResource("4_f4j6e")
 
 [node name="PuffPresioner" type="Sprite2D" parent="YellowCage"]
-position = Vector2(6.259201, 258.73553)
+position = Vector2(5, 266)
 rotation = -3.1415925
-scale = Vector2(0.17158453, -0.16220284)
+scale = Vector2(0.16, -0.151)
 texture = ExtResource("5_bjv8d")
 
 [node name="DetectionArea" type="Area2D" parent="YellowCage"]
