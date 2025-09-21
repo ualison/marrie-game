@@ -12,11 +12,15 @@ public partial class Inventory : Node
 
     #region State
     private int _rockCount = 10;
+    private int _keyCount = 0; // Number of PuffCageKeys collected
     #endregion
 
     #region Signals
     [Signal]
     public delegate void RockCountChangedEventHandler(int newCount);
+    
+    [Signal]
+    public delegate void KeyCountChangedEventHandler(int newCount);
     #endregion
 
     #region Initialization
@@ -147,6 +151,79 @@ public partial class Inventory : Node
     }
     #endregion
 
+    #region Key Management
+    /// <summary>
+    /// Adds a PuffCageKey to the inventory
+    /// </summary>
+    /// <returns>True if key was added successfully</returns>
+    public bool AddKey()
+    {
+        _keyCount++;
+        Log.Debug($"Added 1 key. Total keys: {_keyCount}", "Inventory");
+
+        // Emit signal for UI updates
+        EmitSignal(SignalName.KeyCountChanged, _keyCount);
+        return true;
+    }
+
+    /// <summary>
+    /// Removes a key from the inventory
+    /// </summary>
+    /// <returns>True if key was removed successfully</returns>
+    public bool RemoveKey()
+    {
+        if (_keyCount <= 0)
+        {
+            Log.UI("No keys available to remove", "Inventory");
+            return false;
+        }
+
+        _keyCount--;
+        Log.UI($"Removed 1 key. Total keys: {_keyCount}", "Inventory");
+
+        // Emit signal for UI updates
+        EmitSignal(SignalName.KeyCountChanged, _keyCount);
+        return true;
+    }
+
+    /// <summary>
+    /// Gets the current key count
+    /// </summary>
+    /// <returns>Current number of keys</returns>
+    public int GetKeyCount()
+    {
+        return _keyCount;
+    }
+
+    /// <summary>
+    /// Checks if the player has any keys
+    /// </summary>
+    /// <returns>True if player has at least one key</returns>
+    public bool HasKeys()
+    {
+        return _keyCount > 0;
+    }
+
+    /// <summary>
+    /// Sets the key count directly (useful for loading saved games)
+    /// </summary>
+    /// <param name="count">New key count</param>
+    public void SetKeyCount(int count)
+    {
+        if (count < 0)
+        {
+            Log.Warning($"Invalid key count: {count}", "Inventory");
+            return;
+        }
+
+        _keyCount = count;
+        Log.System($"Key count set to {_keyCount}", "Inventory");
+
+        // Emit signal for UI updates
+        EmitSignal(SignalName.KeyCountChanged, _keyCount);
+    }
+    #endregion
+
     #region Public API
     /// <summary>
     /// Gets a summary of the inventory contents
@@ -154,7 +231,7 @@ public partial class Inventory : Node
     /// <returns>String representation of inventory</returns>
     public string GetInventorySummary()
     {
-        return $"Rocks: {_rockCount}/{MaxRocks}";
+        return $"Rocks: {_rockCount}/{MaxRocks}, Keys: {_keyCount}";
     }
 
     /// <summary>
