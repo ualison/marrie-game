@@ -1055,25 +1055,21 @@ namespace MarrieGame.AI
         /// </summary>
         private bool ShouldTakeDamageFromMonster()
         {
-            // Following and Idle states: Never take damage from monsters (companion safety)
+            // Following and Idle: never take damage from monsters
             if (_currentState == PuffState.Following || _currentState == PuffState.Idle)
-            {
                 return false;
-            }
 
-            // Attack state: Puff should be vulnerable to monster hits
+            // Attack: vulnerable
             if (_currentState == PuffState.Attack)
-            {
                 return true;
-            }
 
-            // Jump state: Take damage (this includes jumping during attacks)
+            // Jump: only vulnerable if the jump originated from an attack
+            // (i.e., previous state was Attack). Navigation jumps (from Following/Idle)
+            // should not make Puff vulnerable.
             if (_currentState == PuffState.Jump)
-            {
-                return true;
-            }
+                return _previousState == PuffState.Attack;
 
-            return false; // Default: no damage
+            return false;
         }
         #endregion
 
