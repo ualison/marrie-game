@@ -12,13 +12,6 @@ size = Vector2(80, 82)
 [node name="Puff" type="CharacterBody2D"]
 collision_layer = 64
 script = ExtResource("1_script")
-FollowSpeed = 160.0
-FollowDistance = 70.0
-MinFollowDistance = 50.0
-AttackSpeed = 200.0
-JumpHeight = 75.0
-MonsterAvoidanceDistance = 200.0
-MonsterAvoidanceForce = 250.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(-2.5, 3)

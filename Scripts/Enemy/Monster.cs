@@ -970,6 +970,7 @@ public void ForceShow()
         if (localDamaged)
         {
             PlayDamageEffect(Colors.Red);
+            Log.System($"Monster {Name}: Took {damage} physical damage", "Monster");
         }
         return localDamaged;
     }

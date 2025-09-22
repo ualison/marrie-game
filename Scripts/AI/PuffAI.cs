@@ -27,6 +27,9 @@ namespace MarrieGame.AI
         [Export] public float MinFollowDistance { get; set; } = 60.0f; // Minimum distance from player
         [Export] public float AttackSpeed { get; set; } = 150.0f;
         [Export] public float AttackRange { get; set; } = 100.0f;
+        [Export] public float AerialAttackRangeMultiplier { get; set; } = 0.8f; // Multiplier for attack range while jumping
+    [Export] public float AttackCommandRangeMultiplier { get; set; } = 6.0f; // How far Q-search can look relative to AttackRange
+        [Export] public float AttackGiveUpRangeMultiplier { get; set; } = 4.0f; // Abort attack if target distance > AttackRange * this value
         [Export] public float JumpHeight { get; set; } = 80.0f;
         [Export] public int MaxLife { get; set; } = 3;
         [Export] public int StartingLife { get; set; } = 3;
@@ -237,40 +240,33 @@ namespace MarrieGame.AI
                 }
             }
 
-            // Handle Q key attack - works from both Following and Idle states
+            // Handle Q key attack - works from any state if monster is visible
             if (Input.IsActionJustPressed("puff_attack") && _canAttack)
             {
-                // Can attack from Following state (if following enabled) or from Idle state
-                if ((_currentState == PuffState.Following && _isFollowingEnabled) || _currentState == PuffState.Idle)
+                Log.System("PuffAI: Q key pressed - attempting to find and attack monster", "PuffAI");
+                var nearestMonster = FindNearestMonster();
+                if (nearestMonster != null)
                 {
-                    Log.System("PuffAI: Q key pressed - attempting to find and attack monster", "PuffAI");
-                    var nearestMonster = FindNearestMonster();
-                    if (nearestMonster != null)
+                    // Always enter Attack state if visible monster is found, regardless of current state
+                    Log.System($"PuffAI: Player commanded attack - engaging monster {nearestMonster.Name}", "PuffAI");
+                    ChangeState(PuffState.Attack);
+                    _currentTarget = nearestMonster;
+                    
+                    // Enable following so we return to Following after attack (if we were in Idle)
+                    if (!_isFollowingEnabled)
                     {
-                        // If attacking from Idle state, enable following so we return to Following after attack
-                        if (_currentState == PuffState.Idle)
-                        {
-                            _isFollowingEnabled = true;
-                            Log.System($"PuffAI: Attacking from Idle - enabling following for post-attack state", "PuffAI");
-                        }
-                        
-                        Log.System($"PuffAI: Player commanded attack - engaging monster {nearestMonster.Name}", "PuffAI");
-                        ChangeState(PuffState.Attack);
-                        _currentTarget = nearestMonster;
-                    }
-                    else
-                    {
-                        Log.Debug("PuffAI: Player commanded attack but no monsters in range", "PuffAI");
+                        _isFollowingEnabled = true;
+                        Log.System("PuffAI: Attack initiated from Idle - enabling following for post-attack state", "PuffAI");
                     }
                 }
                 else
                 {
-                    Log.Debug($"PuffAI: Q pressed but attack not available from current state ({_currentState}) or following disabled", "PuffAI");
+                    Log.Debug("PuffAI: Player commanded attack but no visible monsters in range", "PuffAI");
                 }
             }
             else if (Input.IsActionJustPressed("puff_attack") && !_canAttack)
             {
-                Log.Debug("PuffAI: Q pressed but attack on cooldown", "PuffAI");
+                Log.Warning("PuffAI: *** Q pressed but attack on cooldown ***", "PuffAI");
             }
         }
         #endregion
@@ -312,7 +308,8 @@ namespace MarrieGame.AI
                     // Reset to following mode
                     break;
                 case PuffState.Attack:
-                    StartAttackCooldown();
+                    // Don't start cooldown here - wait until we actually attack
+                    Log.Debug("PuffAI: Entered Attack state, beginning pursuit", "PuffAI");
                     break;
                 case PuffState.Jump:
                     PerformJump();
@@ -512,22 +509,69 @@ namespace MarrieGame.AI
                 return;
             }
 
-            // Check if target monster is in Hidden state - abort attack if so
+            // Comprehensive target validation - check if target is still attackable
+            bool targetIsValid = true;
+            
+            // Check if target monster is in Hidden state - abort attack immediately
             if (_currentTarget.HasMethod("GetCurrentState"))
             {
                 var targetState = _currentTarget.Call("GetCurrentState");
                 if (targetState.AsInt32() == (int)MonsterState.Hidden)
                 {
-                    Log.Debug($"PuffAI: Target {_currentTarget.Name} is Hidden, aborting attack", "PuffAI");
-                    ReturnToAppropriateState();
-                    return;
+                    Log.System($"PuffAI: Target {_currentTarget.Name} became Hidden - aborting attack", "PuffAI");
+                    targetIsValid = false;
                 }
+            }
+            
+            // Check if target is dead
+            if (targetIsValid && _currentTarget.HasMethod("GetLifeSystem"))
+            {
+                var lifeSystemVariant = _currentTarget.Call("GetLifeSystem");
+                if (lifeSystemVariant.VariantType != Variant.Type.Nil)
+                {
+                    var lifeSystem = lifeSystemVariant.AsGodotObject() as Node;
+                    if (lifeSystem != null && lifeSystem.HasMethod("get_IsDead"))
+                    {
+                        bool isDead = (bool)lifeSystem.Call("get_IsDead");
+                        if (isDead)
+                        {
+                            Log.System($"PuffAI: Target {_currentTarget.Name} died - aborting attack", "PuffAI");
+                            targetIsValid = false;
+                        }
+                    }
+                }
+            }
+            
+            // Check if target can take damage
+            if (targetIsValid && _currentTarget.HasMethod("CanTakeDamage"))
+            {
+                bool canTakeDamage = (bool)_currentTarget.Call("CanTakeDamage");
+                if (!canTakeDamage)
+                {
+                    Log.System($"PuffAI: Target {_currentTarget.Name} can no longer take damage - aborting attack", "PuffAI");
+                    targetIsValid = false;
+                }
+            }
+            
+            // If target is no longer valid, return to appropriate state
+            if (!targetIsValid)
+            {
+                ReturnToAppropriateState();
+                return;
+            }
+
+            // Additional safety check before accessing GlobalPosition
+            if (_currentTarget == null || !IsInstanceValid(_currentTarget))
+            {
+                Log.Debug("PuffAI: Target became invalid during validation", "PuffAI");
+                ReturnToAppropriateState();
+                return;
             }
 
             float distanceToTarget = GlobalPosition.DistanceTo(_currentTarget.GlobalPosition);
             
             // If target is too far away, give up and return to appropriate state
-            if (distanceToTarget > AttackRange * 4)
+            if (distanceToTarget > AttackRange * AttackGiveUpRangeMultiplier)
             {
                 Log.Debug($"PuffAI: Target too far away ({distanceToTarget:F1}), giving up attack", "PuffAI");
                 ReturnToAppropriateState();
@@ -546,156 +590,246 @@ namespace MarrieGame.AI
                 }
             }
             
+            // Final safety check before attack logic
+            if (_currentTarget == null || !IsInstanceValid(_currentTarget))
+            {
+                Log.Debug("PuffAI: Target became invalid before attack", "PuffAI");
+                ReturnToAppropriateState();
+                return;
+            }
+            
             // If close enough to attack
             if (distanceToTarget <= AttackRange)
             {
-                // Attack the target
-                AttackTarget(_currentTarget);
-                Log.System($"PuffAI: Successfully attacked {_currentTarget.Name}, returning to appropriate state", "PuffAI");
-                ReturnToAppropriateState();
+                // If we're on the ground and close to target, jump to attack
+                if (IsOnFloor())
+                {
+                    Log.Debug($"PuffAI: Close to target ({distanceToTarget:F1}), jumping to attack (stay in Attack state)", "PuffAI");
+                    // Execute a jump impulse while remaining in Attack state so aerial attack logic can trigger
+                    if (_currentTarget != null && IsInstanceValid(_currentTarget))
+                    {
+                        Vector2 direction = (_currentTarget.GlobalPosition - GlobalPosition).Normalized();
+                        Velocity = new Vector2(direction.X * AttackSpeed, _jumpVelocity);
+                    }
+                }
+                else
+                {
+                    // We're in the air near target - attack when we get close enough
+                    // Made attack range more generous while jumping
+                    if (distanceToTarget <= AttackRange * AerialAttackRangeMultiplier) 
+                    {
+                        Log.Debug($"PuffAI: Attempting aerial attack on {_currentTarget.Name}", "PuffAI");
+                        AttackTarget(_currentTarget);
+                        Log.System($"PuffAI: Completed aerial attack on {_currentTarget.Name}, returning to appropriate state", "PuffAI");
+                        ReturnToAppropriateState();
+                    }
+                    else
+                    {
+                        Log.Debug($"PuffAI: In air but too far for attack: {distanceToTarget:F1} > {AttackRange * AerialAttackRangeMultiplier:F1}", "PuffAI");
+                        // Continue moving toward target while in air
+                        if (_currentTarget != null && IsInstanceValid(_currentTarget))
+                        {
+                            Vector2 direction = (_currentTarget.GlobalPosition - GlobalPosition).Normalized();
+                            Velocity = new Vector2(direction.X * AttackSpeed * 0.7f, Velocity.Y); // Slightly slower air movement
+                        }
+                    }
+                }
             }
             else
             {
                 // Chase toward target (ignore monster avoidance while attacking)
-                Vector2 direction = (_currentTarget.GlobalPosition - GlobalPosition).Normalized();
-                Velocity = new Vector2(direction.X * AttackSpeed, Velocity.Y);
-                
-                // Check if we need to jump over obstacles while chasing
-                if (IsObstacleInFront() && IsOnFloor())
+                if (_currentTarget != null && IsInstanceValid(_currentTarget))
                 {
-                    PerformJump();
+                    Vector2 direction = (_currentTarget.GlobalPosition - GlobalPosition).Normalized();
+                    Velocity = new Vector2(direction.X * AttackSpeed, Velocity.Y);
+                    
+                    // Check if we need to jump over obstacles while chasing (keep Attack state)
+                    if (IsOnFloor())
+                    {
+                        if (IsObstacleInFront())
+                        {
+                            Log.Debug("PuffAI: Obstacle detected while chasing - jumping (stay in Attack state)", "PuffAI");
+                            Velocity = new Vector2(direction.X * AttackSpeed, _jumpVelocity);
+                        }
+                        else
+                        {
+                            // If target is within a moderate range or at a different elevation, perform a pre-attack leap
+                            float verticalGap = Mathf.Abs(_currentTarget.GlobalPosition.Y - GlobalPosition.Y);
+                            if (distanceToTarget <= AttackRange * 2.5f || verticalGap > 16f)
+                            {
+                                Log.Debug($"PuffAI: Performing pre-attack leap (dist={distanceToTarget:F1}, vgap={verticalGap:F1})", "PuffAI");
+                                Velocity = new Vector2(direction.X * AttackSpeed, _jumpVelocity);
+                            }
+                        }
+                    }
+                    
+                    Log.Debug($"PuffAI: Chasing target, distance: {distanceToTarget:F1}", "PuffAI");
                 }
-                
-                Log.Debug($"PuffAI: Chasing target, distance: {distanceToTarget:F1}", "PuffAI");
+                else
+                {
+                    Log.Debug("PuffAI: Target became invalid during chase", "PuffAI");
+                    ReturnToAppropriateState();
+                }
             }
         }
 
         private void AttackTarget(Node2D target)
         {
+            // Final validation before attacking
+            if (target == null || !IsInstanceValid(target))
+            {
+                Log.Warning("PuffAI: AttackTarget called with invalid target", "PuffAI");
+                StartAttackCooldown();
+                return;
+            }
+            
             Log.System($"PuffAI: Attacking {target.Name}", "PuffAI");
-            bool damageDealt = false;
             
-            // Try the specific Monster damage methods first (based on code analysis)
-            if (target.HasMethod("TakePhysicalDamage"))
+            // Simple direct attack - Puff only attacks monsters by jumping at them
+            if (target is Monster monster)
             {
-                var result = target.Call("TakePhysicalDamage", AttackDamage);
-                if (result.AsBool())
+                // Final check: make sure monster is still in a valid state to be attacked
+                if (monster.HasMethod("GetCurrentState"))
                 {
-                    damageDealt = true;
-                    Log.System("PuffAI: Successfully dealt physical damage to monster", "PuffAI");
-                }
-            }
-            else if (target.HasMethod("TakeRockDamage"))
-            {
-                var result = target.Call("TakeRockDamage", AttackDamage);
-                if (result.AsBool())
-                {
-                    damageDealt = true;
-                    Log.System("PuffAI: Successfully dealt rock damage to monster", "PuffAI");
-                }
-            }
-            // Try standard damage methods
-            else if (target.HasMethod("TakeDamage"))
-            {
-                target.Call("TakeDamage", AttackDamage);
-                damageDealt = true;
-                Log.Debug("PuffAI: Direct TakeDamage call made", "PuffAI");
-            }
-            
-            // If direct damage didn't work, try through children
-            if (!damageDealt && target.IsInGroup("enemies"))
-            {
-                foreach (Node child in target.GetChildren())
-                {
-                    if (child.HasMethod("TakeDamage"))
+                    var monsterState = monster.Call("GetCurrentState");
+                    if (monsterState.AsInt32() == (int)MonsterState.Hidden)
                     {
-                        child.Call("TakeDamage", AttackDamage);
-                        damageDealt = true;
-                        Log.Debug("PuffAI: Child TakeDamage call made", "PuffAI");
-                        break;
+                        Log.Debug($"PuffAI: Monster {target.Name} is hidden - cannot attack", "PuffAI");
+                        StartAttackCooldown();
+                        return;
                     }
                 }
-            }
-            
-            // Also try common health system interfaces
-            if (!damageDealt)
-            {
-                // Try calling Hurt method (some enemies might use this)
-                if (target.HasMethod("Hurt"))
+                
+                // Check if monster is dead
+                if (monster.HasMethod("GetLifeSystem"))
                 {
-                    target.Call("Hurt", AttackDamage);
-                    damageDealt = true;
-                    Log.Debug("PuffAI: Used Hurt method", "PuffAI");
+                    var lifeSystemVariant = monster.Call("GetLifeSystem");
+                    if (lifeSystemVariant.VariantType != Variant.Type.Nil)
+                    {
+                        var lifeSystem = lifeSystemVariant.AsGodotObject() as Node;
+                        if (lifeSystem != null && lifeSystem.HasMethod("get_IsDead"))
+                        {
+                            bool isDead = (bool)lifeSystem.Call("get_IsDead");
+                            if (isDead)
+                            {
+                                Log.Debug($"PuffAI: Monster {target.Name} is dead - cannot attack", "PuffAI");
+                                StartAttackCooldown();
+                                return;
+                            }
+                        }
+                    }
                 }
-                // Try calling Hit method
-                else if (target.HasMethod("Hit"))
+                
+                // Check if monster can take damage first
+                if (!monster.CanTakeDamage())
                 {
-                    target.Call("Hit", AttackDamage);
-                    damageDealt = true;
-                    Log.Debug("PuffAI: Used Hit method", "PuffAI");
+                    Log.Debug($"PuffAI: Monster {target.Name} cannot take damage (invulnerable, hidden, or no red hearts)", "PuffAI");
+                    StartAttackCooldown();
+                    return;
+                }
+                
+                // Deal physical damage directly
+                bool damageDealt = monster.TakePhysicalDamage(AttackDamage);
+                
+                if (damageDealt)
+                {
+                    Log.System($"PuffAI: Successfully damaged monster {target.Name}", "PuffAI");
+                }
+                else
+                {
+                    Log.Warning($"PuffAI: Failed to damage monster {target.Name}", "PuffAI");
                 }
             }
-
-            // The Monster class has a built-in PlayDamageEffect method, so try to use it
-            if (target.HasMethod("PlayDamageEffect"))
+            else if (target is GhostMonster ghostMonster)
             {
-                target.Call("PlayDamageEffect", Colors.Red);
-                Log.Debug("PuffAI: Triggered monster's built-in damage effect", "PuffAI");
+                // Handle ghost monsters
+                bool damageDealt = ghostMonster.TakePhysicalDamage(AttackDamage);
+                
+                if (damageDealt)
+                {
+                    Log.System($"PuffAI: Successfully damaged ghost monster {target.Name}", "PuffAI");
+                }
+                else
+                {
+                    Log.Warning($"PuffAI: Failed to damage ghost monster {target.Name}", "PuffAI");
+                }
             }
             else
             {
-                // Create our own red blink effect if monster doesn't have one
-                CreateHitEffect(target);
-            }
+                // Fallback for targets not strongly typed as Monster/GhostMonster
+                // Try a dynamic approach using method names
+                try
+                {
+                    bool canTake = true;
+                    if (target.HasMethod("CanTakeDamage"))
+                    {
+                        var res = target.Call("CanTakeDamage");
+                        if (res.VariantType == Variant.Type.Bool)
+                            canTake = res.AsBool();
+                    }
 
-            if (damageDealt)
-            {
-                Log.System($"PuffAI: Successfully attacked {target.Name}", "PuffAI");
-            }
-            else
-            {
-                Log.Warning($"PuffAI: Could not damage {target.Name} - no valid damage method found", "PuffAI");
+                    if (!canTake)
+                    {
+                        Log.Debug($"PuffAI: Target {target.Name} reported cannot take damage", "PuffAI");
+                        StartAttackCooldown();
+                        return;
+                    }
+
+                    bool dealt = false;
+                    if (target.HasMethod("TakePhysicalDamage"))
+                    {
+                        var dmgRes = target.Call("TakePhysicalDamage", AttackDamage);
+                        if (dmgRes.VariantType == Variant.Type.Bool)
+                            dealt = dmgRes.AsBool();
+                        else
+                            dealt = true; // assume success when method exists but returns non-bool
+                    }
+                    else if (target.HasMethod("TakeDamage"))
+                    {
+                        var dmgRes = target.Call("TakeDamage", AttackDamage);
+                        if (dmgRes.VariantType == Variant.Type.Bool)
+                            dealt = dmgRes.AsBool();
+                        else
+                            dealt = true;
+                    }
+                    else if (target.HasMethod("GetLifeSystem"))
+                    {
+                        var lifeVariant = target.Call("GetLifeSystem");
+                        if (lifeVariant.VariantType != Variant.Type.Nil)
+                        {
+                            var lifeNode = lifeVariant.AsGodotObject() as Node;
+                            if (lifeNode != null && lifeNode.HasMethod("TakePhysicalDamage"))
+                            {
+                                var dmgRes = lifeNode.Call("TakePhysicalDamage", AttackDamage);
+                                if (dmgRes.VariantType == Variant.Type.Bool)
+                                    dealt = dmgRes.AsBool();
+                                else
+                                    dealt = true;
+                            }
+                        }
+                    }
+
+                    if (dealt)
+                    {
+                        Log.System($"PuffAI: Successfully damaged target {target.Name} via fallback", "PuffAI");
+                    }
+                    else
+                    {
+                        Log.Warning($"PuffAI: Fallback damage failed for target {target.Name}", "PuffAI");
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Error($"PuffAI: Fallback attack failed on {target.Name}: {ex.Message}", "PuffAI");
+                }
             }
 
             StartAttackCooldown();
         }
 
-        private void CreateHitEffect(Node2D target)
-        {
-            // Create a red blink effect for the monster - try different sprite types
-            Node spriteNode = target.GetNodeOrNull<Sprite2D>("Sprite2D") 
-                           ?? target.GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D")
-                           ?? target.GetNodeOrNull<Sprite2D>("MonsterSprite")
-                           ?? (Node)target.GetNodeOrNull<AnimatedSprite2D>("MonsterAnimatedSprite");
-
-            if (spriteNode != null)
-            {
-                Color originalModulate = Colors.White;
-                var tween = target.CreateTween();
-                
-                // Get the current modulate color
-                if (spriteNode.HasMethod("get_modulate"))
-                {
-                    originalModulate = spriteNode.Get("modulate").AsColor();
-                }
-                
-                // Flash red briefly
-                tween.TweenProperty(spriteNode, "modulate", Colors.Red, 0.1f);
-                tween.TweenProperty(spriteNode, "modulate", originalModulate, 0.1f);
-                tween.TweenProperty(spriteNode, "modulate", Colors.Red, 0.1f);
-                tween.TweenProperty(spriteNode, "modulate", originalModulate, 0.1f);
-                
-                Log.Debug("PuffAI: Created custom red blink effect", "PuffAI");
-            }
-            else
-            {
-                Log.Warning("PuffAI: Could not find sprite to apply hit effect", "PuffAI");
-            }
-        }
-
         private Node2D FindNearestMonster()
         {
-            var monsters = GetTree().GetNodesInGroup("enemies"); // Fixed: was "enemy", should be "enemies"
+            var monsters = GetTree().GetNodesInGroup("enemies");
             Node2D nearest = null;
             float nearestDistance = float.MaxValue;
 
@@ -705,9 +839,65 @@ namespace MarrieGame.AI
             {
                 if (!IsInstanceValid(monster)) continue;
                 
+                // Check if monster is dead or has no life system
+                if (monster.HasMethod("GetLifeSystem"))
+                {
+                    var lifeSystemVariant = monster.Call("GetLifeSystem");
+                    if (lifeSystemVariant.VariantType == Variant.Type.Nil)
+                    {
+                        Log.Debug($"PuffAI: Skipping monster {monster.Name} - no life system", "PuffAI");
+                        continue;
+                    }
+                    
+                    // Try to check if the monster is dead
+                    if (monster.HasMethod("GetLifeSystem"))
+                    {
+                        var lifeSystem = monster.Call("GetLifeSystem").AsGodotObject() as Node;
+                        if (lifeSystem != null && lifeSystem.HasMethod("get_IsDead"))
+                        {
+                            bool isDead = (bool)lifeSystem.Call("get_IsDead");
+                            if (isDead)
+                            {
+                                Log.Debug($"PuffAI: Skipping dead monster {monster.Name}", "PuffAI");
+                                continue;
+                            }
+                        }
+                    }
+                }
+                
+                // Check if monster is in visible state before considering it as a target
+                bool isVisible = true;
+                if (monster.HasMethod("GetCurrentState"))
+                {
+                    var monsterState = monster.Call("GetCurrentState");
+                    if (monsterState.AsInt32() == (int)MonsterState.Hidden)
+                    {
+                        isVisible = false;
+                        Log.Debug($"PuffAI: Skipping hidden monster {monster.Name}", "PuffAI");
+                    }
+                }
+                else
+                {
+                    // If monster doesn't have state method, assume it's visible but warn
+                    Log.Debug($"PuffAI: Monster {monster.Name} has no state method - assuming visible", "PuffAI");
+                }
+                
+                if (!isVisible) continue;
+                
+                // Additional check: make sure monster can actually take damage before considering it
+                if (monster.HasMethod("CanTakeDamage"))
+                {
+                    bool canTakeDamage = (bool)monster.Call("CanTakeDamage");
+                    if (!canTakeDamage)
+                    {
+                        Log.Debug($"PuffAI: Skipping monster {monster.Name} - cannot take damage", "PuffAI");
+                        continue;
+                    }
+                }
+                
                 float distance = GlobalPosition.DistanceTo(monster.GlobalPosition);
-                // Extended search range for attack command - look further than normal attack range
-                if (distance < nearestDistance && distance <= AttackRange * 3) 
+                // Extended search range for attack command - configurable multiplier of base attack range
+                if (distance < nearestDistance && distance <= AttackRange * AttackCommandRangeMultiplier) 
                 {
                     nearestDistance = distance;
                     nearest = monster;
@@ -716,11 +906,11 @@ namespace MarrieGame.AI
 
             if (nearest != null)
             {
-                Log.System($"PuffAI: Found nearest monster {nearest.Name} at distance {nearestDistance:F1}", "PuffAI");
+                Log.System($"PuffAI: Found nearest attackable monster {nearest.Name} at distance {nearestDistance:F1}", "PuffAI");
             }
             else
             {
-                Log.Debug("PuffAI: No monsters found within extended range", "PuffAI");
+                Log.Debug("PuffAI: No attackable monsters found within extended range", "PuffAI");
             }
 
             return nearest;
@@ -865,24 +1055,24 @@ namespace MarrieGame.AI
         /// </summary>
         private bool ShouldTakeDamageFromMonster()
         {
-            // Following and Idle states: Never take damage from monsters
+            // Following and Idle states: Never take damage from monsters (companion safety)
             if (_currentState == PuffState.Following || _currentState == PuffState.Idle)
             {
                 return false;
             }
-            
-            // Attack state: Only take damage when jumping (falling through the air)
+
+            // Attack state: Puff should be vulnerable to monster hits
             if (_currentState == PuffState.Attack)
             {
-                return false; // Don't take damage during attack chase/combat
+                return true;
             }
-            
+
             // Jump state: Take damage (this includes jumping during attacks)
             if (_currentState == PuffState.Jump)
             {
                 return true;
             }
-            
+
             return false; // Default: no damage
         }
         #endregion

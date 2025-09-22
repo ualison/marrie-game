@@ -69,4 +69,16 @@ position = Vector2(-184, 232)
 TargetScenePath = "uid://djkt6xtpabbyo"
 
 [node name="Puff" parent="." instance=ExtResource("13_j3sk6")]
-position = Vector2(-464, 239)
+position = Vector2(-486, 239)
+FollowSpeed = 100.0
+FollowDistance = 100.0
+MinFollowDistance = 75.0
+AttackRange = 150.0
+AerialAttackRangeMultiplier = 0.9
+AttackCommandRangeMultiplier = 8.0
+AttackGiveUpRangeMultiplier = 15.0
+JumpHeight = 75.0
+AttackCooldown = 1.0
+InvulnerabilityTime = 1.5
+MonsterAvoidanceDistance = 100.0
+MonsterAvoidanceForce = 150.0

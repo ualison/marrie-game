@@ -1,5 +1,6 @@
 using Godot;
 using MarrieGame.Core.Interfaces;
+using MarrieGame.Core.Utils;
 
 // Monster health management with dual heart types (red = physical, purple = magical)
 public partial class MonsterLife : Node, IHealthSystem
@@ -81,11 +82,17 @@ public partial class MonsterLife : Node, IHealthSystem
         if (actual <= 0) return false;
 
         _currentRedHearts = Mathf.Max(0, _currentRedHearts - actual);
+        
+        Log.System($"MonsterLife: Lost {actual} red hearts, {_currentRedHearts} remaining", "MonsterLife");
 
         StartInvulnerability();
         NotifyLifeChanged();
 
-        if (IsDead) EmitSignal("MonsterDied");
+        if (IsDead) 
+        {
+            EmitSignal("MonsterDied");
+        }
+        
         return true;
     }
 
