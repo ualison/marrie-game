@@ -7,9 +7,9 @@ namespace MarrieGame.AI
 {
     /// <summary>
     /// AI controller for Puff companion character
-    /// Features following behavior, attack on command, jumping navigation, and health system
+    /// Features following behavior, attack on command, jumping navigation, and energy system
     /// </summary>
-    public partial class PuffAI : CharacterBody2D, IHealthSystem
+    public partial class PuffAI : CharacterBody2D
     {
         #region Enums
         public enum PuffState
@@ -17,7 +17,9 @@ namespace MarrieGame.AI
             Following,
             Attack,
             Jump,
-            Idle
+            Idle,
+            FaceLeft,
+            FaceRight
         }
         #endregion
 
@@ -28,14 +30,13 @@ namespace MarrieGame.AI
         [Export] public float AttackSpeed { get; set; } = 150.0f;
         [Export] public float AttackRange { get; set; } = 100.0f;
         [Export] public float AerialAttackRangeMultiplier { get; set; } = 0.8f; // Multiplier for attack range while jumping
-    [Export] public float AttackCommandRangeMultiplier { get; set; } = 6.0f; // How far Q-search can look relative to AttackRange
+        [Export] public float AttackCommandRangeMultiplier { get; set; } = 6.0f; // How far Q-search can look relative to AttackRange
         [Export] public float AttackGiveUpRangeMultiplier { get; set; } = 4.0f; // Abort attack if target distance > AttackRange * this value
         [Export] public float JumpHeight { get; set; } = 80.0f;
-        [Export] public int MaxLife { get; set; } = 3;
-        [Export] public int StartingLife { get; set; } = 3;
+        [Export] public int MaxEnergy { get; set; } = 100;
+        [Export] public int StartingEnergy { get; set; } = 100;
         [Export] public int AttackDamage { get; set; } = 1;
         [Export] public float AttackCooldown { get; set; } = 1.5f;
-        [Export] public float InvulnerabilityTime { get; set; } = 2.0f;
         [Export] public float MonsterAvoidanceDistance { get; set; } = 150.0f; // Distance to avoid monsters
         [Export] public float MonsterAvoidanceForce { get; set; } = 200.0f; // How strong the avoidance is
         #endregion
@@ -45,7 +46,6 @@ namespace MarrieGame.AI
         private PuffState _previousState = PuffState.Following;
         private Timer _stateTimer;
         private Timer _attackCooldownTimer;
-        private Timer _invulnerabilityTimer;
         #endregion
 
         #region Components
@@ -57,11 +57,9 @@ namespace MarrieGame.AI
         private Area2D _hurtBox;
         #endregion
 
-        #region Health System
-        public int CurrentHealth { get; private set; }
-        public int MaxHealth => MaxLife;
-        public bool IsDead => CurrentHealth <= 0;
-        public bool IsInvulnerable { get; private set; }
+        #region Energy System
+        public int CurrentEnergy { get; private set; }
+        public int MaxEnergyLimit => MaxEnergy;
         #endregion
 
         #region Physics
@@ -75,8 +73,7 @@ namespace MarrieGame.AI
         #endregion
 
         #region Signals
-        [Signal] public delegate void PuffDiedEventHandler();
-        [Signal] public delegate void PuffHealthChangedEventHandler(int currentHealth, int maxHealth);
+        [Signal] public delegate void PuffEnergyChangedEventHandler(int currentEnergy, int maxEnergy);
         #endregion
 
         #region Initialization
@@ -86,7 +83,7 @@ namespace MarrieGame.AI
             InitializePhysics();
             InitializeComponents();
             SetupTimers();
-            InitializeHealth();
+            InitializeEnergy();
             
             // Use CallDeferred to ensure everything is ready before starting following
             CallDeferred(MethodName.StartFollowing);
@@ -159,25 +156,21 @@ namespace MarrieGame.AI
             _attackCooldownTimer.OneShot = true;
             _attackCooldownTimer.Timeout += OnAttackCooldownFinished;
             AddChild(_attackCooldownTimer);
-
-            // Invulnerability timer
-            _invulnerabilityTimer = new Timer();
-            _invulnerabilityTimer.WaitTime = InvulnerabilityTime;
-            _invulnerabilityTimer.OneShot = true;
-            _invulnerabilityTimer.Timeout += EndInvulnerability;
-            AddChild(_invulnerabilityTimer);
         }
 
-        private void InitializeHealth()
+        private void InitializeEnergy()
         {
-            CurrentHealth = StartingLife;
-            EmitSignal(SignalName.PuffHealthChanged, CurrentHealth, MaxHealth);
+            CurrentEnergy = StartingEnergy;
+            EmitSignal(SignalName.PuffEnergyChanged, CurrentEnergy, MaxEnergyLimit);
         }
         #endregion
 
         #region Physics Process
         public override void _PhysicsProcess(double delta)
         {
+            // CRITICAL: Ensure Puff never disappears - force visibility every frame
+            EnsurePuffVisibility();
+            
             // Fallback: try to find player if not found during initialization
             if (_player == null)
             {
@@ -190,7 +183,7 @@ namespace MarrieGame.AI
                 }
             }
             
-            if (IsDead || _player == null || !_initialized) return;
+            if (_player == null || !_initialized) return;
 
             // Safety check: prevent Puff from going too far from player
             if (_player != null)
@@ -199,7 +192,10 @@ namespace MarrieGame.AI
                 if (distanceFromPlayer > 1000.0f) // If Puff is more than 1000 units away
                 {
                     Log.Warning($"PuffAI: Too far from player ({distanceFromPlayer:F1}), teleporting back", "PuffAI");
-                    GlobalPosition = _player.GlobalPosition + Vector2.Left * FollowDistance;
+                    // Use the same logic as in following behavior to determine safe position
+                    bool playerFacingRight = GetPlayerFacingDirection();
+                    Vector2 safePosition = _player.GlobalPosition - (playerFacingRight ? Vector2.Right : Vector2.Left) * FollowDistance;
+                    GlobalPosition = safePosition;
                     Velocity = Vector2.Zero;
                     ReturnToAppropriateState();
                 }
@@ -210,6 +206,85 @@ namespace MarrieGame.AI
             ApplyGravity(delta);
             MoveAndSlide();
             UpdateSpriteDirection();
+        }
+
+        /// <summary>
+        /// Critical safety method to ensure Puff never disappears
+        /// </summary>
+        private void EnsurePuffVisibility()
+        {
+            // Ensure Puff node itself is always visible and active
+            if (!base.Visible)
+            {
+                Log.Warning("PuffAI: CRITICAL - Puff was invisible, forcing visible!", "PuffAI");
+                base.Visible = true;
+            }
+
+            // Ensure Puff sprite is always visible (except when properly dead)
+            if (_puffSprite != null)
+            {
+                if (!_puffSprite.Visible)
+                {
+                    Log.Warning("PuffAI: CRITICAL - PuffSprite was invisible, forcing visible!", "PuffAI");
+                    _puffSprite.Visible = true;
+                }
+
+                // Prevent complete transparency
+                if (_puffSprite.Modulate.A < 0.1f)
+                {
+                    Log.Warning("PuffAI: CRITICAL - PuffSprite was nearly transparent, restoring opacity!", "PuffAI");
+                    _puffSprite.Modulate = new Color(_puffSprite.Modulate.R, _puffSprite.Modulate.G, _puffSprite.Modulate.B, 1.0f);
+                }
+            }
+
+            // Ensure collision shape is active
+            if (_collisionShape != null && _collisionShape.Disabled)
+            {
+                Log.Warning("PuffAI: CRITICAL - Collision shape was disabled, re-enabling!", "PuffAI");
+                _collisionShape.Disabled = false;
+            }
+
+            // Validate position is not NaN or infinite
+            if (!GlobalPosition.IsFinite() || GlobalPosition.Length() > 50000)
+            {
+                Log.Warning($"PuffAI: CRITICAL - Invalid position detected ({GlobalPosition}), teleporting to player!", "PuffAI");
+                if (_player != null && _player.GlobalPosition.IsFinite())
+                {
+                    GlobalPosition = _player.GlobalPosition + Vector2.Right * 50; // Safe offset
+                    Velocity = Vector2.Zero;
+                }
+                else
+                {
+                    GlobalPosition = Vector2.Zero; // Fallback to origin
+                    Velocity = Vector2.Zero;
+                }
+            }
+        }
+
+        /// <summary>
+        /// New method to safely destroy Puff (use this instead of QueueFree)
+        /// </summary>
+        public void SafeDestroy()
+        {
+            Log.System("PuffAI: Safely destroying Puff", "PuffAI");
+            base.QueueFree();
+        }
+
+        /// <summary>
+        /// Override visibility setter to ensure Puff never becomes invisible
+        /// </summary>
+        public new bool Visible
+        {
+            get => base.Visible;
+            set
+            {
+                if (!value)
+                {
+                    Log.Warning("PuffAI: CRITICAL - Something tried to make Puff invisible! Ignoring.", "PuffAI");
+                    return; // Don't allow invisible
+                }
+                base.Visible = value;
+            }
         }
 
         private void ApplyGravity(double delta)
@@ -247,10 +322,9 @@ namespace MarrieGame.AI
                 var nearestMonster = FindNearestMonster();
                 if (nearestMonster != null)
                 {
-                    // Always enter Attack state if visible monster is found, regardless of current state
-                    Log.System($"PuffAI: Player commanded attack - engaging monster {nearestMonster.Name}", "PuffAI");
-                    ChangeState(PuffState.Attack);
+                    // Set the target and initiate attack with proper facing
                     _currentTarget = nearestMonster;
+                    InitiateAttackWithFacing();
                     
                     // Enable following so we return to Following after attack (if we were in Idle)
                     if (!_isFollowingEnabled)
@@ -267,6 +341,34 @@ namespace MarrieGame.AI
             else if (Input.IsActionJustPressed("puff_attack") && !_canAttack)
             {
                 Log.Warning("PuffAI: *** Q pressed but attack on cooldown ***", "PuffAI");
+            }
+        }
+
+        private void InitiateAttackWithFacing()
+        {
+            if (_currentTarget == null || !IsInstanceValid(_currentTarget))
+            {
+                Log.Warning("PuffAI: InitiateAttackWithFacing called with invalid target", "PuffAI");
+                return;
+            }
+
+            Log.System($"PuffAI: Player commanded attack - engaging monster {_currentTarget.Name}", "PuffAI");
+
+            // Check if Puff needs to face the target first
+            float targetDirection = _currentTarget.GlobalPosition.X - GlobalPosition.X;
+            bool targetIsOnRight = targetDirection > 0;
+            
+            // If Puff is not facing the target, use a brief facing state first
+            if (targetIsOnRight != _facingRight)
+            {
+                Log.Debug($"PuffAI: Need to face target - switching to {(targetIsOnRight ? "FaceRight" : "FaceLeft")} state", "PuffAI");
+                ChangeState(targetIsOnRight ? PuffState.FaceRight : PuffState.FaceLeft);
+            }
+            else
+            {
+                // Already facing the correct direction, go straight to attack
+                Log.Debug("PuffAI: Already facing target - going directly to Attack state", "PuffAI");
+                ChangeState(PuffState.Attack);
             }
         }
         #endregion
@@ -297,6 +399,10 @@ namespace MarrieGame.AI
                 case PuffState.Jump:
                     // Jump state naturally ends when landing
                     break;
+                case PuffState.FaceLeft:
+                case PuffState.FaceRight:
+                    // Facing states are transitional - no special cleanup needed
+                    break;
             }
         }
 
@@ -316,6 +422,12 @@ namespace MarrieGame.AI
                     break;
                 case PuffState.Idle:
                     Velocity = Vector2.Zero;
+                    break;
+                case PuffState.FaceLeft:
+                    // Facing states are brief - just used for orientation
+                    break;
+                case PuffState.FaceRight:
+                    // Facing states are brief - just used for orientation
                     break;
             }
         }
@@ -342,6 +454,12 @@ namespace MarrieGame.AI
                     break;
                 case PuffState.Idle:
                     UpdateIdleBehavior();
+                    break;
+                case PuffState.FaceLeft:
+                    UpdateFacingBehavior();
+                    break;
+                case PuffState.FaceRight:
+                    UpdateFacingBehavior();
                     break;
             }
         }
@@ -454,39 +572,81 @@ namespace MarrieGame.AI
 
         private Vector2 CalculateMonsterAvoidance()
         {
+            // Only calculate avoidance in Following state - ignore in other states
+            if (_currentState != PuffState.Following)
+                return Vector2.Zero;
+
             Vector2 avoidanceForce = Vector2.Zero;
-            var monsters = GetTree().GetNodesInGroup("enemies"); // Fixed: was "enemy", should be "enemies"
+            var monsters = GetTree().GetNodesInGroup("enemies");
             bool foundNearbyMonster = false;
 
             foreach (Node2D monster in monsters)
             {
-                if (!IsInstanceValid(monster)) continue;
+                // Robust validation to prevent crashes
+                if (!IsInstanceValid(monster) || monster == null) continue;
 
-                float distanceToMonster = GlobalPosition.DistanceTo(monster.GlobalPosition);
-                
-                // If monster is within avoidance distance, calculate repulsion force
-                if (distanceToMonster < MonsterAvoidanceDistance && distanceToMonster > 0)
+                // Additional safety check - ensure monster has a valid GlobalPosition
+                Vector2 monsterPos;
+                try
                 {
-                    foundNearbyMonster = true;
-                    
-                    // Calculate direction away from monster
-                    Vector2 awayFromMonster = (GlobalPosition - monster.GlobalPosition).Normalized();
-                    
-                    // Stronger force when monster is closer (inverse square relationship)
-                    float forceStrength = MonsterAvoidanceForce / (distanceToMonster * distanceToMonster);
-                    forceStrength = Mathf.Min(forceStrength, MonsterAvoidanceForce); // Cap the maximum force
-                    
-                    avoidanceForce += awayFromMonster * forceStrength;
+                    monsterPos = monster.GlobalPosition;
                 }
+                catch
+                {
+                    Log.Warning($"PuffAI: Monster {monster.Name} has invalid position, skipping avoidance", "PuffAI");
+                    continue;
+                }
+
+                float distanceToMonster = GlobalPosition.DistanceTo(monsterPos);
+                
+                // Skip monsters that are too far or at same position
+                if (distanceToMonster >= MonsterAvoidanceDistance || distanceToMonster <= 0.1f) 
+                    continue;
+
+                // Skip hidden/inactive monsters for avoidance calculation
+                if (monster.HasMethod("GetCurrentState"))
+                {
+                    try
+                    {
+                        var monsterState = monster.Call("GetCurrentState");
+                        if (monsterState.AsInt32() == (int)MonsterState.Hidden)
+                        {
+                            // Don't avoid hidden monsters
+                            continue;
+                        }
+                    }
+                    catch
+                    {
+                        // If we can't get state, assume monster is active
+                    }
+                }
+
+                foundNearbyMonster = true;
+                
+                // Calculate direction away from monster
+                Vector2 awayFromMonster = (GlobalPosition - monsterPos).Normalized();
+                
+                // Stronger force when monster is closer (inverse square relationship)
+                float forceStrength = MonsterAvoidanceForce / (distanceToMonster * distanceToMonster);
+                forceStrength = Mathf.Min(forceStrength, MonsterAvoidanceForce); // Cap the maximum force
+                
+                avoidanceForce += awayFromMonster * forceStrength;
             }
 
             // If there are nearby monsters, also add force toward player for safety
             if (foundNearbyMonster && _player != null)
             {
-                Vector2 towardPlayer = (_player.GlobalPosition - GlobalPosition).Normalized();
-                avoidanceForce += towardPlayer * 0.5f; // Moderate force toward player
-                
-                Log.Debug("PuffAI: Monsters detected, seeking safety near player", "PuffAI");
+                try
+                {
+                    Vector2 towardPlayer = (_player.GlobalPosition - GlobalPosition).Normalized();
+                    avoidanceForce += towardPlayer * 0.5f; // Moderate force toward player
+                    
+                    Log.Debug("PuffAI: Monsters detected, seeking safety near player", "PuffAI");
+                }
+                catch
+                {
+                    Log.Warning("PuffAI: Error calculating direction to player during avoidance", "PuffAI");
+                }
             }
 
             // Normalize the final avoidance force
@@ -957,84 +1117,58 @@ namespace MarrieGame.AI
             // Still collect apples and take damage if needed, but don't move
             // The only way out of idle is through the R key toggle
         }
+
+        private void UpdateFacingBehavior()
+        {
+            // Facing states are brief transitional states
+            // Stay still while turning to face the correct direction
+            Velocity = new Vector2(0, Velocity.Y); // Keep Y velocity for gravity
+            
+            // The facing direction will be handled by UpdateSpriteDirection()
+            // After one frame, transition to the appropriate action state
+            
+            // If we have a target, go to Attack state; otherwise return to appropriate state
+            if (_currentTarget != null && IsInstanceValid(_currentTarget))
+            {
+                Log.Debug("PuffAI: Facing complete - transitioning to Attack state", "PuffAI");
+                ChangeState(PuffState.Attack);
+            }
+            else
+            {
+                ReturnToAppropriateState();
+            }
+        }
         #endregion
 
-        #region Health System
-        public bool TakeDamage(int damage = 1)
+        #region Energy System
+        public bool UseEnergy(int amount = 1)
         {
-            if (IsDead || IsInvulnerable) return false;
+            if (CurrentEnergy < amount) return false;
 
-            CurrentHealth = Mathf.Max(0, CurrentHealth - damage);
-            StartInvulnerability();
+            CurrentEnergy = Mathf.Max(0, CurrentEnergy - amount);
+            EmitSignal(SignalName.PuffEnergyChanged, CurrentEnergy, MaxEnergyLimit);
             
-            EmitSignal(SignalName.PuffHealthChanged, CurrentHealth, MaxHealth);
-            
-            if (IsDead)
-            {
-                HandleDeath();
-            }
-
-            Log.System($"PuffAI: Took {damage} damage, health: {CurrentHealth}/{MaxHealth}", "PuffAI");
+            Log.System($"PuffAI: Used {amount} energy, current: {CurrentEnergy}/{MaxEnergyLimit}", "PuffAI");
             return true;
         }
 
-        public void Heal(int amount = 1)
+        public void GainEnergy(int amount = 1)
         {
-            if (IsDead) return;
-
-            CurrentHealth = Mathf.Min(MaxHealth, CurrentHealth + amount);
-            EmitSignal(SignalName.PuffHealthChanged, CurrentHealth, MaxHealth);
+            CurrentEnergy = Mathf.Min(MaxEnergyLimit, CurrentEnergy + amount);
+            EmitSignal(SignalName.PuffEnergyChanged, CurrentEnergy, MaxEnergyLimit);
             
-            Log.System($"PuffAI: Healed {amount}, health: {CurrentHealth}/{MaxHealth}", "PuffAI");
+            Log.System($"PuffAI: Gained {amount} energy, current: {CurrentEnergy}/{MaxEnergyLimit}", "PuffAI");
         }
 
-        private void StartInvulnerability()
+        public void ConsumeBlueApple()
         {
-            IsInvulnerable = true;
-            _invulnerabilityTimer.Start();
-            
-            // Visual feedback for invulnerability
-            if (_puffSprite != null)
-            {
-                var tween = CreateTween();
-                tween.TweenProperty(_puffSprite, "modulate:a", 0.5f, 0.1f);
-                tween.TweenProperty(_puffSprite, "modulate:a", 1.0f, 0.1f);
-                tween.SetLoops((int)(InvulnerabilityTime * 5)); // Blink during invulnerability
-            }
-        }
-
-        private void EndInvulnerability()
-        {
-            IsInvulnerable = false;
-            if (_puffSprite != null)
-            {
-                _puffSprite.Modulate = Colors.White; // Restore normal appearance
-            }
-        }
-
-        private void HandleDeath()
-        {
-            EmitSignal(SignalName.PuffDied);
-            ChangeState(PuffState.Idle);
-            Log.System("PuffAI: Died", "PuffAI");
-            
-            // Optional: Hide sprite or play death animation
-            if (_puffSprite != null)
-            {
-                _puffSprite.Modulate = new Color(1, 1, 1, 0.5f); // Semi-transparent
-            }
-        }
-
-        public void ConsumeRedApple()
-        {
-            Heal(1);
-            Log.System("PuffAI: Consumed red apple", "PuffAI");
+            GainEnergy(10);
+            Log.System("PuffAI: Consumed blue apple for energy", "PuffAI");
         }
 
         public void Reset()
         {
-            CurrentHealth = StartingLife;
-            IsInvulnerable = false;
+            CurrentEnergy = StartingEnergy;
             _currentTarget = null;
             _canAttack = true;
             ReturnToAppropriateState();
@@ -1044,81 +1178,56 @@ namespace MarrieGame.AI
                 _puffSprite.Modulate = Colors.White;
             }
             
-            EmitSignal(SignalName.PuffHealthChanged, CurrentHealth, MaxHealth);
+            EmitSignal(SignalName.PuffEnergyChanged, CurrentEnergy, MaxEnergyLimit);
             Log.System("PuffAI: Reset to initial state", "PuffAI");
-        }
-        #endregion
-
-        #region Collision Logic
-        /// <summary>
-        /// Determines if Puff should take damage from monsters based on current state
-        /// </summary>
-        private bool ShouldTakeDamageFromMonster()
-        {
-            // Following and Idle: never take damage from monsters
-            if (_currentState == PuffState.Following || _currentState == PuffState.Idle)
-                return false;
-
-            // Attack: vulnerable
-            if (_currentState == PuffState.Attack)
-                return true;
-
-            // Jump: only vulnerable if the jump originated from an attack
-            // (i.e., previous state was Attack). Navigation jumps (from Following/Idle)
-            // should not make Puff vulnerable.
-            if (_currentState == PuffState.Jump)
-                return _previousState == PuffState.Attack;
-
-            return false;
         }
         #endregion
 
         #region Signal Handlers
         private void OnHurtBoxBodyEntered(Node2D body)
         {
-            // Handle apple collection - Puff should collect apples
+            // Handle apple collection in all states
             if (body.IsInGroup("apple"))
             {
                 CheckAndConsumeApple(body);
             }
-            // Only take damage from enemies in specific states (Jump state only)
+            // Handle monster interactions in attack states
             else if (body.IsInGroup("enemies"))
             {
-                if (ShouldTakeDamageFromMonster())
+                // If Puff is in Attack state and collides with the target monster, attack it!
+                if (_currentState == PuffState.Attack && body == _currentTarget)
                 {
-                    TakeDamage(1);
-                    Log.Debug($"PuffAI: Hit by enemy {body.Name} while in {_currentState} state - took damage", "PuffAI");
+                    Log.System($"PuffAI: Collision-based attack on {body.Name} (Body collision)", "PuffAI");
+                    AttackTarget(body);
+                    ReturnToAppropriateState();
+                    return;
                 }
-                else
-                {
-                    Log.Debug($"PuffAI: Hit by enemy {body.Name} while in {_currentState} state - ignoring damage", "PuffAI");
-                }
+                // Puff no longer takes damage from monsters - only attacks them
             }
         }
 
         private void OnHurtBoxAreaEntered(Area2D area)
         {
             var parent = area.GetParent();
-            if (parent != null)
+            if (parent == null) return;
+
+            // Handle apple collection in all states
+            if (parent.IsInGroup("apple"))
             {
-                // Handle apple collection first
-                if (parent.IsInGroup("apple"))
+                CheckAndConsumeApple(parent);
+            }
+            // Handle monster interactions in attack states
+            else if (parent.IsInGroup("enemies"))
+            {
+                // If Puff is in Attack state and collides with the target monster, attack it!
+                if (_currentState == PuffState.Attack && parent == _currentTarget)
                 {
-                    CheckAndConsumeApple(parent);
+                    Log.System($"PuffAI: Collision-based attack on {parent.Name} (Area collision)", "PuffAI");
+                    AttackTarget(parent as Node2D);
+                    ReturnToAppropriateState();
+                    return;
                 }
-                // Handle enemy damage only in specific states (Jump state only)
-                else if (parent.IsInGroup("enemies"))
-                {
-                    if (ShouldTakeDamageFromMonster())
-                    {
-                        TakeDamage(1);
-                        Log.Debug($"PuffAI: Hit by enemy area {area.Name} while in {_currentState} state - took damage", "PuffAI");
-                    }
-                    else
-                    {
-                        Log.Debug($"PuffAI: Hit by enemy area {area.Name} while in {_currentState} state - ignoring damage", "PuffAI");
-                    }
-                }
+                // Puff no longer takes damage from monsters - only attacks them
             }
         }
 
@@ -1132,9 +1241,9 @@ namespace MarrieGame.AI
                 
                 if (isLifePhase && isCollectible)
                 {
-                    ConsumeRedApple();
+                    ConsumeBlueApple(); // All apples now give energy instead of health
                     apple.Call("DestroyApple");
-                    Log.System("PuffAI: Consumed red apple", "PuffAI");
+                    Log.System("PuffAI: Consumed apple for energy", "PuffAI");
                 }
             }
         }
@@ -1145,13 +1254,37 @@ namespace MarrieGame.AI
         {
             if (_puffSprite == null) return;
 
-            bool shouldFaceRight = Velocity.X > 0;
+            bool shouldFaceRight = DetermineFacingDirection();
             if (shouldFaceRight != _facingRight)
             {
                 _facingRight = shouldFaceRight;
                 var scale = _puffSprite.Scale;
                 _puffSprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
+                Log.Debug($"PuffAI: Facing direction changed to {(_facingRight ? "Right" : "Left")}", "PuffAI");
             }
+        }
+
+        private bool DetermineFacingDirection()
+        {
+            // Priority 1: If in Attack state and have a target, face the target
+            if (_currentState == PuffState.Attack && _currentTarget != null && IsInstanceValid(_currentTarget))
+            {
+                float targetDirection = _currentTarget.GlobalPosition.X - GlobalPosition.X;
+                return targetDirection > 0; // True if target is to the right
+            }
+
+            // Priority 2: If in FaceLeft or FaceRight state, use that direction
+            if (_currentState == PuffState.FaceLeft)
+                return false;
+            if (_currentState == PuffState.FaceRight)
+                return true;
+
+            // Priority 3: Use velocity direction (existing behavior)
+            if (Mathf.Abs(Velocity.X) > 0.1f)
+                return Velocity.X > 0;
+
+            // Priority 4: Keep current facing direction if no movement
+            return _facingRight;
         }
         
         /// <summary>
