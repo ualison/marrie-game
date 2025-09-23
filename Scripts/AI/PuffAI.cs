@@ -1265,6 +1265,9 @@ namespace MarrieGame.AI
             // Stay completely still when in idle state
             Velocity = new Vector2(0, Velocity.Y); // Keep Y velocity for gravity
             
+            // Facing direction will be handled by DetermineFacingDirection() in UpdateSpriteDirection()
+            // which is called after UpdateState() in _PhysicsProcess()
+            
             // Still collect apples and take damage if needed, but don't move
             // The only way out of idle is through the R key toggle
         }
@@ -1492,11 +1495,18 @@ namespace MarrieGame.AI
             if (_currentState == PuffState.FaceRight)
                 return true;
 
-            // Priority 3: Use velocity direction (existing behavior)
+            // Priority 3: If in Idle state, face the player
+            if (_currentState == PuffState.Idle && _player != null)
+            {
+                float directionToPlayer = _player.GlobalPosition.X - GlobalPosition.X;
+                return directionToPlayer > 0; // True if player is to the right
+            }
+
+            // Priority 4: Use velocity direction (existing behavior)
             if (Mathf.Abs(Velocity.X) > 0.1f)
                 return Velocity.X > 0;
 
-            // Priority 4: Keep current facing direction if no movement
+            // Priority 5: Keep current facing direction if no movement
             return _facingRight;
         }
         

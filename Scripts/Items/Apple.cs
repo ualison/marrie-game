@@ -6,16 +6,18 @@ using System.Linq;
 /// <summary>
 /// Apple item with different state cycles that change randomly:
 /// 
-/// Tree States: RedLife, GrayKnockable, PurpleMana (selected randomly)
-/// Fallen States: RedLife, GrayNotCollectible, PurpleMana (selected randomly)
+/// Tree States: RedLife, GrayKnockable, PurpleMana, YellowEnergy (selected randomly)
+/// Fallen States: RedLife, GrayNotCollectible, PurpleMana, YellowEnergy (selected randomly)
 /// 
 /// States:
 /// - RedLife: Red color, Life phase (collectible when fallen, restores health)
 /// - GrayKnockable: Gray color, Knockable phase (tree only, can be hit by rocks to fall)
 /// - PurpleMana: Purple color, Mana phase (collectible when fallen, restores mana)
 /// - GrayNotCollectible: Dark gray color, Non-collectible phase (fallen only, not collectible)
+/// - YellowEnergy: Yellow color, Energy phase (collectible by Puff in both positions, restores Puff energy)
 /// 
-/// Only RedLife and PurpleMana phases are collectible, and only when apple is on the ground
+/// RedLife and PurpleMana phases are collectible by player, only when apple is on the ground
+/// YellowEnergy phase is collectible by Puff regardless of position (tree or ground)
 /// Transition times are randomly selected within configurable ranges
 /// </summary>
 public partial class Apple : Node2D
@@ -27,9 +29,11 @@ public partial class Apple : Node2D
     [Export] public float MaxNeutralPhaseTime { get; set; } = 4.0f; // Maximum time spent in neutral/collectible phases
     [Export] public int LifeRestoreAmount { get; set; } = 1; // Life restored by red apple
     [Export] public int ManaRestoreAmount { get; set; } = 2; // Mana restored by purple apple
+    [Export] public int EnergyRestoreAmount { get; set; } = 1; // Energy restored to Puff by yellow apple
     [Export] public Texture2D RedAppleTexture { get; set; }
     [Export] public Texture2D PurpleAppleTexture { get; set; }
     [Export] public Texture2D NeutralAppleTexture { get; set; }
+    [Export] public Texture2D ApplePuffTexture { get; set; }
     #endregion
 
     #region UI Components
@@ -39,6 +43,7 @@ public partial class Apple : Node2D
     private RigidBody2D _rigidBody;
     private Area2D _rockDetectionArea;
     private Area2D _groundDetectionArea;
+    private Area2D _puffDetectionArea;
     #endregion
 
     #region State
@@ -74,6 +79,7 @@ public partial class Apple : Node2D
     _promptLabel = NodeHelpers.GetNodeOrNull<Label>(this, null, "RigidBody2D/PromptLabel");
     _rockDetectionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "RigidBody2D/RockDetectionArea");
     _groundDetectionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "RigidBody2D/GroundDetectionArea");
+    _puffDetectionArea = NodeHelpers.GetNodeOrNull<Area2D>(this, null, "RigidBody2D/PuffDetectionArea");
     }
 
     private void SetupRigidBody()
@@ -90,6 +96,14 @@ public partial class Apple : Node2D
         // Connect to ground collision detection via dedicated ground detection area
         if (_groundDetectionArea != null)
             _groundDetectionArea.BodyEntered += OnGroundCollision;
+            
+        // Connect Puff collision detection for energy restoration
+        if (_puffDetectionArea != null)
+        {
+            _puffDetectionArea.Monitoring = true;
+            _puffDetectionArea.Monitorable = true;
+            _puffDetectionArea.BodyEntered += OnPuffCollision;
+        }
     }
 
     private void ConnectSignals()
@@ -145,14 +159,14 @@ public partial class Apple : Node2D
         if (_currentPosition == ApplePosition.OnTree)
         {
             // Tree apples can start with any tree state
-            AppleState[] treeStates = { AppleState.RedLife, AppleState.GrayKnockable, AppleState.PurpleMana };
+            AppleState[] treeStates = { AppleState.RedLife, AppleState.GrayKnockable, AppleState.PurpleMana, AppleState.YellowEnergy };
             int randomIndex = GD.RandRange(0, treeStates.Length - 1);
             _currentState = treeStates[randomIndex];
         }
         else
         {
             // Ground apples can start with any ground state
-            AppleState[] groundStates = { AppleState.RedLife, AppleState.GrayNotCollectible, AppleState.PurpleMana };
+            AppleState[] groundStates = { AppleState.RedLife, AppleState.GrayNotCollectible, AppleState.PurpleMana, AppleState.YellowEnergy };
             int randomIndex = GD.RandRange(0, groundStates.Length - 1);
             _currentState = groundStates[randomIndex];
         }
@@ -164,6 +178,7 @@ public partial class Apple : Node2D
             AppleState.GrayKnockable => NeutralAppleTexture,
             AppleState.PurpleMana => PurpleAppleTexture,
             AppleState.GrayNotCollectible => NeutralAppleTexture,
+            AppleState.YellowEnergy => ApplePuffTexture,
             _ => RedAppleTexture
         };
 
@@ -265,6 +280,45 @@ public partial class Apple : Node2D
         }
     }
 
+    private void RestoreEnergyToPuff()
+    {
+        // Debug level - routine apple consumption by Puff
+        Log.Debug($"Puff consumed yellow apple - restoring {EnergyRestoreAmount} energy", "Apple");
+        
+        // Find Puff and restore energy
+        var puff = GetTree().GetFirstNodeInGroup("puff") as Node;
+        var puffEnergyBar = puff != null ? NodeHelpers.GetNodeOrNull<MarrieGame.UI.PuffEnergyBar>(puff, null, "PuffEnergyBar") : null;
+        
+        if (puffEnergyBar != null)
+        {
+            puffEnergyBar.GainEnergy(EnergyRestoreAmount);
+        }
+        else
+        {
+            // Try alternative way to find energy bar in scene tree
+            var energyBars = GetTree().GetNodesInGroup("puff_energy_bar");
+            if (energyBars.Count > 0)
+            {
+                var energyBar = energyBars[0] as MarrieGame.UI.PuffEnergyBar;
+                if (energyBar != null)
+                {
+                    energyBar.GainEnergy(EnergyRestoreAmount);
+                }
+                else
+                {
+                    Log.Warning("PuffEnergyBar found but incorrect type", "Apple");
+                }
+            }
+            else
+            {
+                Log.Warning("PuffEnergyBar not found", "Apple");
+            }
+        }
+
+        // Remove apple after energy restoration
+        DestroyApple();
+    }
+
     private void DestroyApple()
     {
         Log.UI("Apple consumed and destroyed", "Apple");
@@ -308,8 +362,8 @@ public partial class Apple : Node2D
         // Random state selection based on apple position
         if (_currentPosition == ApplePosition.OnGround)
         {
-            // Ground apple: choose randomly from RedLife, GrayNotCollectible, PurpleMana
-            AppleState[] groundStates = { AppleState.RedLife, AppleState.GrayNotCollectible, AppleState.PurpleMana };
+            // Ground apple: choose randomly from RedLife, GrayNotCollectible, PurpleMana, YellowEnergy
+            AppleState[] groundStates = { AppleState.RedLife, AppleState.GrayNotCollectible, AppleState.PurpleMana, AppleState.YellowEnergy };
             
             // If transitioning from tree to ground, start with GrayNotCollectible
             if (_currentState == AppleState.GrayKnockable)
@@ -329,8 +383,8 @@ public partial class Apple : Node2D
         }
         else // ApplePosition.OnTree
         {
-            // Tree apple: choose randomly from RedLife, GrayKnockable, PurpleMana
-            AppleState[] treeStates = { AppleState.RedLife, AppleState.GrayKnockable, AppleState.PurpleMana };
+            // Tree apple: choose randomly from RedLife, GrayKnockable, PurpleMana, YellowEnergy
+            AppleState[] treeStates = { AppleState.RedLife, AppleState.GrayKnockable, AppleState.PurpleMana, AppleState.YellowEnergy };
             
             // Get available states (excluding current state to ensure change)
             var availableStates = treeStates.Where(state => state != _currentState).ToArray();
@@ -348,6 +402,7 @@ public partial class Apple : Node2D
             AppleState.GrayKnockable => NeutralAppleTexture,
             AppleState.PurpleMana => PurpleAppleTexture,
             AppleState.GrayNotCollectible => NeutralAppleTexture,
+            AppleState.YellowEnergy => ApplePuffTexture,
             _ => RedAppleTexture
         };
 
@@ -384,6 +439,10 @@ public partial class Apple : Node2D
             case AppleState.GrayNotCollectible:
                 // Darker gray appearance for fallen apples (not collectible)
                 _appleSprite.Modulate = new Color(0.5f, 0.5f, 0.5f, 1.0f);
+                break;
+            case AppleState.YellowEnergy:
+                // Bright yellow appearance with slight glow effect for Puff energy
+                _appleSprite.Modulate = new Color(1.2f, 1.2f, 0.8f, 1.0f);
                 break;
         }
     }
@@ -431,6 +490,16 @@ public partial class Apple : Node2D
             Log.System("Apple landed on ground", "Apple");
             // Use CallDeferred to avoid physics state change during collision detection
             CallDeferred(nameof(OnGroundLanding));
+        }
+    }
+
+    private void OnPuffCollision(Node2D body)
+    {
+        // Check if Puff collided with apple in YellowEnergy state
+        if (body.IsInGroup("puff") && _currentState == AppleState.YellowEnergy)
+        {
+            Log.System($"Puff collided with YellowEnergy apple - restoring {EnergyRestoreAmount} energy", "Apple");
+            RestoreEnergyToPuff();
         }
     }
 
@@ -539,6 +608,8 @@ public partial class Apple : Node2D
 
     public bool IsCollectible() => _currentState == AppleState.RedLife || _currentState == AppleState.PurpleMana;
     
+    public bool IsCollectibleByPuff() => _currentState == AppleState.YellowEnergy;
+    
     public AppleState GetCurrentState() => _currentState;
     
     public ApplePosition GetCurrentPosition() => _currentPosition;
@@ -546,6 +617,8 @@ public partial class Apple : Node2D
     public bool IsInLifePhase() => _currentState == AppleState.RedLife;
     
     public bool IsInManaPhase() => _currentState == AppleState.PurpleMana;
+    
+    public bool IsInEnergyPhase() => _currentState == AppleState.YellowEnergy;
     
     public bool IsOnTree() => _currentPosition == ApplePosition.OnTree;
     

@@ -11,7 +11,7 @@ size = Vector2(62, 93)
 size = Vector2(71, 93)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hurtbox"]
-size = Vector2(50, 80)
+size = Vector2(62, 84)
 
 [node name="Puff" type="CharacterBody2D" groups=["puff"]]
 collision_layer = 64
@@ -34,6 +34,7 @@ collision_layer = 0
 collision_mask = 4
 
 [node name="HurtBoxShape" type="CollisionShape2D" parent="HurtBox"]
+position = Vector2(0, -2)
 shape = SubResource("RectangleShape2D_hurtbox")
 debug_color = Color(0.97390443, 0, 0.4340493, 0.41960785)
 
