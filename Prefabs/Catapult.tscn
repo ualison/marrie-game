@@ -78,3 +78,32 @@ position = Vector2(-365.62558, 27.941164)
 position = Vector2(-35.937553, 186.76465)
 shape = SubResource("CircleShape2D_mtggb")
 debug_color = Color(0, 0.6498678, 0.13839722, 0.41960785)
+
+[node name="PromptLabel-E" type="Label" parent="RigidBody2D"]
+offset_left = -17.0
+offset_top = 23.0
+offset_right = 22.0
+offset_bottom = 37.0
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 10
+text = "Press E"
+
+[node name="PromptLabel-C1" type="Label" parent="RigidBody2D"]
+offset_left = -252.0
+offset_top = 64.0
+offset_right = -213.0
+offset_bottom = 95.0
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 10
+text = "Press C
+"
+
+[node name="PromptLabel-C2" type="Label" parent="RigidBody2D"]
+offset_left = 191.0
+offset_top = 62.0
+offset_right = 230.0
+offset_bottom = 93.0
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 10
+text = "Press C
+"

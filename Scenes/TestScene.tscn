@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://bnv528gs1hngu"]
+[gd_scene load_steps=14 format=3 uid="uid://bnv528gs1hngu"]
 
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="1_ytmxh"]
 [ext_resource type="PackedScene" uid="uid://bprvmud1sukcc" path="res://Prefabs/Environment.tscn" id="2_hctok"]
@@ -12,6 +12,7 @@
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/Monster.mp3" id="10_dwn5r"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="11_1vcy8"]
 [ext_resource type="PackedScene" uid="uid://byspjo0wirw6v" path="res://Prefabs/Catapult.tscn" id="12_65o0v"]
+[ext_resource type="PackedScene" uid="uid://dfauk4svx1fjh" path="res://Prefabs/Puff.tscn" id="13_hctok"]
 
 [node name="Root" type="Node2D"]
 
@@ -57,8 +58,12 @@ autoplay = true
 script = ExtResource("11_1vcy8")
 
 [node name="Catapult" parent="." instance=ExtResource("12_65o0v")]
+z_index = -1
 position = Vector2(209, 110)
 PushForce = 950.0
 WheelRotationSpeed = 50.0
 BodyLinearDamp = 1.0
 BodyAngularDamp = 0.0
+
+[node name="Puff" parent="." instance=ExtResource("13_hctok")]
+position = Vector2(-176, 190)

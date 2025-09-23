@@ -38,6 +38,8 @@ public partial class Catapult : Node2D, IPausable
 	private RigidBody2D _rigidBody;
 	private Node2D _spritesRoot;
 	private Player _player;
+	private CanvasItem _promptC1;
+	private CanvasItem _promptC2;
 	private bool _isPaused = false;
 	#endregion
 
@@ -62,6 +64,24 @@ public partial class Catapult : Node2D, IPausable
 		// Ensure physics inherits the instance scale by baking it into the body
 		BakeInstanceScaleIntoBody();
 		InitializePhysics();
+
+		// Ensure player collisions are ignored by default. Collisions will only be
+		// enabled when the player is both in the detection area and pressing the
+		// push action. This prevents accidental blocking when the player walks near
+		// or under the catapult.
+		if (_rigidBody != null)
+		{
+			var nodes = GetTree().GetNodesInGroup("player");
+			foreach (var obj in nodes)
+			{
+				// Only add collision exceptions for physics bodies
+				if (obj is PhysicsBody2D physBody)
+				{
+					// Add collision exception so player and catapult do not collide by default
+					_rigidBody.AddCollisionExceptionWith(physBody);
+				}
+			}
+		}
 		
 		// Diagnostics: log effective transforms and physics settings
 		if (_rigidBody != null)
@@ -79,6 +99,25 @@ public partial class Catapult : Node2D, IPausable
 		Log.Info($"Catapult initialized at position {GlobalPosition}", "Catapult");
 		Log.Debug($"Detection area found: {_detectionArea != null}", "Catapult");
 		Log.Debug($"Wheels found - Left: {_wheelLeft != null}, Right: {_wheelRight != null}", "Catapult");
+
+		// Cache prompt labels (they are direct children in the tscn). Use CanvasItem
+		// so we can handle both Control-based Label (UI) and world-space Label2D
+		// if present. This avoids hard dependency on a Label2D type that may not
+		// exist in the runtime being used.
+		// Try to find prompts under the RigidBody2D (so they move with physics) first,
+		// then fall back to the scene root. Support both CanvasItem and Control types.
+		if (_rigidBody != null)
+		{
+			_promptC1 = _rigidBody.GetNodeOrNull<CanvasItem>("PromptLabel-C1") ?? _rigidBody.GetNodeOrNull<Control>("PromptLabel-C1");
+			_promptC2 = _rigidBody.GetNodeOrNull<CanvasItem>("PromptLabel-C2") ?? _rigidBody.GetNodeOrNull<Control>("PromptLabel-C2");
+		}
+		else
+		{
+			_promptC1 = GetNodeOrNull<CanvasItem>("PromptLabel-C1") ?? GetNodeOrNull<Control>("PromptLabel-C1");
+			_promptC2 = GetNodeOrNull<CanvasItem>("PromptLabel-C2") ?? GetNodeOrNull<Control>("PromptLabel-C2");
+		}
+		if (_promptC1 != null) _promptC1.Visible = false;
+		if (_promptC2 != null) _promptC2.Visible = false;
 	}
 
 	private void InitializeComponents()
@@ -225,7 +264,12 @@ public partial class Catapult : Node2D, IPausable
 
 	private void HandlePlayerInteraction()
 	{
-		if (_player == null || !_playerInRange) return;
+		if (_player == null || !_playerInRange)
+		{
+			// Ensure collisions remain disabled when player is not in range
+			DisablePlayerCollision();
+			return;
+		}
 		
 		// Check if player is pressing push button
 		bool wantsToPush = Input.IsActionPressed("push_catapult");
@@ -240,11 +284,41 @@ public partial class Catapult : Node2D, IPausable
 			Log.Info("Player stopped pushing catapult", "Catapult");
 		}
 		
+		// Toggle collision only while player is in range and pressing push
 		_isBeingPushed = wantsToPush;
-		
 		if (_isBeingPushed)
 		{
+			EnablePlayerCollision();
 			ApplyPushForce();
+		}
+		else
+		{
+			// Player in range but not pressing push - keep collisions disabled
+			DisablePlayerCollision();
+		}
+	}
+
+	private void EnablePlayerCollision()
+	{
+		if (_rigidBody == null || _player == null) return;
+
+		if (_player is PhysicsBody2D phys)
+		{
+			// Remove exception so physics will consider collisions
+			_rigidBody.RemoveCollisionExceptionWith(phys);
+			Log.Debug("Enabled collisions with player", "Catapult");
+		}
+	}
+
+	private void DisablePlayerCollision()
+	{
+		if (_rigidBody == null || _player == null) return;
+
+		if (_player is PhysicsBody2D phys)
+		{
+			// Ensure catapult and player do not collide
+			_rigidBody.AddCollisionExceptionWith(phys);
+			Log.Debug("Disabled collisions with player", "Catapult");
 		}
 	}
 
@@ -300,16 +374,25 @@ public partial class Catapult : Node2D, IPausable
 		{
 			// Slight yellow tint when being pushed
 			Modulate = Colors.LightYellow;
+			// Hide prompts while pushing
+			if (_promptC1 != null) _promptC1.Visible = false;
+			if (_promptC2 != null) _promptC2.Visible = false;
 		}
 		else if (_playerInRange)
 		{
 			// Slight green tint when player is in range
 			Modulate = Colors.LightGreen;
+			// Show prompts when player is in range and not pushing
+			if (_promptC1 != null) _promptC1.Visible = true;
+			if (_promptC2 != null) _promptC2.Visible = true;
 		}
 		else
 		{
 			// Normal color
 			Modulate = _originalModulate;
+			// Hide prompts when player not in range
+			if (_promptC1 != null) _promptC1.Visible = false;
+			if (_promptC2 != null) _promptC2.Visible = false;
 		}
 	}
 
@@ -322,6 +405,8 @@ public partial class Catapult : Node2D, IPausable
 		{
 			_player = player;
 			_playerInRange = true;
+			// Keep collisions disabled until the player actively pushes
+			DisablePlayerCollision();
 			Log.Info("Player entered catapult detection area", "Catapult");
 		}
 	}
@@ -332,9 +417,11 @@ public partial class Catapult : Node2D, IPausable
 		
 		if (body is Player)
 		{
+			// Make sure to disable any collision and reset state when player leaves
 			_player = null;
 			_playerInRange = false;
 			_isBeingPushed = false;
+			DisablePlayerCollision();
 			Log.Info("Player left catapult detection area", "Catapult");
 		}
 	}
