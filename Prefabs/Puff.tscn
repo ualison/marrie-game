@@ -5,40 +5,26 @@
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="3_0n4xf"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_8mxow"]
-size = Vector2(65, 90)
+size = Vector2(62, 93)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_detection"]
-size = Vector2(80, 82)
+size = Vector2(71, 93)
 
 [node name="Puff" type="CharacterBody2D"]
 collision_layer = 64
 script = ExtResource("1_script")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(-2.5, 3)
+position = Vector2(-1, 1.5)
 shape = SubResource("RectangleShape2D_8mxow")
-
-[node name="PuffSprite" type="Sprite2D" parent="."]
-position = Vector2(-3, 4)
-scale = Vector2(0.176, 0.16)
-texture = ExtResource("1_daoqv")
 
 [node name="MonsterDetectionArea" type="Area2D" parent="."]
 collision_layer = 0
 collision_mask = 16
 
 [node name="MonsterDetectionShape" type="CollisionShape2D" parent="MonsterDetectionArea"]
-position = Vector2(-3, 3)
+position = Vector2(-1.5, 1.5)
 shape = SubResource("RectangleShape2D_detection")
-
-[node name="HurtBox" type="Area2D" parent="."]
-collision_layer = 0
-collision_mask = 20
-
-[node name="HurtBoxShape" type="CollisionShape2D" parent="HurtBox"]
-position = Vector2(-3, 4)
-shape = SubResource("RectangleShape2D_detection")
-debug_color = Color(0.92771673, 0.24964693, 0.26696035, 0.41960785)
 
 [node name="PuffEnergyBar" parent="." instance=ExtResource("3_0n4xf")]
 offset_left = -53.0
@@ -46,3 +32,8 @@ offset_top = -236.0
 offset_right = 47.0
 offset_bottom = -186.0
 OffsetFromMonster = Vector2(-80, -220)
+
+[node name="PuffSprite" type="Sprite2D" parent="."]
+position = Vector2(-3, 4)
+scale = Vector2(0.176, 0.16)
+texture = ExtResource("1_daoqv")
