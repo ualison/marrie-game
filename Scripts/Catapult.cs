@@ -41,6 +41,8 @@ public partial class Catapult : Node2D, IPausable
 	private Player _player;
 	private CanvasItem _promptC1;
 	private CanvasItem _promptC2;
+	private Timer _stockTimer;
+	[Export] public float StockTimeoutSeconds { get; set; } = 10.0f;
 	private bool _isPaused = false;
 	#endregion
 
@@ -137,6 +139,13 @@ public partial class Catapult : Node2D, IPausable
 			_handleArea.BodyExited += OnHandleAreaBodyExited;
 			Log.Debug("Connected HandleArea signals", "Catapult");
 		}
+
+		// Create a timer for holding Puff in the catapult (stock timeout)
+		_stockTimer = new Timer();
+		_stockTimer.WaitTime = StockTimeoutSeconds;
+		_stockTimer.OneShot = true;
+		_stockTimer.Timeout += () => ReleasePuffFromHandle();
+		AddChild(_stockTimer);
 	}
 
 	private void InitializeComponents()
@@ -326,9 +335,9 @@ public partial class Catapult : Node2D, IPausable
 	{
 		if (!_playerInHandleArea || _playerInHandleRef == null) return;
 
-		bool isPressingE = Input.IsActionPressed("interact") || Input.IsActionPressed("ui_accept");
+		bool isJustPressedE = Input.IsActionJustPressed("interact") || Input.IsActionJustPressed("ui_accept");
 
-		if (isPressingE)
+		if (isJustPressedE)
 		{
 			// Command Puff to move to PuffPosition
 			var puffNodes = GetTree().GetNodesInGroup("puff");
@@ -341,6 +350,9 @@ public partial class Catapult : Node2D, IPausable
 				{
 					puffAI.SetStockPosition(puffPosNode.GlobalPosition);
 					Log.Debug("Sent SetStockPosition to Puff (typed call)", "Catapult");
+					// Start/restart stock timer
+					try { _stockTimer.WaitTime = StockTimeoutSeconds; } catch {}
+					try { _stockTimer.Start(); } catch {}
 				}
 				else
 				{
@@ -349,11 +361,8 @@ public partial class Catapult : Node2D, IPausable
 				}
 			}
 		}
-		else
-		{
-			// Player not pressing E - ensure Puff resumes normal behavior
-			ReleasePuffFromHandle();
-		}
+		// Note: do not clear Puff every frame when E is not held.
+		// Puff will be released when the player leaves the handle area or when the stock timer expires.
 	}
 
 	private void EnablePlayerCollision()
@@ -517,6 +526,12 @@ public partial class Catapult : Node2D, IPausable
 
 	private void ReleasePuffFromHandle()
 	{
+		// Stop/reset the stock timer if it exists
+		if (_stockTimer != null)
+		{
+			try { _stockTimer.Stop(); } catch {}
+		}
+
 		// Find Puff instance in scene and clear stock
 		var puffNodes = GetTree().GetNodesInGroup("puff");
 		if (puffNodes.Count > 0)

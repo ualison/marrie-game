@@ -1,10 +1,11 @@
-[gd_scene load_steps=9 format=3 uid="uid://byspjo0wirw6v"]
+[gd_scene load_steps=10 format=3 uid="uid://byspjo0wirw6v"]
 
 [ext_resource type="Texture2D" uid="uid://dw8th8mtv0yh8" path="res://Art/Skeleton.png" id="1_utwii"]
 [ext_resource type="Script" uid="uid://dxmpmwulpk2wn" path="res://Scripts/Catapult.cs" id="2_script"]
 [ext_resource type="Texture2D" uid="uid://gqv20ju7km0o" path="res://Art/Wheel.png" id="3_70bc4"]
 [ext_resource type="Texture2D" uid="uid://bahverfqaipxx" path="res://Art/Spoon.png" id="3_utwii"]
 [ext_resource type="Texture2D" uid="uid://b057y6k8yfefo" path="res://Art/Handle.png" id="4_3xnqg"]
+[ext_resource type="Texture2D" uid="uid://cbsyvdemldcvk" path="res://Art/SpoonIsolated.png" id="5_70bc4"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(492, 300)
@@ -59,10 +60,20 @@ position = Vector2(-292.188, 194.11761)
 scale = Vector2(0.42089012, 0.4)
 texture = ExtResource("3_70bc4")
 
-[node name="Spoon" type="Sprite2D" parent="RigidBody2D/Sprites"]
-position = Vector2(-220, 130)
-scale = Vector2(0.567, 0.5)
+[node name="SpoonPivot" type="Node2D" parent="RigidBody2D/Sprites"]
+position = Vector2(-34.37506, 185.29407)
+scale = Vector2(0.5669999, 0.49999997)
+
+[node name="Spoon" type="Sprite2D" parent="RigidBody2D/Sprites/SpoonPivot"]
+position = Vector2(-340.59247, -102.719795)
+scale = Vector2(1.0000001, 1.0000001)
 texture = ExtResource("3_utwii")
+
+[node name="SpoonIsolated" type="Sprite2D" parent="RigidBody2D/Sprites/SpoonPivot/Spoon"]
+z_index = 1
+position = Vector2(-273.3697, -98.23532)
+scale = Vector2(0.88712066, 1.0450877)
+texture = ExtResource("5_70bc4")
 
 [node name="Handle" type="Sprite2D" parent="RigidBody2D/Sprites"]
 position = Vector2(-38, 188.00002)
@@ -70,7 +81,7 @@ scale = Vector2(0.61668026, 0.6000002)
 texture = ExtResource("4_3xnqg")
 
 [node name="PuffPosition" type="Node2D" parent="RigidBody2D/Sprites"]
-position = Vector2(-365.62558, 27.941164)
+position = Vector2(-368.7506, 8.823523)
 
 [node name="HandleArea" type="Area2D" parent="RigidBody2D/Sprites"]
 

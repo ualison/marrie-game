@@ -26,6 +26,7 @@ FollowOffset = Vector2(0, -165)
 [node name="GameEntities" type="Node2D" parent="."]
 
 [node name="Player" parent="GameEntities" instance=ExtResource("4_lp1f3")]
+z_index = 1
 position = Vector2(-327, 116)
 
 [node name="GameSystems" type="Node" parent="."]
@@ -62,8 +63,8 @@ z_index = -1
 position = Vector2(209, 110)
 PushForce = 950.0
 WheelRotationSpeed = 50.0
-BodyLinearDamp = 1.0
-BodyAngularDamp = 0.0
+BodyLinearDamp = 1.5
 
 [node name="Puff" parent="." instance=ExtResource("13_hctok")]
+z_index = -1
 position = Vector2(-176, 190)
