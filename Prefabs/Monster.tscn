@@ -42,17 +42,18 @@ position = Vector2(-50, -5.5)
 shape = SubResource("RectangleShape2D_kyqiw")
 
 [node name="MonsterLifeBar" parent="CharacterBody2D" instance=ExtResource("4_lifebar")]
-offset_left = -53.0
-offset_top = -236.0
-offset_right = 47.0
-offset_bottom = -186.0
-OffsetFromMonster = Vector2(-80, -220)
+offset_left = -101.0
+offset_top = -252.0
+offset_right = -1.0
+offset_bottom = -202.0
+OffsetFromMonster = Vector2(-100, -240)
 
 [node name="MonsterLife" type="Node2D" parent="CharacterBody2D"]
-position = Vector2(0, -195)
+position = Vector2(-43, -234)
 script = ExtResource("3_monsterlife")
-MaxLife = 2
-StartingLife = 2
+MaxLife = 3
+StartingLife = 3
+InvulnerabilityTime = 0.8
 
 [node name="MonsterSprite" type="Sprite2D" parent="CharacterBody2D"]
 position = Vector2(-31.000004, 25.000002)

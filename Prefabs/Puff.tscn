@@ -43,9 +43,9 @@ offset_left = -53.0
 offset_top = -334.0
 offset_right = 47.0
 offset_bottom = -284.0
-OffsetFromPuff = Vector2(-50, -100)
-MaxEnergyOrbs = 4
-MaxEnergyOverride = 4
+OffsetFromPuff = Vector2(-50, -85)
+MaxEnergyOrbs = 3
+MaxEnergyOverride = 3
 ActiveEnergyOverride = 3
 
 [node name="PuffSprite" type="Sprite2D" parent="."]
