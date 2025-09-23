@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3 uid="uid://bhff38051b28y"]
+[gd_scene load_steps=6 format=3 uid="uid://bhff38051b28y"]
 
 [ext_resource type="Script" uid="uid://dfikillaf8den" path="res://Scripts/Systems/CanvasCameraFollower.cs" id="1_pryuf"]
 [ext_resource type="PackedScene" uid="uid://dxvamghbt08mr" path="res://Prefabs/UI/ScreenElements.tscn" id="2_3h2j0"]
 [ext_resource type="PackedScene" uid="uid://d0spjehyu6cuy" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="3_7ddsm"]
 [ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="4_7aa8c"]
+[ext_resource type="PackedScene" uid="uid://bjv4m5whn2djf" path="res://Prefabs/UI/Message.tscn" id="5_message"]
 
 [node name="UserInterface" type="CanvasLayer"]
 follow_viewport_enabled = true
@@ -47,5 +48,9 @@ grow_vertical = 2
 mouse_filter = 2
 
 [node name="GameOverUI" parent="Overlays" instance=ExtResource("4_7aa8c")]
+visible = false
+layout_mode = 1
+
+[node name="GameMessage" parent="Overlays" instance=ExtResource("5_message")]
 visible = false
 layout_mode = 1

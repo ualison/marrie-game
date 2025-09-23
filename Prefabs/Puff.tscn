@@ -13,7 +13,7 @@ size = Vector2(71, 93)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hurtbox"]
 size = Vector2(50, 80)
 
-[node name="Puff" type="CharacterBody2D"]
+[node name="Puff" type="CharacterBody2D" groups=["puff"]]
 collision_layer = 64
 script = ExtResource("1_script")
 
@@ -43,8 +43,9 @@ offset_top = -334.0
 offset_right = 47.0
 offset_bottom = -284.0
 OffsetFromPuff = Vector2(-50, -100)
-MaxEnergyOverride = 3
-ActiveEnergyOverride = 2
+MaxEnergyOrbs = 4
+MaxEnergyOverride = 4
+ActiveEnergyOverride = 3
 
 [node name="PuffSprite" type="Sprite2D" parent="."]
 position = Vector2(-3, 4)

@@ -15,8 +15,6 @@ script = ExtResource("1_energybar")
 ActiveEnergyTexture = ExtResource("2_active")
 InactiveEnergyTexture = ExtResource("3_inactive")
 MaxEnergyOrbs = 5
-MaxEnergyOverride = -1
-ActiveEnergyOverride = -1
 
 [node name="EnergyOrbsContainer" type="HBoxContainer" parent="."]
 custom_minimum_size = Vector2(120, 24)

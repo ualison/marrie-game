@@ -57,11 +57,17 @@ namespace MarrieGame.AI
         private CollisionShape2D _collisionShape;
         private Area2D _monsterDetectionArea;
         private Area2D _hurtBox;
+        private MarrieGame.UI.PuffEnergyBar _energyBar; // Reference to the energy bar (source of truth)
         #endregion
 
         #region Energy System
         public int CurrentEnergy { get; private set; }
         public int MaxEnergyLimit => MaxEnergy;
+        
+        // Property to get current energy from energy bar if available
+        public int ActualCurrentEnergy => _energyBar?.GetCurrentEnergyValue() ?? CurrentEnergy;
+        public int ActualMaxEnergy => _energyBar?.GetMaxEnergyValue() ?? MaxEnergyLimit;
+        
         private float _energyRegenTimer = 0f;
         private const float EnergyRegenInterval = 2.0f; // 2 seconds per energy point
         #endregion
@@ -152,6 +158,17 @@ namespace MarrieGame.AI
                 _hurtBox.AreaEntered += OnHurtBoxAreaEntered;
             }
 
+            // Find and connect to the energy bar (source of truth for energy)
+            _energyBar = GetNodeOrNull<MarrieGame.UI.PuffEnergyBar>("PuffEnergyBar");
+            if (_energyBar != null)
+            {
+                Log.Debug("PuffAI: Found PuffEnergyBar - using as energy source of truth", "PuffAI");
+            }
+            else
+            {
+                Log.Warning("PuffAI: PuffEnergyBar not found - using internal energy system", "PuffAI");
+            }
+
             if (_player == null)
                 Log.Warning("PuffAI: Player not found in group 'player'", "PuffAI");
             else
@@ -205,8 +222,7 @@ namespace MarrieGame.AI
             
             if (_player == null || !_initialized) return;
 
-            // Energy regeneration over time (1 energy every 2 seconds when not at max)
-            HandleEnergyRegeneration(delta);
+            // Note: Energy regeneration removed - will be implemented later per requirements
 
             // Safety check: prevent Puff from going too far from player
             if (_player != null)
@@ -341,10 +357,24 @@ namespace MarrieGame.AI
             // Handle Q key attack - works from any state if monster is visible
             if (Input.IsActionJustPressed("puff_attack") && _canAttack)
             {
-                // Check if Puff has enough energy to attack (cost: 10 energy per attack)
-                if (CurrentEnergy < 10)
+                // Check if Puff has enough energy to attack (cost: 1 energy when entering attack state)
+                int currentEnergy = _energyBar?.GetCurrentEnergyValue() ?? CurrentEnergy;
+                Log.Debug($"PuffAI: Q pressed - Current energy: {currentEnergy}, Required: 1", "PuffAI");
+                
+                if (currentEnergy < 1)
                 {
-                    Log.Debug("PuffAI: Not enough energy to attack! Current energy: " + CurrentEnergy, "PuffAI");
+                    Log.System("PuffAI: Not enough energy to attack! Current energy: " + currentEnergy, "PuffAI");
+                    
+                    // Show "Puff needs eat!" message using the UI system
+                    try
+                    {
+                        UIManager.ShowGameplayMessage("Puff needs eat!");
+                        Log.System("PuffAI: Successfully called UIManager.ShowGameplayMessage", "PuffAI");
+                    }
+                    catch (System.Exception e)
+                    {
+                        Log.Warning($"Failed to show 'Puff needs eat!' message: {e.Message}", "PuffAI");
+                    }
                     return;
                 }
                 
@@ -352,6 +382,13 @@ namespace MarrieGame.AI
                 var nearestMonster = FindNearestMonster();
                 if (nearestMonster != null)
                 {
+                    // Consume energy when entering attack state (as per requirements)
+                    if (!UseEnergy(1))
+                    {
+                        Log.Warning("PuffAI: Failed to use energy for attack state entry", "PuffAI");
+                        return;
+                    }
+                    
                     // Set the target and initiate attack with proper facing
                     _currentTarget = nearestMonster;
                     InitiateAttackWithFacing();
@@ -370,14 +407,28 @@ namespace MarrieGame.AI
             }
             else if (Input.IsActionJustPressed("puff_attack") && !_canAttack)
             {
-                Log.Debug("PuffAI: Attack on cooldown", "PuffAI");
+                Log.Debug("PuffAI: Attack on cooldown - cannot attack", "PuffAI");
             }
-            else if (Input.IsActionJustPressed("puff_attack") && CurrentEnergy < 10)
+            else if (Input.IsActionJustPressed("puff_attack"))
             {
-                Log.Debug("PuffAI: Not enough energy to attack!", "PuffAI");
-            }
-            {
-                Log.Warning("PuffAI: *** Q pressed but attack on cooldown ***", "PuffAI");
+                // This catches cases where Q is pressed but the main condition failed for other reasons
+                int currentEnergy = _energyBar?.GetCurrentEnergyValue() ?? CurrentEnergy;
+                Log.Debug($"PuffAI: Q pressed but main condition failed - Energy: {currentEnergy}, CanAttack: {_canAttack}", "PuffAI");
+                
+                // Show energy message if that's the issue
+                if (currentEnergy < 1)
+                {
+                    Log.System("PuffAI: No energy (fallback check) - showing message", "PuffAI");
+                    try
+                    {
+                        UIManager.ShowGameplayMessage("Puff needs eat!");
+                        Log.System("PuffAI: Successfully called UIManager.ShowGameplayMessage (fallback)", "PuffAI");
+                    }
+                    catch (System.Exception e)
+                    {
+                        Log.Warning($"Failed to show 'Puff needs eat!' message (fallback): {e.Message}", "PuffAI");
+                    }
+                }
             }
         }
 
@@ -986,20 +1037,12 @@ namespace MarrieGame.AI
                     return;
                 }
                 
-                // Consume energy for the attack (10 energy per attack)
-                if (!UseEnergy(10))
-                {
-                    Log.Debug("PuffAI: Not enough energy to complete attack!", "PuffAI");
-                    StartAttackCooldown();
-                    return;
-                }
-                
                 // Deal physical damage directly
                 bool damageDealt = monster.TakePhysicalDamage(AttackDamage);
                 
                 if (damageDealt)
                 {
-                    Log.System($"PuffAI: Successfully damaged monster {target.Name} (used 10 energy)", "PuffAI");
+                    Log.System($"PuffAI: Successfully damaged monster {target.Name}", "PuffAI");
                 }
                 else
                 {
@@ -1008,20 +1051,12 @@ namespace MarrieGame.AI
             }
             else if (target is GhostMonster ghostMonster)
             {
-                // Consume energy for the attack (10 energy per attack)
-                if (!UseEnergy(10))
-                {
-                    Log.Debug("PuffAI: Not enough energy to complete attack!", "PuffAI");
-                    StartAttackCooldown();
-                    return;
-                }
-                
                 // Handle ghost monsters
                 bool damageDealt = ghostMonster.TakePhysicalDamage(AttackDamage);
                 
                 if (damageDealt)
                 {
-                    Log.System($"PuffAI: Successfully damaged ghost monster {target.Name} (used 10 energy)", "PuffAI");
+                    Log.System($"PuffAI: Successfully damaged ghost monster {target.Name}", "PuffAI");
                 }
                 else
                 {
@@ -1049,14 +1084,7 @@ namespace MarrieGame.AI
                         return;
                     }
 
-                    // Consume energy for the attack (10 energy per attack)
-                    if (!UseEnergy(10))
-                    {
-                        Log.Debug("PuffAI: Not enough energy to complete attack!", "PuffAI");
-                        StartAttackCooldown();
-                        return;
-                    }
-
+                    // Deal damage
                     bool dealt = false;
                     if (target.HasMethod("TakePhysicalDamage"))
                     {
@@ -1224,15 +1252,9 @@ namespace MarrieGame.AI
         {
             if (IsOnFloor())
             {
-                // Consume energy for jumping (2 energy per jump)
-                if (!UseEnergy(2))
-                {
-                    Log.Debug("PuffAI: Not enough energy to jump!", "PuffAI");
-                    return;
-                }
-                
+                // Jump without consuming energy (automatic navigation behavior)
                 Velocity = new Vector2(Velocity.X, _jumpVelocity);
-                Log.Debug("PuffAI: Jumping (used 2 energy)", "PuffAI");
+                Log.Debug("PuffAI: Jumping (navigation - no energy cost)", "PuffAI");
             }
         }
         #endregion
@@ -1272,6 +1294,13 @@ namespace MarrieGame.AI
         #region Energy System
         public bool UseEnergy(int amount = 1)
         {
+            // Use energy bar as source of truth if available
+            if (_energyBar != null)
+            {
+                return _energyBar.UseEnergy(amount);
+            }
+            
+            // Fallback to internal energy system
             if (CurrentEnergy < amount) 
             {
                 Log.Debug($"PuffAI: Insufficient energy for action. Current: {CurrentEnergy}, Required: {amount}", "PuffAI");
@@ -1287,6 +1316,14 @@ namespace MarrieGame.AI
 
         public void GainEnergy(int amount = 1)
         {
+            // Use energy bar as source of truth if available
+            if (_energyBar != null)
+            {
+                _energyBar.GainEnergy(amount);
+                return;
+            }
+            
+            // Fallback to internal energy system
             CurrentEnergy = Mathf.Min(MaxEnergyLimit, CurrentEnergy + amount);
             EmitSignal(SignalName.PuffEnergyChanged, CurrentEnergy, MaxEnergyLimit);
             
@@ -1315,25 +1352,8 @@ namespace MarrieGame.AI
             Log.System("PuffAI: Reset to initial state", "PuffAI");
         }
 
-        private void HandleEnergyRegeneration(double delta)
-        {
-            // Only regenerate if not at max energy
-            if (CurrentEnergy >= MaxEnergyLimit) 
-            {
-                _energyRegenTimer = 0f;
-                return;
-            }
-
-            _energyRegenTimer += (float)delta;
-            
-            // Regenerate 1 energy every 2 seconds
-            if (_energyRegenTimer >= EnergyRegenInterval)
-            {
-                GainEnergy(1);
-                _energyRegenTimer = 0f;
-                Log.Debug($"PuffAI: Regenerated 1 energy, current: {CurrentEnergy}/{MaxEnergyLimit}", "PuffAI");
-            }
-        }
+        // Note: Energy regeneration removed - will be implemented later per requirements
+        // private void HandleEnergyRegeneration(double delta) { ... }
         #endregion
 
         #region Signal Handlers

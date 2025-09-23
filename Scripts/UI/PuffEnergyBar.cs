@@ -89,15 +89,31 @@ namespace MarrieGame.UI
 
             if (_puffAI != null)
             {
-                // Connect to energy change signal
-                _puffAI.PuffEnergyChanged += OnEnergyChanged;
+                // Connect to energy change signal (for cases where energy bar is not source of truth)
+                if (!_puffAI.IsConnected(PuffAI.SignalName.PuffEnergyChanged, new Callable(this, nameof(OnEnergyChanged))))
+                {
+                    _puffAI.PuffEnergyChanged += OnEnergyChanged;
+                    Log.Debug($"Successfully connected to PuffEnergyChanged signal from {_puffAI.Name}", "PuffEnergyBarUI");
+                }
+                else
+                {
+                    Log.Warning($"Already connected to PuffEnergyChanged signal from {_puffAI.Name}", "PuffEnergyBarUI");
+                }
                 
-                // Initial update with potential overrides
-                int currentEnergy = ActiveEnergyOverride >= 0 ? ActiveEnergyOverride : _puffAI.CurrentEnergy;
-                int maxEnergy = MaxEnergyOverride >= 0 ? MaxEnergyOverride : _puffAI.MaxEnergyLimit;
-                OnEnergyChanged(currentEnergy, maxEnergy);
+                // If overrides are not set, initialize them as source of truth from PuffAI values
+                if (ActiveEnergyOverride < 0 && MaxEnergyOverride < 0)
+                {
+                    InitializeAsSourceOfTruth(_puffAI.CurrentEnergy, _puffAI.MaxEnergyLimit);
+                }
+                else
+                {
+                    // Overrides are already set - use them as source of truth
+                    int currentEnergy = ActiveEnergyOverride >= 0 ? ActiveEnergyOverride : _puffAI.CurrentEnergy;
+                    int maxEnergy = MaxEnergyOverride >= 0 ? MaxEnergyOverride : _puffAI.MaxEnergyLimit;
+                    UpdateEnergyOrbs(currentEnergy, maxEnergy);
+                }
                 
-                Log.Debug($"Connected to PuffAI: {_puffAI.Name}", "PuffEnergyBarUI");
+                Log.Debug($"Connected to PuffAI: {_puffAI.Name} - Energy: {GetCurrentEnergyValue()}/{GetMaxEnergyValue()}", "PuffEnergyBarUI");
             }
             else
             {
@@ -149,18 +165,31 @@ namespace MarrieGame.UI
         #region Energy Display Management
         private void OnEnergyChanged(int currentEnergy, int maxEnergy)
         {
-            // Apply overrides if they are set (not -1)
-            int displayCurrentEnergy = ActiveEnergyOverride >= 0 ? ActiveEnergyOverride : currentEnergy;
-            int displayMaxEnergy = MaxEnergyOverride >= 0 ? MaxEnergyOverride : maxEnergy;
-            
-            // Only update if energy actually changed
-            if (displayCurrentEnergy == _lastEnergyValue && MaxEnergyOverride == -1 && ActiveEnergyOverride == -1)
+            // If overrides are set, they are the source of truth - don't update from PuffAI signals
+            if (ActiveEnergyOverride >= 0 || MaxEnergyOverride >= 0)
+            {
+                Log.Debug($"PuffEnergyBar: Ignoring PuffAI energy change - using override values as source of truth", "PuffEnergyBarUI");
                 return;
-
-            _lastEnergyValue = displayCurrentEnergy;
+            }
             
-            Log.Debug($"PuffEnergyBar: Energy changed - Current: {displayCurrentEnergy}, Max: {displayMaxEnergy} (Overrides: Active={ActiveEnergyOverride}, Max={MaxEnergyOverride})", "PuffEnergyBarUI");
-            UpdateEnergyOrbs(displayCurrentEnergy, displayMaxEnergy);
+            // Apply values from PuffAI only when overrides are not set
+            int displayCurrentEnergy = currentEnergy;
+            int displayMaxEnergy = maxEnergy;
+            
+            Log.Debug($"PuffEnergyBar: OnEnergyChanged called - Received: {currentEnergy}/{maxEnergy}, Display: {displayCurrentEnergy}/{displayMaxEnergy}, LastValue: {_lastEnergyValue}", "PuffEnergyBarUI");
+            
+            // Only update if energy actually changed or if this is the first update
+            if (displayCurrentEnergy != _lastEnergyValue || _lastEnergyValue == -1)
+            {
+                _lastEnergyValue = displayCurrentEnergy;
+                
+                Log.Debug($"PuffEnergyBar: Updating energy orbs - Current: {displayCurrentEnergy}, Max: {displayMaxEnergy}", "PuffEnergyBarUI");
+                UpdateEnergyOrbs(displayCurrentEnergy, displayMaxEnergy);
+            }
+            else
+            {
+                Log.Debug($"PuffEnergyBar: No update needed - energy value unchanged", "PuffEnergyBarUI");
+            }
         }
 
         private void UpdateEnergyOrbs(int currentEnergy, int maxEnergy)
@@ -256,6 +285,109 @@ namespace MarrieGame.UI
 
             orbLabel.AddThemeFontSizeOverride("font_size", 16);
             return orbLabel;
+        }
+        #endregion
+
+        #region Energy Management (Source of Truth)
+        /// <summary>
+        /// Use energy from the energy bar - this is the source of truth for Puff's energy
+        /// </summary>
+        public bool UseEnergy(int amount = 1)
+        {
+            int currentEnergy = GetCurrentEnergyValue();
+            
+            if (currentEnergy < amount)
+            {
+                Log.Debug($"PuffEnergyBar: Insufficient energy for action. Current: {currentEnergy}, Required: {amount}", "PuffEnergyBarUI");
+                return false;
+            }
+            
+            // Update the override value (source of truth)
+            ActiveEnergyOverride = Mathf.Max(0, currentEnergy - amount);
+            
+            // Update the visual display immediately
+            int maxEnergy = GetMaxEnergyValue();
+            UpdateEnergyOrbs(ActiveEnergyOverride, maxEnergy);
+            
+            Log.System($"PuffEnergyBar: Used {amount} energy, current: {ActiveEnergyOverride}/{maxEnergy}", "PuffEnergyBarUI");
+            return true;
+        }
+        
+        /// <summary>
+        /// Gain energy to the energy bar
+        /// </summary>
+        public void GainEnergy(int amount = 1)
+        {
+            int currentEnergy = GetCurrentEnergyValue();
+            int maxEnergy = GetMaxEnergyValue();
+            
+            // Update the override value (source of truth)
+            ActiveEnergyOverride = Mathf.Min(maxEnergy, currentEnergy + amount);
+            
+            // Update the visual display immediately
+            UpdateEnergyOrbs(ActiveEnergyOverride, maxEnergy);
+            
+            Log.System($"PuffEnergyBar: Gained {amount} energy, current: {ActiveEnergyOverride}/{maxEnergy}", "PuffEnergyBarUI");
+        }
+        
+        /// <summary>
+        /// Get the current energy value (from override or PuffAI)
+        /// </summary>
+        public int GetCurrentEnergyValue()
+        {
+            int energyValue;
+            
+            if (ActiveEnergyOverride >= 0)
+            {
+                energyValue = ActiveEnergyOverride;
+                Log.Debug($"PuffEnergyBar: GetCurrentEnergyValue from override: {energyValue}", "PuffEnergyBarUI");
+            }
+            else
+            {
+                energyValue = _puffAI?.CurrentEnergy ?? 0;
+                Log.Debug($"PuffEnergyBar: GetCurrentEnergyValue from PuffAI: {energyValue}", "PuffEnergyBarUI");
+            }
+                
+            return energyValue;
+        }
+        
+        /// <summary>
+        /// Get the max energy value (from override or PuffAI)
+        /// </summary>
+        public int GetMaxEnergyValue()
+        {
+            if (MaxEnergyOverride >= 0)
+                return MaxEnergyOverride;
+                
+            return _puffAI?.MaxEnergyLimit ?? 100;
+        }
+        
+        /// <summary>
+        /// Initialize energy bar as source of truth
+        /// </summary>
+        public void InitializeAsSourceOfTruth(int startingEnergy, int maxEnergy)
+        {
+            ActiveEnergyOverride = startingEnergy;
+            MaxEnergyOverride = maxEnergy;
+            
+            // Update display immediately
+            UpdateEnergyOrbs(ActiveEnergyOverride, MaxEnergyOverride);
+            
+            Log.Debug($"PuffEnergyBar: Initialized as source of truth - {ActiveEnergyOverride}/{MaxEnergyOverride}", "PuffEnergyBarUI");
+        }
+        
+        /// <summary>
+        /// Handle energy regeneration - called from PuffAI
+        /// </summary>
+        public void HandleEnergyRegeneration()
+        {
+            int currentEnergy = GetCurrentEnergyValue();
+            int maxEnergy = GetMaxEnergyValue();
+            
+            if (currentEnergy >= maxEnergy)
+                return;
+                
+            GainEnergy(1);
         }
         #endregion
 
