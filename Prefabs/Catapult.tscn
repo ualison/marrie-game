@@ -75,13 +75,14 @@ position = Vector2(-273.3697, -98.23532)
 scale = Vector2(0.88712066, 1.0450877)
 texture = ExtResource("5_70bc4")
 
+[node name="PuffPosition" type="Node2D" parent="RigidBody2D/Sprites/SpoonPivot/Spoon/SpoonIsolated"]
+position = Vector2(27.318176, -145.42896)
+scale = Vector2(1.9880819, 1.9137151)
+
 [node name="Handle" type="Sprite2D" parent="RigidBody2D/Sprites"]
 position = Vector2(-38, 188.00002)
 scale = Vector2(0.61668026, 0.6000002)
 texture = ExtResource("4_3xnqg")
-
-[node name="PuffPosition" type="Node2D" parent="RigidBody2D/Sprites"]
-position = Vector2(-368.7506, 8.823523)
 
 [node name="HandleArea" type="Area2D" parent="RigidBody2D/Sprites"]
 

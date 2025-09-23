@@ -345,7 +345,7 @@ public partial class Catapult : Node2D, IPausable
 			{
 				var puffNode = puffNodes[0] as Node2D;
 				var puffAI = puffNode as MarrieGame.AI.PuffAI;
-				var puffPosNode = _rigidBody.GetNodeOrNull<Node2D>("Sprites/PuffPosition") ?? GetNodeOrNull<Node2D>("Sprites/PuffPosition");
+				var puffPosNode = _rigidBody.GetNodeOrNull<Node2D>("Sprites/SpoonPivot/Spoon/SpoonIsolated/PuffPosition") ?? GetNodeOrNull<Node2D>("Sprites/PuffPosition");
 				if (puffAI != null && puffPosNode != null)
 				{
 					puffAI.SetStockPosition(puffPosNode.GlobalPosition);
