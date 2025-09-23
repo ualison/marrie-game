@@ -60,6 +60,10 @@ public partial class Apple : Node2D
     #region Initialization
     public override void _Ready()
     {
+        // Add to apple group for easy discovery
+        AddToGroup("apple");
+        
+        // Initialize the apple system
         InitializeComponents();
         SetupRigidBody();
         ConnectSignals();
@@ -67,8 +71,8 @@ public partial class Apple : Node2D
         SetupTransitionTimer();
         SetInitialState();
         EnableInputProcessing();
-
-        Log.System("Apple item ready", "Apple");
+        
+        Log.System($"Apple initialized at position {GlobalPosition} in state {_currentState}", "Apple");
     }
 
     private void InitializeComponents()
@@ -103,6 +107,11 @@ public partial class Apple : Node2D
             _puffDetectionArea.Monitoring = true;
             _puffDetectionArea.Monitorable = true;
             _puffDetectionArea.BodyEntered += OnPuffCollision;
+            Log.Debug($"PuffDetectionArea setup - Monitoring: {_puffDetectionArea.Monitoring}, CollisionMask: {_puffDetectionArea.CollisionMask}", "Apple");
+        }
+        else
+        {
+            Log.Warning("PuffDetectionArea not found in scene - Puff collision won't work!", "Apple");
         }
     }
 
@@ -283,39 +292,60 @@ public partial class Apple : Node2D
     private void RestoreEnergyToPuff()
     {
         // Debug level - routine apple consumption by Puff
-        Log.Debug($"Puff consumed yellow apple - restoring {EnergyRestoreAmount} energy", "Apple");
+        Log.System($"RestoreEnergyToPuff called - restoring {EnergyRestoreAmount} energy", "Apple");
         
         // Find Puff and restore energy
         var puff = GetTree().GetFirstNodeInGroup("puff") as Node;
+        Log.Debug($"Found puff node: {(puff != null ? puff.Name : "null")}", "Apple");
+        
         var puffEnergyBar = puff != null ? NodeHelpers.GetNodeOrNull<MarrieGame.UI.PuffEnergyBar>(puff, null, "PuffEnergyBar") : null;
+        Log.Debug($"Found PuffEnergyBar as child: {(puffEnergyBar != null ? "Yes" : "No")}", "Apple");
         
         if (puffEnergyBar != null)
         {
+            Log.System($"Calling GainEnergy({EnergyRestoreAmount}) on PuffEnergyBar", "Apple");
             puffEnergyBar.GainEnergy(EnergyRestoreAmount);
+            Log.System($"Energy restored successfully to Puff", "Apple");
         }
         else
         {
-            // Try alternative way to find energy bar in scene tree
-            var energyBars = GetTree().GetNodesInGroup("puff_energy_bar");
-            if (energyBars.Count > 0)
+            // Try alternative ways to find energy bar in scene tree
+            Log.Debug("Trying alternative search for PuffEnergyBar via groups", "Apple");
+            
+            // Try multiple possible group names
+            string[] possibleGroups = { "puff_energy_bar", "puff_energy_bar_ui" };
+            MarrieGame.UI.PuffEnergyBar foundEnergyBar = null;
+            
+            foreach (string groupName in possibleGroups)
             {
-                var energyBar = energyBars[0] as MarrieGame.UI.PuffEnergyBar;
-                if (energyBar != null)
+                var energyBars = GetTree().GetNodesInGroup(groupName);
+                Log.Debug($"Found {energyBars.Count} nodes in '{groupName}' group", "Apple");
+                
+                if (energyBars.Count > 0)
                 {
-                    energyBar.GainEnergy(EnergyRestoreAmount);
+                    foundEnergyBar = energyBars[0] as MarrieGame.UI.PuffEnergyBar;
+                    if (foundEnergyBar != null)
+                    {
+                        Log.Debug($"Found PuffEnergyBar in '{groupName}' group", "Apple");
+                        break;
+                    }
                 }
-                else
-                {
-                    Log.Warning("PuffEnergyBar found but incorrect type", "Apple");
-                }
+            }
+            
+            if (foundEnergyBar != null)
+            {
+                Log.System($"Calling GainEnergy({EnergyRestoreAmount}) on PuffEnergyBar from group", "Apple");
+                foundEnergyBar.GainEnergy(EnergyRestoreAmount);
+                Log.System($"Energy restored successfully to Puff via group search", "Apple");
             }
             else
             {
-                Log.Warning("PuffEnergyBar not found", "Apple");
+                Log.Warning("PuffEnergyBar not found via any group search", "Apple");
             }
         }
 
         // Remove apple after energy restoration
+        Log.System("Destroying apple after energy restoration", "Apple");
         DestroyApple();
     }
 
@@ -410,6 +440,9 @@ public partial class Apple : Node2D
         {
             _appleSprite.Texture = newTexture;
             
+            // Debug: Log state changes
+            Log.System($"Apple state changed to: {_currentState} at position: {_currentPosition}", "Apple");
+            
             // Apply visual effects for different states
             ApplyStateVisualEffects();
         }
@@ -495,11 +528,22 @@ public partial class Apple : Node2D
 
     private void OnPuffCollision(Node2D body)
     {
+        // Debug: Log all collision attempts
+        Log.Debug($"Apple: Body collision detected - Name: {body.Name}, Groups: [{string.Join(", ", body.GetGroups())}], Current State: {_currentState}", "Apple");
+        
         // Check if Puff collided with apple in YellowEnergy state
         if (body.IsInGroup("puff") && _currentState == AppleState.YellowEnergy)
         {
             Log.System($"Puff collided with YellowEnergy apple - restoring {EnergyRestoreAmount} energy", "Apple");
             RestoreEnergyToPuff();
+        }
+        else if (body.IsInGroup("puff") && _currentState != AppleState.YellowEnergy)
+        {
+            Log.Debug($"Puff collided with apple but apple is in {_currentState} state (not YellowEnergy)", "Apple");
+        }
+        else if (!body.IsInGroup("puff"))
+        {
+            Log.Debug($"Non-Puff collision detected - Body: {body.Name}", "Apple");
         }
     }
 
