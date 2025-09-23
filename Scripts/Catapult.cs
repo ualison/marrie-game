@@ -28,11 +28,26 @@ public partial class Catapult : Node2D, IPausable
 	[Export] public NodePath DetectionAreaPath = "RigidBody2D/DetectionArea";
 	[Export] public NodePath RigidBodyPath = "RigidBody2D";
 	[Export] public NodePath SpritesRootPath = "RigidBody2D/Sprites";
+	[Export] public NodePath SpoonPivotPath = "RigidBody2D/Sprites/SpoonPivot";
+	[Export] public float SpoonTargetAngleDegrees { get; set; } = 45.0f;
+	[Export] public float SpoonRotationDuration { get; set; } = 0.2f;
 	#endregion
 
 	#region Components
 	private Sprite2D _wheelLeft;
 	private Sprite2D _wheelRight;
+	private Node2D _spoonPivot;
+	private object _spoonTween;
+	private Timer _puffPollTimer;
+	private Node2D _puffNodeRefForPoll;
+	private Vector2 _puffTargetPosForPoll = Vector2.Zero;
+	private float _puffPollElapsed = 0f;
+	private bool _puffIsStocked = false;
+	private bool _spoonHasRotated = false;
+
+	[Export] public float PuffPollInterval { get; set; } = 0.05f;
+	[Export] public float PuffPollTimeout { get; set; } = 1.0f;
+	[Export] public float PuffPositionTolerance { get; set; } = 6.0f;
 	private CollisionShape2D _collisionShape;
 	private Area2D _detectionArea;
 	private Area2D _handleArea;
@@ -130,6 +145,13 @@ public partial class Catapult : Node2D, IPausable
 		_handleArea = _rigidBody.GetNodeOrNull<Area2D>("Sprites/HandleArea");
 		if (_handleArea != null)
 		{
+		
+		// Create puff poll timer (used to wait until Puff actually reaches the stock position)
+		_puffPollTimer = new Timer();
+		_puffPollTimer.WaitTime = PuffPollInterval;
+		_puffPollTimer.OneShot = false;
+		_puffPollTimer.Timeout += OnPuffPollTimeout;
+		AddChild(_puffPollTimer);
 			// Configure handle area so it detects the player (player uses collision layer 2)
 			try { _handleArea.SetCollisionLayerValue(11, true); } catch {}
 			try { _handleArea.SetCollisionMaskValue(2, true); } catch {}
@@ -146,6 +168,14 @@ public partial class Catapult : Node2D, IPausable
 		_stockTimer.OneShot = true;
 		_stockTimer.Timeout += () => ReleasePuffFromHandle();
 		AddChild(_stockTimer);
+
+		// Cache spoon pivot (used for visual rotation when puff is stocked/launched)
+		_spoonPivot = _rigidBody.GetNodeOrNull<Node2D>(SpoonPivotPath) ?? _rigidBody.GetNodeOrNull<Node2D>("Sprites/SpoonPivot");
+		if (_spoonPivot != null)
+		{
+			// Ensure pivot starts at zero rotation
+			try { _spoonPivot.RotationDegrees = 0f; } catch {}
+		}
 	}
 
 	private void InitializeComponents()
@@ -339,7 +369,7 @@ public partial class Catapult : Node2D, IPausable
 
 		if (isJustPressedE)
 		{
-			// Command Puff to move to PuffPosition
+			// Command Puff to move to PuffPosition or rotate spoon when already stocked
 			var puffNodes = GetTree().GetNodesInGroup("puff");
 			if (puffNodes.Count > 0)
 			{
@@ -348,11 +378,38 @@ public partial class Catapult : Node2D, IPausable
 				var puffPosNode = _rigidBody.GetNodeOrNull<Node2D>("Sprites/SpoonPivot/Spoon/SpoonIsolated/PuffPosition") ?? GetNodeOrNull<Node2D>("Sprites/PuffPosition");
 				if (puffAI != null && puffPosNode != null)
 				{
-					puffAI.SetStockPosition(puffPosNode.GlobalPosition);
-					Log.Debug("Sent SetStockPosition to Puff (typed call)", "Catapult");
-					// Start/restart stock timer
-					try { _stockTimer.WaitTime = StockTimeoutSeconds; } catch {}
-					try { _stockTimer.Start(); } catch {}
+					// If Puff is already stocked (or catapult detected arrival) and stock timer is active,
+					// treat this press as the 'launch' press that rotates the spoon.
+					bool puffStateIsStocked = false;
+					try { puffStateIsStocked = puffAI.GetCurrentState() == MarrieGame.AI.PuffAI.PuffState.StuckInCatapult; } catch {}
+					bool stockTimerActive = false;
+					try { stockTimerActive = _stockTimer != null && !_stockTimer.IsStopped(); } catch {}
+
+					if ((_puffIsStocked || puffStateIsStocked) && stockTimerActive)
+					{
+						// Only allow rotating the spoon once per stocked event unless you want repeated rotation
+						if (!_spoonHasRotated)
+						{
+							TryRotateSpoonTo(SpoonTargetAngleDegrees, SpoonRotationDuration);
+							_spoonHasRotated = true;
+							Log.Debug("Spoon rotated by player while Puff is stocked", "Catapult");
+						}
+						else
+						{
+							Log.Debug("Player pressed E but spoon already rotated this stock event", "Catapult");
+						}
+					}
+					else
+					{
+						// Initial press: command Puff to move to PuffPosition
+						puffAI.SetStockPosition(puffPosNode.GlobalPosition);
+						Log.Debug("Sent SetStockPosition to Puff (typed call)", "Catapult");
+						// Start/restart stock timer
+						try { _stockTimer.WaitTime = StockTimeoutSeconds; } catch {}
+						try { _stockTimer.Start(); } catch {}
+						// Start polling Puff position; when Puff arrives we'll mark it stocked
+						StartPuffPositionPoll(puffNode as Node2D, puffPosNode.GlobalPosition);
+					}
 				}
 				else
 				{
@@ -365,6 +422,57 @@ public partial class Catapult : Node2D, IPausable
 		// Puff will be released when the player leaves the handle area or when the stock timer expires.
 	}
 
+	private void OnPuffPollTimeout()
+	{
+		// Increment elapsed
+		_puffPollElapsed += PuffPollInterval;
+		if (_puffNodeRefForPoll == null)
+		{
+			StopPuffPositionPoll();
+			return;
+		}
+		// If puff node no longer valid, stop
+		if (!IsInstanceValid(_puffNodeRefForPoll))
+		{
+			StopPuffPositionPoll();
+			return;
+		}
+		// Check distance
+		float dist = (_puffNodeRefForPoll.GlobalPosition - _puffTargetPosForPoll).Length();
+		if (dist <= PuffPositionTolerance)
+		{
+			// Puff reached target; mark stocked and stop polling. Rotation will occur
+			// only when the player presses E a second time during the stock window.
+			_puffIsStocked = true;
+			Log.Debug("Puff reached stock position and marked as stocked", "Catapult");
+			StopPuffPositionPoll();
+			return;
+		}
+		// Timeout exceeded
+		if (_puffPollElapsed >= PuffPollTimeout)
+		{
+			Log.Debug("Puff did not reach stock position within timeout", "Catapult");
+			StopPuffPositionPoll();
+		}
+	}
+
+	private void StopPuffPositionPoll()
+	{
+		try { if (_puffPollTimer != null) _puffPollTimer.Stop(); } catch {}
+		_puffNodeRefForPoll = null;
+		_puffPollElapsed = 0f;
+	}
+
+	private void StartPuffPositionPoll(Node2D puffNode, Vector2 targetPosition)
+	{
+		_puffNodeRefForPoll = puffNode;
+		_puffTargetPosForPoll = targetPosition;
+		_puffPollElapsed = 0f;
+ 		// Reset stocked/rotation flags for the new stock attempt
+ 		_puffIsStocked = false;
+ 		_spoonHasRotated = false;
+		try { if (_puffPollTimer != null) _puffPollTimer.Start(); } catch {}
+	}
 	private void EnablePlayerCollision()
 	{
 		if (_rigidBody == null || _player == null) return;
@@ -463,6 +571,40 @@ public partial class Catapult : Node2D, IPausable
 		}
 	}
 
+	/// <summary>
+	/// Try to rotate the SpoonPivot to a target angle (degrees) over duration seconds.
+	/// Uses the scene tree tween API and cancels any previous spoon tween.
+	/// </summary>
+	private void TryRotateSpoonTo(float targetDegrees, float duration)
+	{
+		if (_spoonPivot == null) return;
+		// Cancel existing tween if any
+		try
+		{
+			if (_spoonTween is Tween existingTween)
+			{
+				existingTween.Kill();
+			}
+		}
+		catch {}
+		// Create new tween
+		try
+		{
+			var tween = GetTree().CreateTween();
+			tween.TweenProperty(_spoonPivot, "rotation_degrees", targetDegrees, duration).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+			_spoonTween = tween;
+		}
+		catch (System.Exception ex)
+		{
+			Log.Warning($"Failed rotating spoon pivot: {ex.Message}", "Catapult");
+		}
+	}
+
+	private void TryRotateSpoonBack(float duration)
+	{
+		TryRotateSpoonTo(0f, duration);
+	}
+
 	#region Detection Area Events
 	private void OnDetectionAreaBodyEntered(Node2D body)
 	{
@@ -547,6 +689,12 @@ public partial class Catapult : Node2D, IPausable
 				Log.Warning("No PuffAI instance found in 'puff' group when releasing", "Catapult");
 			}
 		}
+		// Stop any poll and rotate spoon pivot back to neutral when releasing
+		StopPuffPositionPoll();
+		// Reset stocked/rotation flags so subsequent stock attempts behave correctly
+		_puffIsStocked = false;
+		_spoonHasRotated = false;
+		TryRotateSpoonBack(SpoonRotationDuration);
 	}
 
 	#endregion

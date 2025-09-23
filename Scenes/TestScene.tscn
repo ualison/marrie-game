@@ -63,6 +63,7 @@ z_index = -1
 position = Vector2(209, 110)
 PushForce = 950.0
 WheelRotationSpeed = 50.0
+BodyGravityScale = 1.5
 BodyLinearDamp = 1.5
 
 [node name="Puff" parent="." instance=ExtResource("13_hctok")]
