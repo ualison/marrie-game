@@ -1,5 +1,7 @@
 using Godot;
 using MarrieGame.Core.Interfaces;
+using System;
+using System.Collections.Generic;
 
 /// <summary>
 /// Catapult that can be pushed by the player when pressing C key
@@ -31,6 +33,15 @@ public partial class Catapult : Node2D, IPausable
 	[Export] public NodePath SpoonPivotPath = "RigidBody2D/Sprites/SpoonPivot";
 	[Export] public float SpoonTargetAngleDegrees { get; set; } = 45.0f;
 	[Export] public float SpoonRotationDuration { get; set; } = 0.2f;
+
+	// Trajectory preview settings (shown when player first presses E)
+	[Export] public float LaunchSpeed { get; set; } = 400.0f;
+	[Export] public int TrajectorySamples { get; set; } = 50;
+	[Export] public float TrajectorySampleDt { get; set; } = 0.05f;
+	[Export] public float TrajectoryWidth { get; set; } = 4.0f;
+	[Export] public float TrajectoryGravityScale { get; set; } = 1.0f; // Adjust gravity for trajectory arc
+	[Export] public float LaunchAngleDegrees { get; set; } = 65.0f; // Launch angle in degrees (steeper for catapult)
+	[Export] public Color TrajectoryColor { get; set; } = Colors.Green;
 	#endregion
 
 	#region Components
@@ -59,6 +70,9 @@ public partial class Catapult : Node2D, IPausable
 	private Timer _stockTimer;
 	[Export] public float StockTimeoutSeconds { get; set; } = 10.0f;
 	private bool _isPaused = false;
+
+	// Trajectory preview node (created on demand)
+	private Line2D _trajectoryPreview;
 	#endregion
 
 	#region State
@@ -461,6 +475,14 @@ public partial class Catapult : Node2D, IPausable
 		try { if (_puffPollTimer != null) _puffPollTimer.Stop(); } catch {}
 		_puffNodeRefForPoll = null;
 		_puffPollElapsed = 0f;
+		// If Puff reached stock position (stocked), keep the trajectory visible
+		// while the stock timer runs so player sees the launch arc. Otherwise hide it.
+		try {
+			if (!_puffIsStocked)
+			{
+				HideTrajectory();
+			}
+		} catch {}
 	}
 
 	private void StartPuffPositionPoll(Node2D puffNode, Vector2 targetPosition)
@@ -472,6 +494,102 @@ public partial class Catapult : Node2D, IPausable
  		_puffIsStocked = false;
  		_spoonHasRotated = false;
 		try { if (_puffPollTimer != null) _puffPollTimer.Start(); } catch {}
+
+		// Show predicted arc for where Puff will be launched
+		try { ShowTrajectory(); } catch {}
+	}
+
+	/// <summary>
+	/// Build and show a Line2D that visualizes a parabolic projectile arc
+	/// starting from the Spoon pivot/world puff position using physics-based trajectory calculation.
+	/// </summary>
+	private void ShowTrajectory()
+	{
+		// If already present, remove first
+		if (_trajectoryPreview != null && IsInstanceValid(_trajectoryPreview))
+		{
+			_trajectoryPreview.QueueFree();
+			_trajectoryPreview = null;
+		}
+
+		// Create Line2D
+		_trajectoryPreview = new Line2D();
+		_trajectoryPreview.Width = TrajectoryWidth;
+		_trajectoryPreview.DefaultColor = Colors.Green;
+		_trajectoryPreview.ZIndex = 1000;
+
+		// Determine start position: use PuffPosition node if available, otherwise spoon pivot
+		Vector2 startPos = Vector2.Zero;
+		var puffPosNode = _rigidBody?.GetNodeOrNull<Node2D>("Sprites/SpoonPivot/Spoon/SpoonIsolated/PuffPosition") ?? _rigidBody?.GetNodeOrNull<Node2D>("Sprites/PuffPosition");
+		if (puffPosNode != null) startPos = puffPosNode.GlobalPosition;
+		else if (_spoonPivot != null) startPos = _spoonPivot.GlobalPosition;
+		else startPos = GlobalPosition;
+
+		// Get gravity from project settings - use positive value since we're working in screen coordinates
+		float gravity = ProjectSettings.HasSetting("physics/2d/default_gravity") ? (float)ProjectSettings.GetSetting("physics/2d/default_gravity") : 980f;
+		gravity *= TrajectoryGravityScale;
+
+		// Use the exported launch angle for catapult trajectory
+		float angleRad = Mathf.DegToRad(LaunchAngleDegrees);
+		
+		// Determine launch direction based on player position or default to right
+		float direction = 1.0f; // Default to right
+		if (_player != null)
+		{
+			// Launch away from player (if player is on left, launch right, and vice versa)
+			if (_player.GlobalPosition.X < startPos.X)
+				direction = 1.0f; // Launch right
+			else
+				direction = -1.0f; // Launch left
+		}
+		
+		// Calculate initial velocity components for catapult-like launch
+		float initialSpeedX = LaunchSpeed * Mathf.Cos(angleRad) * direction;
+		float initialSpeedY = -LaunchSpeed * Mathf.Sin(angleRad); // Negative for upward launch in Godot coordinates
+
+		// Calculate trajectory points using proper projectile motion physics
+		var points = new List<Vector2>();
+		points.Add(startPos); // Start point
+		
+		float timeStep = 0.02f; // Smaller time step for smoother curve
+		float maxTime = 3.0f; // Maximum simulation time
+		
+		for (float t = timeStep; t <= maxTime; t += timeStep)
+		{
+			// Standard projectile motion equations
+			// x = x0 + vx0 * t
+			// y = y0 + vy0 * t + (1/2) * g * t^2
+			float x = startPos.X + initialSpeedX * t;
+			float y = startPos.Y + initialSpeedY * t + 0.5f * gravity * t * t;
+			
+			Vector2 pos = new Vector2(x, y);
+			points.Add(pos);
+			
+			// Stop if projectile goes significantly below start position or gets too far away
+			if (y > startPos.Y + 600f || Mathf.Abs(x - startPos.X) > 1000f)
+			{
+				break;
+			}
+		}
+
+		// Convert to array for Line2D
+		_trajectoryPreview.Points = points.ToArray();
+		_trajectoryPreview.DefaultColor = TrajectoryColor;
+		// Add to the scene root so it renders in world space
+		GetTree().Root.AddChild(_trajectoryPreview);
+	}
+
+	private void HideTrajectory()
+	{
+		try
+		{
+			if (_trajectoryPreview != null && IsInstanceValid(_trajectoryPreview))
+			{
+				_trajectoryPreview.QueueFree();
+			}
+		}
+		catch {}
+		_trajectoryPreview = null;
 	}
 	private void EnablePlayerCollision()
 	{
@@ -691,6 +809,8 @@ public partial class Catapult : Node2D, IPausable
 		}
 		// Stop any poll and rotate spoon pivot back to neutral when releasing
 		StopPuffPositionPoll();
+		// Ensure preview arc is hidden when releasing
+		try { HideTrajectory(); } catch {}
 		// Reset stocked/rotation flags so subsequent stock attempts behave correctly
 		_puffIsStocked = false;
 		_spoonHasRotated = false;
