@@ -16,12 +16,58 @@ namespace MarrieGame.AI
         public enum PuffState
         {
             Following,
+            StuckInCatapult,
             Attack,
             Jump,
             Idle,
             FaceLeft,
             FaceRight
         }
+        #endregion
+
+        #region Stock In Catapult Behavior
+        private void UpdateStockBehavior()
+        {
+            // Stay at the specified stock position while player holds E
+            if (!_hasStockPosition || _player == null)
+            {
+                // No valid stock position - return to appropriate state
+                ReturnToAppropriateState();
+                return;
+            }
+
+            // Move instantly to stock position (teleportation is fine for this mechanic)
+            GlobalPosition = _stockPosition;
+            Velocity = Vector2.Zero;
+
+            // Face the player while stocked
+            if (_player != null)
+            {
+                float dir = _player.GlobalPosition.X - GlobalPosition.X;
+                _facingRight = dir > 0;
+                if (_puffSprite != null)
+                {
+                    var scale = _puffSprite.Scale;
+                    _puffSprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
+                    UpdateHitboxesForFacing();
+                }
+            }
+        }
+
+        public void SetStockPosition(Vector2 pos)
+        {
+            _stockPosition = pos;
+            _hasStockPosition = true;
+            ChangeState(PuffState.StuckInCatapult);
+        }
+
+        public void ClearStockPosition()
+        {
+            _hasStockPosition = false;
+            // Return to following/idle depending on toggle
+            ReturnToAppropriateState();
+        }
+
         #endregion
 
         #region Exported Properties
@@ -77,6 +123,9 @@ namespace MarrieGame.AI
         private float _jumpVelocity;
         private bool _facingRight = true;
         private Node2D _currentTarget;
+        // Position to move to and remain while stocked in a catapult
+        private Vector2 _stockPosition = new Vector2(float.NaN, float.NaN);
+        private bool _hasStockPosition = false;
         private bool _canAttack = true;
         private bool _initialized = false;
         private bool _isFollowingEnabled = true; // New: tracks R key toggle state
@@ -504,6 +553,10 @@ namespace MarrieGame.AI
                 case PuffState.Following:
                     // Reset to following mode
                     break;
+                case PuffState.StuckInCatapult:
+                    // When stocked, freeze horizontal movement and aim to position
+                    Velocity = new Vector2(0, Velocity.Y);
+                    break;
                 case PuffState.Attack:
                     // Don't start cooldown here - wait until we actually attack
                     Log.Debug("PuffAI: Entered Attack state, beginning pursuit", "PuffAI");
@@ -539,6 +592,9 @@ namespace MarrieGame.AI
             {
                 case PuffState.Following:
                     UpdateFollowingBehavior();
+                    break;
+                case PuffState.StuckInCatapult:
+                    UpdateStockBehavior();
                     break;
                 case PuffState.Attack:
                     UpdateAttackBehavior();

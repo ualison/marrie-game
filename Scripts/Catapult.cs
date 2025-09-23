@@ -35,6 +35,7 @@ public partial class Catapult : Node2D, IPausable
 	private Sprite2D _wheelRight;
 	private CollisionShape2D _collisionShape;
 	private Area2D _detectionArea;
+	private Area2D _handleArea;
 	private RigidBody2D _rigidBody;
 	private Node2D _spritesRoot;
 	private Player _player;
@@ -118,6 +119,24 @@ public partial class Catapult : Node2D, IPausable
 		}
 		if (_promptC1 != null) _promptC1.Visible = false;
 		if (_promptC2 != null) _promptC2.Visible = false;
+
+		// Ensure the small E prompt is hidden initially (it will be shown when player enters HandleArea)
+		var promptEInit = _rigidBody.GetNodeOrNull<CanvasItem>("PromptLabel-E") ?? GetNodeOrNull<CanvasItem>("PromptLabel-E");
+		if (promptEInit != null) promptEInit.Visible = false;
+
+		// Find handle area (used for commanding Puff to be stocked)
+		_handleArea = _rigidBody.GetNodeOrNull<Area2D>("Sprites/HandleArea");
+		if (_handleArea != null)
+		{
+			// Configure handle area so it detects the player (player uses collision layer 2)
+			try { _handleArea.SetCollisionLayerValue(11, true); } catch {}
+			try { _handleArea.SetCollisionMaskValue(2, true); } catch {}
+			try { _handleArea.Monitoring = true; } catch {}
+			try { _handleArea.Monitorable = true; } catch {}
+			_handleArea.BodyEntered += OnHandleAreaBodyEntered;
+			_handleArea.BodyExited += OnHandleAreaBodyExited;
+			Log.Debug("Connected HandleArea signals", "Catapult");
+		}
 	}
 
 	private void InitializeComponents()
@@ -268,6 +287,8 @@ public partial class Catapult : Node2D, IPausable
 		{
 			// Ensure collisions remain disabled when player is not in range
 			DisablePlayerCollision();
+			// Also handle handle-area prompt/logic when player is not in primary detection area
+			HandleHandleAreaInput();
 			return;
 		}
 		
@@ -295,6 +316,43 @@ public partial class Catapult : Node2D, IPausable
 		{
 			// Player in range but not pressing push - keep collisions disabled
 			DisablePlayerCollision();
+		}
+
+		// Always check handle-area input even when in detection range
+		HandleHandleAreaInput();
+	}
+
+	private void HandleHandleAreaInput()
+	{
+		if (!_playerInHandleArea || _playerInHandleRef == null) return;
+
+		bool isPressingE = Input.IsActionPressed("interact") || Input.IsActionPressed("ui_accept");
+
+		if (isPressingE)
+		{
+			// Command Puff to move to PuffPosition
+			var puffNodes = GetTree().GetNodesInGroup("puff");
+			if (puffNodes.Count > 0)
+			{
+				var puffNode = puffNodes[0] as Node2D;
+				var puffAI = puffNode as MarrieGame.AI.PuffAI;
+				var puffPosNode = _rigidBody.GetNodeOrNull<Node2D>("Sprites/PuffPosition") ?? GetNodeOrNull<Node2D>("Sprites/PuffPosition");
+				if (puffAI != null && puffPosNode != null)
+				{
+					puffAI.SetStockPosition(puffPosNode.GlobalPosition);
+					Log.Debug("Sent SetStockPosition to Puff (typed call)", "Catapult");
+				}
+				else
+				{
+					if (puffAI == null) Log.Warning("No PuffAI instance found in 'puff' group", "Catapult");
+					if (puffPosNode == null) Log.Warning("PuffPosition node not found under catapult sprites", "Catapult");
+				}
+			}
+		}
+		else
+		{
+			// Player not pressing E - ensure Puff resumes normal behavior
+			ReleasePuffFromHandle();
 		}
 	}
 
@@ -425,6 +483,58 @@ public partial class Catapult : Node2D, IPausable
 			Log.Info("Player left catapult detection area", "Catapult");
 		}
 	}
+
+	#region Handle Area Events
+	private bool _playerInHandleArea = false;
+	private Player _playerInHandleRef = null;
+
+	private void OnHandleAreaBodyEntered(Node2D body)
+	{
+		if (body is Player player)
+		{
+			_playerInHandleArea = true;
+			_playerInHandleRef = player;
+			// Show the small E prompt (PromptLabel-E is a sibling on RigidBody2D)
+			var promptE = _rigidBody.GetNodeOrNull<CanvasItem>("PromptLabel-E") ?? GetNodeOrNull<CanvasItem>("PromptLabel-E");
+			if (promptE != null) promptE.Visible = true;
+			Log.Info("Player entered handle area", "Catapult");
+		}
+	}
+
+	private void OnHandleAreaBodyExited(Node2D body)
+	{
+		if (body is Player player)
+		{
+			_playerInHandleArea = false;
+			_playerInHandleRef = null;
+			var promptE = _rigidBody.GetNodeOrNull<CanvasItem>("PromptLabel-E") ?? GetNodeOrNull<CanvasItem>("PromptLabel-E");
+			if (promptE != null) promptE.Visible = false;
+			// Ensure Puff is released if player leaves while holding
+			ReleasePuffFromHandle();
+			Log.Info("Player left handle area", "Catapult");
+		}
+	}
+
+	private void ReleasePuffFromHandle()
+	{
+		// Find Puff instance in scene and clear stock
+		var puffNodes = GetTree().GetNodesInGroup("puff");
+		if (puffNodes.Count > 0)
+		{
+			var puffNode = puffNodes[0] as MarrieGame.AI.PuffAI;
+			if (puffNode != null)
+			{
+				puffNode.ClearStockPosition();
+				Log.Debug("Sent ClearStockPosition to Puff (typed call)", "Catapult");
+			}
+			else
+			{
+				Log.Warning("No PuffAI instance found in 'puff' group when releasing", "Catapult");
+			}
+		}
+	}
+
+	#endregion
 	#endregion
 
 	#region Public API
