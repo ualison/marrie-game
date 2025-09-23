@@ -405,8 +405,9 @@ public partial class Catapult : Node2D, IPausable
 						if (!_spoonHasRotated)
 						{
 							TryRotateSpoonTo(SpoonTargetAngleDegrees, SpoonRotationDuration);
+							LaunchPuff(puffNode as Node2D, puffAI);
 							_spoonHasRotated = true;
-							Log.Debug("Spoon rotated by player while Puff is stocked", "Catapult");
+							Log.Debug("Spoon rotated and Puff launched by player", "Catapult");
 						}
 						else
 						{
@@ -590,6 +591,74 @@ public partial class Catapult : Node2D, IPausable
 		}
 		catch {}
 		_trajectoryPreview = null;
+	}
+
+	/// <summary>
+	/// Launch Puff following the trajectory physics when the spoon rotates
+	/// </summary>
+	private void LaunchPuff(Node2D puffNode, MarrieGame.AI.PuffAI puffAI)
+	{
+		if (puffNode == null || puffAI == null)
+		{
+			Log.Warning("Cannot launch Puff - missing node or AI reference", "Catapult");
+			return;
+		}
+
+		// Calculate launch velocity using same physics as trajectory
+		float angleRad = Mathf.DegToRad(LaunchAngleDegrees);
+		
+		// Determine launch direction based on player position or default to right
+		float direction = 1.0f; // Default to right
+		if (_player != null)
+		{
+			// Get launch position
+			Vector2 launchPos = puffNode.GlobalPosition;
+			// Launch away from player (if player is on left, launch right, and vice versa)
+			if (_player.GlobalPosition.X < launchPos.X)
+				direction = 1.0f; // Launch right
+			else
+				direction = -1.0f; // Launch left
+		}
+		
+		// Calculate initial velocity components matching the trajectory
+		float initialSpeedX = LaunchSpeed * Mathf.Cos(angleRad) * direction;
+		float initialSpeedY = -LaunchSpeed * Mathf.Sin(angleRad); // Negative for upward launch in Godot coordinates
+		
+		Vector2 launchVelocity = new Vector2(initialSpeedX, initialSpeedY);
+
+		// Apply the launch velocity to Puff
+		if (puffNode is CharacterBody2D characterBody)
+		{
+			// For CharacterBody2D, set the velocity directly
+			characterBody.Velocity = launchVelocity;
+			Log.Info($"Launched Puff (CharacterBody2D) with velocity: {launchVelocity}", "Catapult");
+		}
+		else if (puffNode is RigidBody2D rigidBody)
+		{
+			// For RigidBody2D, apply impulse
+			rigidBody.LinearVelocity = launchVelocity;
+			Log.Info($"Launched Puff (RigidBody2D) with velocity: {launchVelocity}", "Catapult");
+		}
+		else
+		{
+			Log.Warning($"Puff node type {puffNode.GetType()} not supported for launching", "Catapult");
+		}
+
+		// Clear Puff from catapult stock state
+		puffAI.ClearStockPosition();
+		
+		// Reset catapult state
+		_puffIsStocked = false;
+		_spoonHasRotated = false;
+		
+		// Hide trajectory after a short delay to show the launch path briefly
+		var hideTimer = GetTree().CreateTimer(0.5f);
+		hideTimer.Timeout += HideTrajectory;
+		
+		// Stop stock timer
+		try { _stockTimer?.Stop(); } catch {}
+		
+		Log.Info("Puff successfully launched from catapult following trajectory", "Catapult");
 	}
 	private void EnablePlayerCollision()
 	{
