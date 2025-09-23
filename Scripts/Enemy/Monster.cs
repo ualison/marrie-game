@@ -1125,10 +1125,16 @@ public void ForceShow()
 
     private void OnPlayerEntered(Node2D body)
     {
-        // Only process player collisions - ignore ground and other objects
+        // Only process player collisions - ignore ground, Puff, and other objects
         if (body is not Player player)
         {
             return; // Don't log non-player collisions to reduce spam
+        }
+
+        // Ignore Puff collisions - Puff should not trigger damage
+        if (body.IsInGroup("puff"))
+        {
+            return;
         }
 
         if (Log.IsCategoryEnabled(MarrieGame.Core.Logging.LogCategory.Debug))
