@@ -33,7 +33,7 @@ position = Vector2(-327, 116)
 [node name="Enemies" type="Node2D" parent="GameEntities"]
 
 [node name="Monster" parent="GameEntities/Enemies" instance=ExtResource("5_e2fbs")]
-position = Vector2(286, 68)
+position = Vector2(270, 95)
 
 [node name="GameSystems" type="Node" parent="."]
 
@@ -69,7 +69,7 @@ position = Vector2(-184, 232)
 TargetScenePath = "uid://djkt6xtpabbyo"
 
 [node name="Puff" parent="." instance=ExtResource("13_j3sk6")]
-position = Vector2(-486, 239)
+position = Vector2(-85, 225)
 FollowSpeed = 100.0
 FollowDistance = 100.0
 MinFollowDistance = 75.0
