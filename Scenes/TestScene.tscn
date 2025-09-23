@@ -1,0 +1,64 @@
+[gd_scene load_steps=13 format=3 uid="uid://bnv528gs1hngu"]
+
+[ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="1_ytmxh"]
+[ext_resource type="PackedScene" uid="uid://bprvmud1sukcc" path="res://Prefabs/Environment.tscn" id="2_hctok"]
+[ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="3_t2vuu"]
+[ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_lp1f3"]
+[ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="5_p30di"]
+[ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="6_8c81w"]
+[ext_resource type="Script" uid="uid://bmh2wdvmm4i7l" path="res://Scripts/Systems/EnemyManager.cs" id="7_fi7j4"]
+[ext_resource type="Script" uid="uid://cf5q88b7yl5la" path="res://Scripts/Systems/ReplaySystemManager.cs" id="8_4v62a"]
+[ext_resource type="Script" uid="uid://bb2ife872jlja" path="res://Scripts/Replay/ReplayRecorder.cs" id="9_c2lnq"]
+[ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/Monster.mp3" id="10_dwn5r"]
+[ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="11_1vcy8"]
+[ext_resource type="PackedScene" uid="uid://byspjo0wirw6v" path="res://Prefabs/Catapult.tscn" id="12_65o0v"]
+
+[node name="Root" type="Node2D"]
+
+[node name="CameraFollower" parent="." instance=ExtResource("1_ytmxh")]
+FollowOffset = Vector2(0, -165)
+
+[node name="Environment" parent="." instance=ExtResource("2_hctok")]
+
+[node name="UserInterface" parent="." instance=ExtResource("3_t2vuu")]
+
+[node name="GameEntities" type="Node2D" parent="."]
+
+[node name="Player" parent="GameEntities" instance=ExtResource("4_lp1f3")]
+position = Vector2(-327, 116)
+
+[node name="GameSystems" type="Node" parent="."]
+
+[node name="Managers" type="Node" parent="GameSystems"]
+
+[node name="SceneLifecycleManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("5_p30di")
+
+[node name="UIManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("6_8c81w")
+
+[node name="EnemyManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("7_fi7j4")
+
+[node name="ReplaySystemManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("8_4v62a")
+
+[node name="ReplaySystem" type="Node" parent="GameSystems"]
+
+[node name="ReplayRecorder" type="Node" parent="GameSystems/ReplaySystem"]
+script = ExtResource("9_c2lnq")
+
+[node name="AudioSystem" type="Node" parent="GameSystems"]
+
+[node name="AudioManager" type="AudioStreamPlayer2D" parent="GameSystems/AudioSystem"]
+stream = ExtResource("10_dwn5r")
+volume_db = 6.038
+autoplay = true
+script = ExtResource("11_1vcy8")
+
+[node name="Catapult" parent="." instance=ExtResource("12_65o0v")]
+position = Vector2(209, 110)
+PushForce = 950.0
+WheelRotationSpeed = 50.0
+BodyLinearDamp = 1.0
+BodyAngularDamp = 0.0

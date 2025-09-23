@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://byspjo0wirw6v"]
+[gd_scene load_steps=9 format=3 uid="uid://byspjo0wirw6v"]
 
 [ext_resource type="Texture2D" uid="uid://dw8th8mtv0yh8" path="res://Art/Skeleton.png" id="1_utwii"]
 [ext_resource type="Script" uid="uid://dxmpmwulpk2wn" path="res://Scripts/Catapult.cs" id="2_script"]
@@ -7,50 +7,74 @@
 [ext_resource type="Texture2D" uid="uid://b057y6k8yfefo" path="res://Art/Handle.png" id="4_3xnqg"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
-size = Vector2(723, 442)
+size = Vector2(492, 300)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_2"]
-size = Vector2(770, 413)
+size = Vector2(18, 300.59375)
 
-[node name="Catapult" type="RigidBody2D"]
-collision_layer = 4
-collision_mask = 3
+[sub_resource type="CircleShape2D" id="CircleShape2D_mtggb"]
+radius = 64.079475
+
+[node name="Catapult" type="Node2D"]
 script = ExtResource("2_script")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(-39.5, 36)
+[node name="RigidBody2D" type="RigidBody2D" parent="."]
+collision_layer = 4
+collision_mask = 3
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RigidBody2D"]
+position = Vector2(-13, -12)
 shape = SubResource("RectangleShape2D_1")
 
-[node name="DetectionArea" type="Area2D" parent="."]
+[node name="DetectionArea" type="Area2D" parent="RigidBody2D"]
 collision_layer = 512
 collision_mask = 2
 
-[node name="DetectionShape" type="CollisionShape2D" parent="DetectionArea"]
-position = Vector2(-39, 17.5)
+[node name="DetectionShapeLeft" type="CollisionShape2D" parent="RigidBody2D/DetectionArea"]
+position = Vector2(-270, -12)
 shape = SubResource("RectangleShape2D_2")
 debug_color = Color(0.9964364, 0, 0.19552094, 0.41960785)
 
-[node name="Skeleton" type="Sprite2D" parent="."]
-position = Vector2(-3.5000057, 3.4999952)
-scale = Vector2(0.58521193, 0.5323246)
+[node name="DetectionShapeRight" type="CollisionShape2D" parent="RigidBody2D/DetectionArea"]
+position = Vector2(243, -11.296875)
+shape = SubResource("RectangleShape2D_2")
+debug_color = Color(0.9964364, 0, 0.19552094, 0.41960785)
+
+[node name="Sprites" type="Node2D" parent="RigidBody2D"]
+position = Vector2(25.999996, -36.999996)
+scale = Vector2(0.6399989, 0.6800001)
+
+[node name="Skeleton" type="Sprite2D" parent="RigidBody2D/Sprites"]
+position = Vector2(-39.000023, 18.600075)
+scale = Vector2(0.64923346, 0.5573592)
 texture = ExtResource("1_utwii")
 
-[node name="WheelRight" type="Sprite2D" parent="."]
-position = Vector2(209, 200)
-scale = Vector2(0.42069983, 0.41561514)
+[node name="WheelRight" type="Sprite2D" parent="RigidBody2D/Sprites"]
+position = Vector2(176.75539, 197.05879)
+scale = Vector2(0.41611814, 0.38968256)
 texture = ExtResource("3_70bc4")
 
-[node name="WheelLeft" type="Sprite2D" parent="."]
-position = Vector2(-220, 195.99998)
-scale = Vector2(0.42069983, 0.41561514)
+[node name="WheelLeft" type="Sprite2D" parent="RigidBody2D/Sprites"]
+position = Vector2(-292.188, 194.11761)
+scale = Vector2(0.42089012, 0.4)
 texture = ExtResource("3_70bc4")
 
-[node name="Spoon" type="Sprite2D" parent="."]
-position = Vector2(-214, 88)
-scale = Vector2(0.4699017, 0.4699017)
+[node name="Spoon" type="Sprite2D" parent="RigidBody2D/Sprites"]
+position = Vector2(-220, 130)
+scale = Vector2(0.567, 0.5)
 texture = ExtResource("3_utwii")
 
-[node name="Handle" type="Sprite2D" parent="."]
-position = Vector2(-2, 157)
-scale = Vector2(0.7075768, 0.6982072)
+[node name="Handle" type="Sprite2D" parent="RigidBody2D/Sprites"]
+position = Vector2(-38, 188.00002)
+scale = Vector2(0.61668026, 0.6000002)
 texture = ExtResource("4_3xnqg")
+
+[node name="PuffPosition" type="Node2D" parent="RigidBody2D/Sprites"]
+position = Vector2(-365.62558, 27.941164)
+
+[node name="HandleArea" type="Area2D" parent="RigidBody2D/Sprites"]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RigidBody2D/Sprites/HandleArea"]
+position = Vector2(-35.937553, 186.76465)
+shape = SubResource("CircleShape2D_mtggb")
+debug_color = Color(0, 0.6498678, 0.13839722, 0.41960785)
