@@ -62,6 +62,8 @@ namespace MarrieGame.AI
         #region Energy System
         public int CurrentEnergy { get; private set; }
         public int MaxEnergyLimit => MaxEnergy;
+        private float _energyRegenTimer = 0f;
+        private const float EnergyRegenInterval = 2.0f; // 2 seconds per energy point
         #endregion
 
         #region Physics
@@ -130,6 +132,8 @@ namespace MarrieGame.AI
             
             // Get detection areas
             _monsterDetectionArea = GetNodeOrNull<Area2D>("MonsterDetectionArea");
+            _hurtBox = GetNodeOrNull<Area2D>("HurtBox");
+            
             // Connect signals on MonsterDetectionArea (use only this area)
             if (_monsterDetectionArea != null)
             {
@@ -137,6 +141,15 @@ namespace MarrieGame.AI
                 try { _monsterDetectionArea.Monitorable = true; } catch {}
                 _monsterDetectionArea.BodyEntered += OnMonsterDetectionBodyEntered;
                 _monsterDetectionArea.AreaEntered += OnMonsterDetectionAreaEntered;
+            }
+
+            // Connect signals on HurtBox for apple collection
+            if (_hurtBox != null)
+            {
+                try { _hurtBox.Monitoring = true; } catch {}
+                try { _hurtBox.Monitorable = true; } catch {}
+                _hurtBox.BodyEntered += OnHurtBoxBodyEntered;
+                _hurtBox.AreaEntered += OnHurtBoxAreaEntered;
             }
 
             if (_player == null)
@@ -167,7 +180,8 @@ namespace MarrieGame.AI
         private void InitializeEnergy()
         {
             CurrentEnergy = StartingEnergy;
-            EmitSignal(SignalName.PuffEnergyChanged, CurrentEnergy, MaxEnergyLimit);
+            EmitSignal(SignalName.PuffEnergyChanged, CurrentEnergy, MaxEnergy);
+            Log.Debug($"PuffAI Energy initialized: {CurrentEnergy}/{MaxEnergy}", "PuffAI");
         }
         #endregion
 
@@ -190,6 +204,9 @@ namespace MarrieGame.AI
             }
             
             if (_player == null || !_initialized) return;
+
+            // Energy regeneration over time (1 energy every 2 seconds when not at max)
+            HandleEnergyRegeneration(delta);
 
             // Safety check: prevent Puff from going too far from player
             if (_player != null)
@@ -324,6 +341,13 @@ namespace MarrieGame.AI
             // Handle Q key attack - works from any state if monster is visible
             if (Input.IsActionJustPressed("puff_attack") && _canAttack)
             {
+                // Check if Puff has enough energy to attack (cost: 10 energy per attack)
+                if (CurrentEnergy < 10)
+                {
+                    Log.Debug("PuffAI: Not enough energy to attack! Current energy: " + CurrentEnergy, "PuffAI");
+                    return;
+                }
+                
                 Log.System("PuffAI: Q key pressed - attempting to find and attack monster", "PuffAI");
                 var nearestMonster = FindNearestMonster();
                 if (nearestMonster != null)
@@ -345,6 +369,13 @@ namespace MarrieGame.AI
                 }
             }
             else if (Input.IsActionJustPressed("puff_attack") && !_canAttack)
+            {
+                Log.Debug("PuffAI: Attack on cooldown", "PuffAI");
+            }
+            else if (Input.IsActionJustPressed("puff_attack") && CurrentEnergy < 10)
+            {
+                Log.Debug("PuffAI: Not enough energy to attack!", "PuffAI");
+            }
             {
                 Log.Warning("PuffAI: *** Q pressed but attack on cooldown ***", "PuffAI");
             }
@@ -955,12 +986,20 @@ namespace MarrieGame.AI
                     return;
                 }
                 
+                // Consume energy for the attack (10 energy per attack)
+                if (!UseEnergy(10))
+                {
+                    Log.Debug("PuffAI: Not enough energy to complete attack!", "PuffAI");
+                    StartAttackCooldown();
+                    return;
+                }
+                
                 // Deal physical damage directly
                 bool damageDealt = monster.TakePhysicalDamage(AttackDamage);
                 
                 if (damageDealt)
                 {
-                    Log.System($"PuffAI: Successfully damaged monster {target.Name}", "PuffAI");
+                    Log.System($"PuffAI: Successfully damaged monster {target.Name} (used 10 energy)", "PuffAI");
                 }
                 else
                 {
@@ -969,12 +1008,20 @@ namespace MarrieGame.AI
             }
             else if (target is GhostMonster ghostMonster)
             {
+                // Consume energy for the attack (10 energy per attack)
+                if (!UseEnergy(10))
+                {
+                    Log.Debug("PuffAI: Not enough energy to complete attack!", "PuffAI");
+                    StartAttackCooldown();
+                    return;
+                }
+                
                 // Handle ghost monsters
                 bool damageDealt = ghostMonster.TakePhysicalDamage(AttackDamage);
                 
                 if (damageDealt)
                 {
-                    Log.System($"PuffAI: Successfully damaged ghost monster {target.Name}", "PuffAI");
+                    Log.System($"PuffAI: Successfully damaged ghost monster {target.Name} (used 10 energy)", "PuffAI");
                 }
                 else
                 {
@@ -998,6 +1045,14 @@ namespace MarrieGame.AI
                     if (!canTake)
                     {
                         Log.Debug($"PuffAI: Target {target.Name} reported cannot take damage", "PuffAI");
+                        StartAttackCooldown();
+                        return;
+                    }
+
+                    // Consume energy for the attack (10 energy per attack)
+                    if (!UseEnergy(10))
+                    {
+                        Log.Debug("PuffAI: Not enough energy to complete attack!", "PuffAI");
                         StartAttackCooldown();
                         return;
                     }
@@ -1169,8 +1224,15 @@ namespace MarrieGame.AI
         {
             if (IsOnFloor())
             {
+                // Consume energy for jumping (2 energy per jump)
+                if (!UseEnergy(2))
+                {
+                    Log.Debug("PuffAI: Not enough energy to jump!", "PuffAI");
+                    return;
+                }
+                
                 Velocity = new Vector2(Velocity.X, _jumpVelocity);
-                Log.Debug("PuffAI: Jumping", "PuffAI");
+                Log.Debug("PuffAI: Jumping (used 2 energy)", "PuffAI");
             }
         }
         #endregion
@@ -1210,7 +1272,11 @@ namespace MarrieGame.AI
         #region Energy System
         public bool UseEnergy(int amount = 1)
         {
-            if (CurrentEnergy < amount) return false;
+            if (CurrentEnergy < amount) 
+            {
+                Log.Debug($"PuffAI: Insufficient energy for action. Current: {CurrentEnergy}, Required: {amount}", "PuffAI");
+                return false;
+            }
 
             CurrentEnergy = Mathf.Max(0, CurrentEnergy - amount);
             EmitSignal(SignalName.PuffEnergyChanged, CurrentEnergy, MaxEnergyLimit);
@@ -1247,6 +1313,26 @@ namespace MarrieGame.AI
             
             EmitSignal(SignalName.PuffEnergyChanged, CurrentEnergy, MaxEnergyLimit);
             Log.System("PuffAI: Reset to initial state", "PuffAI");
+        }
+
+        private void HandleEnergyRegeneration(double delta)
+        {
+            // Only regenerate if not at max energy
+            if (CurrentEnergy >= MaxEnergyLimit) 
+            {
+                _energyRegenTimer = 0f;
+                return;
+            }
+
+            _energyRegenTimer += (float)delta;
+            
+            // Regenerate 1 energy every 2 seconds
+            if (_energyRegenTimer >= EnergyRegenInterval)
+            {
+                GainEnergy(1);
+                _energyRegenTimer = 0f;
+                Log.Debug($"PuffAI: Regenerated 1 energy, current: {CurrentEnergy}/{MaxEnergyLimit}", "PuffAI");
+            }
         }
         #endregion
 

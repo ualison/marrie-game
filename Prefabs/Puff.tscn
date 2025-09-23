@@ -1,14 +1,17 @@
-[gd_scene load_steps=6 format=3 uid="uid://dfauk4svx1fjh"]
+[gd_scene load_steps=7 format=3 uid="uid://dfauk4svx1fjh"]
 
 [ext_resource type="Texture2D" uid="uid://breg64qhs8o35" path="res://Art/PuffNew.png" id="1_daoqv"]
 [ext_resource type="Script" uid="uid://ceuvh18egajhm" path="res://Scripts/AI/PuffAI.cs" id="1_script"]
-[ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="3_0n4xf"]
+[ext_resource type="PackedScene" uid="uid://b4s5j2k8dh1m6" path="res://Prefabs/UI/PuffEnergyBar.tscn" id="3_0n4xf"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_8mxow"]
 size = Vector2(62, 93)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_detection"]
 size = Vector2(71, 93)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hurtbox"]
+size = Vector2(50, 80)
 
 [node name="Puff" type="CharacterBody2D"]
 collision_layer = 64
@@ -26,12 +29,22 @@ collision_mask = 16
 position = Vector2(-1.5, 1.5)
 shape = SubResource("RectangleShape2D_detection")
 
+[node name="HurtBox" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 4
+
+[node name="HurtBoxShape" type="CollisionShape2D" parent="HurtBox"]
+shape = SubResource("RectangleShape2D_hurtbox")
+debug_color = Color(0.97390443, 0, 0.4340493, 0.41960785)
+
 [node name="PuffEnergyBar" parent="." instance=ExtResource("3_0n4xf")]
 offset_left = -53.0
-offset_top = -236.0
+offset_top = -334.0
 offset_right = 47.0
-offset_bottom = -186.0
-OffsetFromMonster = Vector2(-80, -220)
+offset_bottom = -284.0
+OffsetFromPuff = Vector2(-50, -100)
+MaxEnergyOverride = 3
+ActiveEnergyOverride = 2
 
 [node name="PuffSprite" type="Sprite2D" parent="."]
 position = Vector2(-3, 4)
