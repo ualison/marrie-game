@@ -1,0 +1,56 @@
+[gd_scene load_steps=8 format=3 uid="uid://byspjo0wirw6v"]
+
+[ext_resource type="Texture2D" uid="uid://dw8th8mtv0yh8" path="res://Art/Skeleton.png" id="1_utwii"]
+[ext_resource type="Script" uid="uid://dxmpmwulpk2wn" path="res://Scripts/Catapult.cs" id="2_script"]
+[ext_resource type="Texture2D" uid="uid://gqv20ju7km0o" path="res://Art/Wheel.png" id="3_70bc4"]
+[ext_resource type="Texture2D" uid="uid://bahverfqaipxx" path="res://Art/Spoon.png" id="3_utwii"]
+[ext_resource type="Texture2D" uid="uid://b057y6k8yfefo" path="res://Art/Handle.png" id="4_3xnqg"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(723, 442)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_2"]
+size = Vector2(770, 413)
+
+[node name="Catapult" type="RigidBody2D"]
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("2_script")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(-39.5, 36)
+shape = SubResource("RectangleShape2D_1")
+
+[node name="DetectionArea" type="Area2D" parent="."]
+collision_layer = 512
+collision_mask = 2
+
+[node name="DetectionShape" type="CollisionShape2D" parent="DetectionArea"]
+position = Vector2(-39, 17.5)
+shape = SubResource("RectangleShape2D_2")
+debug_color = Color(0.9964364, 0, 0.19552094, 0.41960785)
+
+[node name="Skeleton" type="Sprite2D" parent="."]
+position = Vector2(-3.5000057, 3.4999952)
+scale = Vector2(0.58521193, 0.5323246)
+texture = ExtResource("1_utwii")
+
+[node name="WheelRight" type="Sprite2D" parent="."]
+position = Vector2(209, 200)
+scale = Vector2(0.42069983, 0.41561514)
+texture = ExtResource("3_70bc4")
+
+[node name="WheelLeft" type="Sprite2D" parent="."]
+position = Vector2(-220, 195.99998)
+scale = Vector2(0.42069983, 0.41561514)
+texture = ExtResource("3_70bc4")
+
+[node name="Spoon" type="Sprite2D" parent="."]
+position = Vector2(-214, 88)
+scale = Vector2(0.4699017, 0.4699017)
+texture = ExtResource("3_utwii")
+
+[node name="Handle" type="Sprite2D" parent="."]
+position = Vector2(-2, 157)
+scale = Vector2(0.7075768, 0.6982072)
+texture = ExtResource("4_3xnqg")

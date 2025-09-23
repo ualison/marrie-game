@@ -4,7 +4,6 @@
 [ext_resource type="PackedScene" uid="uid://bprvmud1sukcc" path="res://Prefabs/Environment.tscn" id="2_sol86"]
 [ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="3_5tihs"]
 [ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_gixge"]
-[ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_2671t"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="6_i55o2"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="7_6t04j"]
 [ext_resource type="Script" uid="uid://bmh2wdvmm4i7l" path="res://Scripts/Systems/EnemyManager.cs" id="8_0s75l"]
@@ -12,6 +11,7 @@
 [ext_resource type="Script" uid="uid://bb2ife872jlja" path="res://Scripts/Replay/ReplayRecorder.cs" id="10_mvcq0"]
 [ext_resource type="AudioStream" uid="uid://c1r3hnngonoj7" path="res://Sounds/Monster.mp3" id="11_sa6d1"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="12_48pvr"]
+[ext_resource type="PackedScene" uid="uid://byspjo0wirw6v" path="res://Prefabs/Catapult.tscn" id="12_ebsfv"]
 
 [node name="Root" type="Node2D"]
 
@@ -26,11 +26,6 @@ FollowOffset = Vector2(0, -165)
 
 [node name="Player" parent="GameEntities" instance=ExtResource("4_gixge")]
 position = Vector2(-327, 116)
-
-[node name="Enemies" type="Node2D" parent="GameEntities"]
-
-[node name="Monster" parent="GameEntities/Enemies" instance=ExtResource("5_2671t")]
-position = Vector2(286, 68)
 
 [node name="GameSystems" type="Node" parent="."]
 
@@ -60,3 +55,11 @@ stream = ExtResource("11_sa6d1")
 volume_db = 6.038
 autoplay = true
 script = ExtResource("12_48pvr")
+
+[node name="Catapult" parent="." instance=ExtResource("12_ebsfv")]
+position = Vector2(245, 165)
+scale = Vector2(0.5, 0.5)
+collision_layer = 1
+collision_mask = 1
+PushForce = 1000.0
+WheelRotationSpeed = 100.0
