@@ -81,8 +81,6 @@ public partial class Apple : Node2D
         SetupTransitionTimer();
         SetInitialState();
         EnableInputProcessing();
-        
-        Log.System($"Apple initialized at position {GlobalPosition} in state {_currentState}", "Apple");
     }
 
     private void InitializeComponents()
@@ -117,7 +115,6 @@ public partial class Apple : Node2D
             _puffDetectionArea.Monitoring = true;
             _puffDetectionArea.Monitorable = true;
             _puffDetectionArea.BodyEntered += OnPuffCollision;
-            Log.Debug($"PuffDetectionArea setup - Monitoring: {_puffDetectionArea.Monitoring}, CollisionMask: {_puffDetectionArea.CollisionMask}", "Apple");
         }
         else
         {
@@ -263,9 +260,6 @@ public partial class Apple : Node2D
 
     private void ConsumeRedApple()
     {
-        // Debug level - routine apple consumption
-        Log.Debug($"Consumed red apple - restoring {LifeRestoreAmount} life", "Apple");
-        
         // Find player and restore life
     var player = GetTree().GetFirstNodeInGroup("player") as Node;
     var playerLife = player != null ? NodeHelpers.GetNodeOrNull<PlayerLife>(player, null, "PlayerLife") : null;
@@ -282,9 +276,6 @@ public partial class Apple : Node2D
 
     private void ConsumePurpleApple()
     {
-        // Debug level - routine apple consumption
-        Log.Debug($"Consumed purple apple - restoring {ManaRestoreAmount} mana", "Apple");
-        
         // Find player and restore mana
     var player = GetTree().GetFirstNodeInGroup("player") as Node;
     var playerMana = player != null ? NodeHelpers.GetNodeOrNull<PlayerMana>(player, null, "PlayerMana") : null;
@@ -301,42 +292,29 @@ public partial class Apple : Node2D
 
     private void RestoreEnergyToPuff()
     {
-        // Debug level - routine apple consumption by Puff
-        Log.System($"RestoreEnergyToPuff called - restoring {EnergyRestoreAmount} energy", "Apple");
-        
         // Find Puff and restore energy
         var puff = GetTree().GetFirstNodeInGroup("puff") as Node;
-        Log.Debug($"Found puff node: {(puff != null ? puff.Name : "null")}", "Apple");
-        
         var puffEnergyBar = puff != null ? NodeHelpers.GetNodeOrNull<MarrieGame.UI.PuffEnergyBar>(puff, null, "PuffEnergyBar") : null;
-        Log.Debug($"Found PuffEnergyBar as child: {(puffEnergyBar != null ? "Yes" : "No")}", "Apple");
         
         if (puffEnergyBar != null)
         {
-            Log.System($"Calling GainEnergy({EnergyRestoreAmount}) on PuffEnergyBar", "Apple");
             puffEnergyBar.GainEnergy(EnergyRestoreAmount);
-            Log.System($"Energy restored successfully to Puff", "Apple");
         }
         else
         {
             // Try alternative ways to find energy bar in scene tree
-            Log.Debug("Trying alternative search for PuffEnergyBar via groups", "Apple");
-            
-            // Try multiple possible group names
             string[] possibleGroups = { "puff_energy_bar", "puff_energy_bar_ui" };
             MarrieGame.UI.PuffEnergyBar foundEnergyBar = null;
             
             foreach (string groupName in possibleGroups)
             {
                 var energyBars = GetTree().GetNodesInGroup(groupName);
-                Log.Debug($"Found {energyBars.Count} nodes in '{groupName}' group", "Apple");
                 
                 if (energyBars.Count > 0)
                 {
                     foundEnergyBar = energyBars[0] as MarrieGame.UI.PuffEnergyBar;
                     if (foundEnergyBar != null)
                     {
-                        Log.Debug($"Found PuffEnergyBar in '{groupName}' group", "Apple");
                         break;
                     }
                 }
@@ -344,9 +322,7 @@ public partial class Apple : Node2D
             
             if (foundEnergyBar != null)
             {
-                Log.System($"Calling GainEnergy({EnergyRestoreAmount}) on PuffEnergyBar from group", "Apple");
                 foundEnergyBar.GainEnergy(EnergyRestoreAmount);
-                Log.System($"Energy restored successfully to Puff via group search", "Apple");
             }
             else
             {
@@ -355,13 +331,11 @@ public partial class Apple : Node2D
         }
 
         // Remove apple after energy restoration
-        Log.System("Destroying apple after energy restoration", "Apple");
         DestroyApple();
     }
 
     private void DestroyApple()
     {
-        Log.UI("Apple consumed and destroyed", "Apple");
         QueueFree();
     }
     #endregion
@@ -450,9 +424,6 @@ public partial class Apple : Node2D
         {
             _appleSprite.Texture = newTexture;
             
-            // Debug: Log state changes
-            Log.System($"Apple state changed to: {_currentState} at position: {_currentPosition}", "Apple");
-            
             // Apply visual effects for different states
             ApplyStateVisualEffects();
         }
@@ -519,7 +490,6 @@ public partial class Apple : Node2D
             // Apple should fall ONLY when hit in GrayKnockable state
             if (_currentState == AppleState.GrayKnockable && !_isFalling)
             {
-                Log.System("Apple hit by rock - triggering fall", "Apple");
                 MakeAppleFall();
             }
         }
@@ -539,7 +509,6 @@ public partial class Apple : Node2D
         // Check if apple hit the ground (StaticBody2D) in a normal falling case
         if (body is StaticBody2D && _isFalling && !_hasLanded)
         {
-            Log.System("Apple landed on ground", "Apple");
             // Use CallDeferred to avoid physics state change during collision detection
             CallDeferred(nameof(OnGroundLanding));
         }
@@ -547,8 +516,6 @@ public partial class Apple : Node2D
 
     private void OnPuffCollision(Node2D body)
     {
-        // Debug: Log all collision attempts
-        Log.Debug($"Apple: Body collision detected - Name: {body.Name}, Groups: [{string.Join(", ", body.GetGroups())}], Current State: {_currentState}", "Apple");
         // If the colliding body is Puff, handle Puff-specific interactions
         if (body.IsInGroup("puff"))
         {
@@ -562,8 +529,6 @@ public partial class Apple : Node2D
                 // If the apple is GrayKnockable and on the tree, Puff should attach and carry it
                 if (_currentState == AppleState.GrayKnockable)
                 {
-                    Log.System("Puff collided with GrayKnockable apple on tree - attaching to Puff", "Apple");
-
                     // Store original parent/index so we can reparent back later
                     _originalParent = GetParent();
                     // original parent stored for later reparenting
@@ -598,7 +563,6 @@ public partial class Apple : Node2D
             // If apple is on ground and in YellowEnergy state it is collectible by Puff
             if (_currentPosition == ApplePosition.OnGround && _currentState == AppleState.YellowEnergy)
             {
-                Log.System($"Puff collided with YellowEnergy apple - restoring {EnergyRestoreAmount} energy", "Apple");
                 RestoreEnergyToPuff();
             }
 

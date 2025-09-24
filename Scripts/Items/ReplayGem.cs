@@ -214,6 +214,7 @@ public partial class ReplayGem : Node2D
             {
                 // Show UI message when no death record is available
                 Log.Warning("No death record available for replay", "ReplayGem");
+                try { UIManager.ShowGameplayMessage("No replay data available yet."); } catch { }
                 return;
             }
 
@@ -236,28 +237,7 @@ public partial class ReplayGem : Node2D
             Log.Warning("Check that RealityManager is properly added to the scene tree before ReplayGem activation.", "ReplayGem");
         }
 
-        // Use the previously obtained deathRecord (checked before consuming mana)
-        if (deathRecord == null)
-        {
-            // In PuzzleMode, missing death records are expected initially
-            var recordingMode = GameManager.Instance?.GetReplayRecordingMode() ?? ReplayRecordingMode.DeathMode;
-            
-            if (recordingMode == ReplayRecordingMode.PuzzleMode)
-            {
-                Log.Debug("No recording data available for PuzzleMode replay", "ReplayGem");
-            }
-            else
-            {
-                Log.Warning("No death record available for replay", "ReplayGem");
-                // Inform the player via UI that no replay is available
-                UIManager.ShowGameplayMessage("No replay available.");
-            }
-            
-            // Refund mana if replay fails
-            playerMana.RestoreMana(1);
-            return;
-        }
-
+        // At this point, deathRecord is guaranteed to be non-null (checked before consuming mana)
         Log.Replay($"ReplayGem found death record: {deathRecord.DeathId}", "ReplayGem");
 
         // Hide gem during replay

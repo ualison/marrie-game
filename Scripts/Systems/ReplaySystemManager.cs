@@ -18,6 +18,16 @@ public partial class ReplaySystemManager : Node
     private ReplayRecorder _recorder;
     private ReplayGem _currentGem;
     private ReplayOrchestrator _orchestrator;
+    // Rolling recording window in seconds (configurable)
+    private float _recordWindowSeconds = 10f;
+    // Whether the recorder was paused because we entered past reality (replaying)
+    private bool _recorderPausedForReplay = false;
+    // Timestamp when the current rolling recording started (ms)
+    private long _rollingRecordingStartMs = 0;
+    // Timer to manage rolling window updates
+    private Timer _rollingWindowTimer;
+    // Current rolling window data (temporary storage)
+    private DeathRecord _currentRollingRecord;
     #endregion
 
     #region Death Records
@@ -65,6 +75,14 @@ public partial class ReplaySystemManager : Node
             // Centralized cleanup
             _subscriptionHelper.UnsubscribeAll();
             SceneLifecycleManager.SceneReady -= OnSceneReady;
+            
+            // Cleanup timer
+            if (_rollingWindowTimer != null)
+            {
+                _rollingWindowTimer.Stop();
+                _rollingWindowTimer.QueueFree();
+                _rollingWindowTimer = null;
+            }
         }
     }
     #endregion
@@ -111,14 +129,23 @@ public partial class ReplaySystemManager : Node
             Log.Debug("Created ReplayOrchestrator", "ReplaySystemManager");
         }
         
-        // Debug level - system initialization is routine
-        Log.Debug($"ReplaySystemManager initialized - Mode: {_currentRecordingMode}", "ReplaySystemManager");
+        // Important: Log initialization to help debug recording issues
+        Log.Info($"ReplaySystemManager initialized - Mode: {_currentRecordingMode}", "ReplaySystemManager");
 
         // Connect to reality changes to broadcast hide/show to all gems
         if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
         {
             RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
         }
+
+        // Setup rolling window timer
+        SetupRollingWindowTimer();
+        
+        // Ensure the recorder is in rolling mode: start recording automatically
+        // only when in the current reality. This keeps a sliding buffer of the
+        // most recent _recordWindowSeconds worth of gameplay.
+        // Always start recording to maintain continuous rolling window
+        TryStartRollingRecordingIfNeeded(true); // Force start
     }
     #endregion
 
@@ -152,31 +179,33 @@ public partial class ReplaySystemManager : Node
             GetTree().CurrentScene.AddChild(_recorder);
         }
 
-        Log.Debug("ReplaySystemManager reset after scene change", "ReplaySystemManager");
+        // Start recording immediately after scene reset
+        TryStartRollingRecordingIfNeeded(true);
+
+        Log.Info("ReplaySystemManager reset after scene change", "ReplaySystemManager");
     }
     #endregion
 
     #region Event Handlers
     private void OnPlayerDied(MarrieGame.Core.Models.PlayerDeath death)
     {
-        // Check if we have current recording data
-        bool hasCurrentRecording = _recorder?.HasRecordedData ?? false;
-        
-        if (!hasCurrentRecording)
+        // In rolling window mode, we always have a recording running
+        // Just save the current rolling window as a death record
+        if (_recorder == null || !_recorder.HasRecordedData)
         {
             Log.Warning("No replay data available for death (no current recording)", "ReplaySystemManager");
             return;
         }
-        // Always stop current recording and save death record
-    _recorder.StopRecording();
-    SaveDeathRecord(death.Position);
+        
+        // Save the current rolling window recording as a death record
+        SaveDeathRecord(death.Position);
 
-    // Defensive: ensure no ReplayGem is left at the player's death position.
-    // Gems should only appear on game restart (or be placed manually in scenes).
-    CleanupCurrentGem();
+        // Don't stop the recorder - it will restart automatically for the next rolling window
+        // Defensive: ensure no ReplayGem is left at the player's death position.
+        CleanupCurrentGem();
 
-    // Important event - player deaths should be tracked for debugging
-    Log.Info($"Player death recorded at {death.Position} (Total deaths: {_deathRecords.Count})", "ReplaySystemManager");
+        // Important event - player deaths should be tracked for debugging
+        Log.Info($"Player death recorded at {death.Position} (Total deaths: {_deathRecords.Count})", "ReplaySystemManager");
     }
 
     private void OnGameRestart()
@@ -206,13 +235,8 @@ public partial class ReplaySystemManager : Node
             _currentDeathId = "";
         }
         
-        // Restart recording for new session
-        if (_recorder != null)
-        {
-            _recorder.RefreshCharacterCache();
-            _recorder.ClearRecording(); // Clear current recording data
-            _recorder.StartRecording(); // Start fresh recording
-        }
+        // Restart rolling recording for new session (always force restart to ensure clean state)
+        TryStartRollingRecordingIfNeeded(true);
         
         // Do NOT automatically create a new ReplayGem on game restart.
         // Reuse an existing gem if present; otherwise only notify the player
@@ -243,17 +267,39 @@ public partial class ReplaySystemManager : Node
     private void SaveDeathRecord(Vector2 deathPosition)
     {
         _currentDeathId = GenerateDeathId();
-        // FIXED: Use _deathRecords.Count as the next sequence (0, 1, 2, etc.)
-        var record = new DeathRecord(_currentDeathId, deathPosition, _deathRecords.Count)
+        
+        DeathRecord recordToSave = null;
+        
+        // Prefer the current rolling record if available and recent
+        if (_currentRollingRecord != null)
         {
-            PlayerFrames = _recorder.GetPlayerFrames(),
-            MonsterFrames = _recorder.GetMonsterFrames()
-        };
+            recordToSave = new DeathRecord(_currentDeathId, deathPosition, 0)
+            {
+                PlayerFrames = _currentRollingRecord.PlayerFrames,
+                MonsterFrames = _currentRollingRecord.MonsterFrames
+            };
+        }
+        // Fallback to current recorder data if no rolling record exists
+        else if (_recorder != null && _recorder.HasRecordedData)
+        {
+            recordToSave = new DeathRecord(_currentDeathId, deathPosition, 0)
+            {
+                PlayerFrames = _recorder.GetPlayerFrames(),
+                MonsterFrames = _recorder.GetMonsterFrames()
+            };
+        }
 
-        _deathRecords[_currentDeathId] = record;
+        if (recordToSave == null)
+        {
+            Log.Warning("No replay data available to save for death", "ReplaySystemManager");
+            return;
+        }
 
-        var stats = _recorder.GetStats();
-        Log.Replay($"Death record saved: {record.TotalFrames} frames, {stats.duration:F1}s duration at position {deathPosition}", "ReplaySystemManager");
+        // Clear previous death records (keep only the latest for rolling behavior)
+        _deathRecords.Clear();
+        _deathRecords[_currentDeathId] = recordToSave;
+
+        Log.Replay($"Death record saved: {recordToSave.TotalFrames} frames at position {deathPosition}", "ReplaySystemManager");
         
         // NOTE: Do not notify the player here (at death) — notifications should appear
         // when the scene/session is (re)started so the player sees replay availability
@@ -326,6 +372,195 @@ public partial class ReplaySystemManager : Node
                 catch { }
             }
         }
+
+        // Pause or resume the rolling recorder depending on reality
+        if (newReality == Reality.PastReality)
+        {
+            // If player is replaying the past, pause the main rolling recorder
+            if (_recorder != null && _recorder.IsRecording && !_recorderPausedForReplay)
+            {
+                _recorder.StopRecording();
+                _recorderPausedForReplay = true;
+                Log.Debug("Paused rolling recorder for replay (past reality)", "ReplaySystemManager");
+            }
+        }
+        else
+        {
+            // Return to current reality: resume rolling recorder and start new window
+            if (_recorderPausedForReplay)
+            {
+                _recorderPausedForReplay = false;
+                TryStartRollingRecordingIfNeeded(true); // Force restart after replay
+                Log.Debug("Resumed rolling recorder after replay (current reality)", "ReplaySystemManager");
+            }
+            else
+            {
+                // Ensure we have a rolling recording active
+                TryStartRollingRecordingIfNeeded(true); // Force to ensure it's working
+            }
+        }
+    }
+
+    private bool IsInCurrentReality()
+    {
+        return !RealityManager.IsInstanceAvailable || RealityManager.Instance.CurrentReality == Reality.CurrentReality;
+    }
+
+    private void TryStartRollingRecordingIfNeeded(bool forceRestart = false)
+    {
+        if (!IsInCurrentReality()) return;
+        if (_recorder == null) return;
+
+        if (forceRestart)
+        {
+            Log.Debug("Force restarting rolling recording", "ReplaySystemManager");
+            StopRollingRecording();
+            StartRollingRecording();
+            return;
+        }
+
+        if (!_recorder.IsRecording)
+        {
+            Log.Debug("Starting rolling recording (recorder not active)", "ReplaySystemManager");
+            StartRollingRecording();
+        }
+        else
+        {
+            // Already recording: ensure rolling window timer is running
+            if (_rollingRecordingStartMs == 0)
+            {
+                _rollingRecordingStartMs = (long)(Time.GetUnixTimeFromSystem() * 1000);
+                Log.Debug("Set rolling recording start timestamp", "ReplaySystemManager");
+            }
+            
+            // Ensure the rolling window timer is running
+            if (_rollingWindowTimer != null)
+            {
+                if (_rollingWindowTimer.IsStopped())
+                {
+                    _rollingWindowTimer.Start();
+                    Log.Debug("Started rolling window timer (was stopped)", "ReplaySystemManager");
+                }
+            }
+            else
+            {
+                Log.Warning("Rolling window timer is null - recreating", "ReplaySystemManager");
+                SetupRollingWindowTimer();
+                if (_rollingWindowTimer != null)
+                {
+                    _rollingWindowTimer.Start();
+                }
+            }
+        }
+    }
+
+    private void StartRollingRecording()
+    {
+        if (_recorder == null) 
+        {
+            Log.Warning("Cannot start rolling recording - recorder is null", "ReplaySystemManager");
+            return;
+        }
+        
+        // Clear previous recording data and start fresh
+        _recorder.ClearRecording();
+        _recorder.StartRecording();
+        _rollingRecordingStartMs = (long)(Time.GetUnixTimeFromSystem() * 1000);
+        
+        // Ensure rolling window timer is set up and started
+        if (_rollingWindowTimer == null)
+        {
+            Log.Debug("Rolling window timer is null during StartRollingRecording - setting up", "ReplaySystemManager");
+            SetupRollingWindowTimer();
+        }
+        
+        if (_rollingWindowTimer != null)
+        {
+            _rollingWindowTimer.Start();
+            Log.Info($"Started rolling recording with {_recordWindowSeconds}s window", "ReplaySystemManager");
+        }
+        else
+        {
+            Log.Error("Failed to create rolling window timer", "ReplaySystemManager");
+        }
+    }
+
+    private void StopRollingRecording()
+    {
+        if (_recorder == null) return;
+        
+        if (_recorder.IsRecording)
+        {
+            _recorder.StopRecording();
+            Log.Debug("Stopped rolling recording", "ReplaySystemManager");
+        }
+        
+        _rollingRecordingStartMs = 0;
+        
+        // Stop the rolling window timer
+        if (_rollingWindowTimer != null)
+        {
+            _rollingWindowTimer.Stop();
+            Log.Debug("Stopped rolling window timer", "ReplaySystemManager");
+        }
+    }
+
+    private void SetupRollingWindowTimer()
+    {
+        // Clean up existing timer
+        if (_rollingWindowTimer != null)
+        {
+            _rollingWindowTimer.Timeout -= OnRollingWindowComplete; // Disconnect signal
+            _rollingWindowTimer.Stop();
+            _rollingWindowTimer.QueueFree();
+            _rollingWindowTimer = null;
+        }
+
+        // Create new timer for rolling window management
+        _rollingWindowTimer = new Timer();
+        _rollingWindowTimer.WaitTime = _recordWindowSeconds;
+        _rollingWindowTimer.Autostart = false;
+        _rollingWindowTimer.OneShot = false; // Repeat every _recordWindowSeconds
+        _rollingWindowTimer.Timeout += OnRollingWindowComplete;
+        AddChild(_rollingWindowTimer);
+        
+        Log.Debug($"Set up rolling window timer with {_recordWindowSeconds}s interval", "ReplaySystemManager");
+    }
+
+    private void OnRollingWindowComplete()
+    {
+        // Only process if we're in current reality and not paused for replay
+        if (!IsInCurrentReality() || _recorderPausedForReplay)
+        {
+            // If paused for replay, restart the timer to continue when we return
+            if (_rollingWindowTimer != null && !_rollingWindowTimer.IsStopped())
+            {
+                _rollingWindowTimer.Start();
+            }
+            return;
+        }
+
+        if (_recorder != null && _recorder.IsRecording)
+        {
+            // Always store current recording as the rolling window record, regardless of duration
+            _currentRollingRecord = new DeathRecord($"rolling_{Time.GetUnixTimeFromSystem()}", Vector2.Zero, 0)
+            {
+                PlayerFrames = _recorder.GetPlayerFrames(),
+                MonsterFrames = _recorder.GetMonsterFrames()
+            };
+            
+            var stats = _recorder.GetStats();
+            Log.Debug($"Rolling window completed: {stats.duration:F1}s recorded ({_currentRollingRecord.TotalFrames} frames)", "ReplaySystemManager");
+
+            // Start new rolling window - this clears old data and starts fresh
+            StartRollingRecording();
+        }
+        else
+        {
+            // If not recording, start recording to ensure continuous operation
+            Log.Debug("Rolling window timer fired but recorder not active - starting recording", "ReplaySystemManager");
+            StartRollingRecording();
+        }
     }
 
     /// <summary>
@@ -342,14 +577,25 @@ public partial class ReplaySystemManager : Node
     #region Public API (for ReplayGem to call)
     public bool HasReplayData()
     {
-        // In PuzzleMode, check if we have current recording data even without death records
-        if (_currentRecordingMode == ReplayRecordingMode.PuzzleMode)
+        // Check death records first (highest priority)
+        if (_deathRecords.Count > 0)
         {
-            return (_recorder?.HasRecordedData ?? false) || _deathRecords.Count > 0;
+            return true;
         }
         
-        // In DeathMode, only return true if we have previous death records to replay
-        return _deathRecords.Count > 0;
+        // Check if we have a current rolling record with data
+        if (_currentRollingRecord != null && _currentRollingRecord.TotalFrames > 0)
+        {
+            return true;
+        }
+        
+        // Check if recorder has current data (fallback)
+        if (_recorder != null && _recorder.HasRecordedData)
+        {
+            return true;
+        }
+        
+        return false;
     }
 
     /// <summary>
@@ -376,52 +622,67 @@ public partial class ReplaySystemManager : Node
         return (_deathRecords.Count, totalFrames);
     }
 
+    /// <summary>
+    /// Configure the rolling record window length (seconds).
+    /// Must be > 0.
+    /// </summary>
+    public void SetRecordWindowSeconds(float seconds)
+    {
+        if (seconds <= 0) return;
+        _recordWindowSeconds = seconds;
+        
+        // Update the timer if it exists
+        if (_rollingWindowTimer != null)
+        {
+            _rollingWindowTimer.WaitTime = _recordWindowSeconds;
+        }
+    }
+
     public DeathRecord GetLastDeathRecord()
     {
-        // In PuzzleMode, create a virtual death record from current recording data if no real deaths exist
-        if (_currentRecordingMode == ReplayRecordingMode.PuzzleMode && _deathRecords.Count == 0)
+        // Always try death records first (from actual player deaths)
+        if (_deathRecords.Count > 0)
         {
-            if (_recorder != null && _recorder.HasRecordedData)
+            var latestRecord = _deathRecords.Values.FirstOrDefault();
+            Log.Debug($"Returning latest death record: {latestRecord?.DeathId}", "ReplaySystemManager");
+            return latestRecord;
+        }
+        
+        // If no death records, check if we have a current rolling record available
+        if (_currentRollingRecord != null && _currentRollingRecord.TotalFrames > 0)
+        {
+            Log.Debug($"Returning current rolling record with {_currentRollingRecord.TotalFrames} frames", "ReplaySystemManager");
+            return _currentRollingRecord;
+        }
+        
+        // Fallback to current recorder data if recording is active
+        if (_recorder != null && _recorder.HasRecordedData)
+        {
+            try
             {
                 var (playerFrames, monsterFrames, duration) = _recorder.GetCurrentRecordingData();
                 
                 if (playerFrames.Count > 0)
                 {
-                    // Create a virtual death record for puzzle mode
-                    var virtualRecord = new DeathRecord("puzzle_session", Vector2.Zero, 0)
+                    // Create a virtual record from current recording data
+                    var virtualRecord = new DeathRecord($"current_session_{Time.GetUnixTimeFromSystem()}", Vector2.Zero, 0)
                     {
                         PlayerFrames = playerFrames,
                         MonsterFrames = monsterFrames
                     };
 
-                    Log.Debug($"Created virtual death record for PuzzleMode with {playerFrames.Count} player frames", "ReplaySystemManager");
+                    Log.Debug($"Created virtual record from current recording with {playerFrames.Count} player frames", "ReplaySystemManager");
                     return virtualRecord;
                 }
             }
-            
-            // In puzzle mode, it's normal to have no death records initially
-            Log.Debug("No recording data available for PuzzleMode replay", "ReplaySystemManager");
-            return null;
-        }
-
-        // Use death sequence to break timestamp ties, ensuring latest death is selected
-        if (_deathRecords.Count > 0)
-        {
-            var latestRecord = _deathRecords.Values
-                .OrderByDescending(record => record.DeathTime)
-                .ThenByDescending(record => record.DeathSequence) // Break ties with sequence number
-                .FirstOrDefault();
-            
-            return latestRecord;
+            catch (System.Exception ex)
+            {
+                Log.Warning($"Failed to get current recording data: {ex.Message}", "ReplaySystemManager");
+            }
         }
         
-        // Only show warning in DeathMode, as PuzzleMode is expected to not have death records initially
-        if (_currentRecordingMode == ReplayRecordingMode.DeathMode)
-        {
-            Log.Warning("No death records available", "ReplaySystemManager");
-            // Also surface this to the player via the message UI
-            try { UIManager.ShowGameplayMessage("No replay available."); } catch { }
-        }
+        // No replay data available
+        Log.Debug($"No replay data available - DeathRecords: {_deathRecords.Count}, RollingRecord: {(_currentRollingRecord != null ? _currentRollingRecord.TotalFrames : 0)} frames, Recorder: {(_recorder?.HasRecordedData ?? false)}", "ReplaySystemManager");
         return null;
     }
     #endregion
