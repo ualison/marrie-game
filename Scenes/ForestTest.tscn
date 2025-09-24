@@ -1,0 +1,88 @@
+[gd_scene load_steps=14 format=3 uid="uid://2dfvproskxs7"]
+
+[ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="1_4idgl"]
+[ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="2_sm6w1"]
+[ext_resource type="PackedScene" uid="uid://bprvmud1sukcc" path="res://Prefabs/Environment.tscn" id="3_ibdem"]
+[ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_t0xha"]
+[ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="6_vq088"]
+[ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="7_m7gvu"]
+[ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="8_tvg5r"]
+[ext_resource type="Script" uid="uid://sdqhqn52n3xp" path="res://Scripts/Systems/InfiniteForestManager.cs" id="9_elyxe"]
+[ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="10_0rdwx"]
+[ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="11_efeo8"]
+[ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="12_tpiq0"]
+[ext_resource type="PackedScene" uid="uid://byspjo0wirw6v" path="res://Prefabs/Catapult.tscn" id="13_4idgl"]
+[ext_resource type="PackedScene" uid="uid://dfauk4svx1fjh" path="res://Prefabs/Puff.tscn" id="13_sadiq"]
+
+[node name="Root" type="Node2D"]
+
+[node name="UserInterface" parent="." instance=ExtResource("1_4idgl")]
+
+[node name="CameraFollower" parent="." instance=ExtResource("2_sm6w1")]
+FollowOffset = Vector2(0, -200)
+TargetPath = NodePath("../GameEntities/Player")
+SmoothSpeed = 10.0
+
+[node name="Environment" parent="." instance=ExtResource("3_ibdem")]
+
+[node name="GameEntities" type="Node2D" parent="."]
+
+[node name="Player" parent="GameEntities" instance=ExtResource("4_t0xha")]
+position = Vector2(-62, 130)
+
+[node name="GameSystems" type="Node" parent="."]
+
+[node name="Managers" type="Node" parent="GameSystems"]
+
+[node name="SceneLifecycleManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("6_vq088")
+
+[node name="PlayerStateManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("7_m7gvu")
+
+[node name="UIManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("8_tvg5r")
+
+[node name="InfinityForestManager" type="Node2D" parent="GameSystems/Managers" node_paths=PackedStringArray("PlayerCamera")]
+position = Vector2(-19, -44)
+script = ExtResource("9_elyxe")
+EnvironmentChunkPrefab = ExtResource("3_ibdem")
+PlayerCamera = NodePath("../../../CameraFollower")
+
+[node name="AudioSystem" type="Node" parent="GameSystems"]
+
+[node name="AudioSystem" type="Node" parent="."]
+
+[node name="AudioManager" type="AudioStreamPlayer2D" parent="AudioSystem"]
+stream = ExtResource("10_0rdwx")
+volume_db = 6.038
+autoplay = true
+script = ExtResource("11_efeo8")
+
+[node name="SceneSwicherCrystal" parent="." instance=ExtResource("12_tpiq0")]
+position = Vector2(-184, 232)
+TargetScenePath = "uid://djkt6xtpabbyo"
+
+[node name="Puff" parent="." instance=ExtResource("13_sadiq")]
+position = Vector2(84, 240)
+FollowSpeed = 100.0
+FollowDistance = 100.0
+MinFollowDistance = 75.0
+AttackRange = 150.0
+AerialAttackRangeMultiplier = 0.9
+AttackCommandRangeMultiplier = 8.0
+AttackGiveUpRangeMultiplier = 15.0
+JumpHeight = 75.0
+AttackCooldown = 1.0
+MonsterAvoidanceDistance = 100.0
+MonsterAvoidanceForce = 150.0
+
+[node name="Catapult" parent="." instance=ExtResource("13_4idgl")]
+z_index = -1
+position = Vector2(310, 155)
+PushForce = 1150.0
+WheelRotationSpeed = 55.0
+BodyGravityScale = 1.5
+LaunchSpeed = 750.0
+TrajectorySamples = 60
+TrajectorySampleDt = 0.07

@@ -32,7 +32,7 @@ ApplePrefab = ExtResource("5_p64kh")
 MinApplesPerTree = 5
 MaxApplesPerTree = 5
 ApplePlacementRadius = 60.0
-ApplePlacementOffsetY = -140.0
+ApplePlacementOffsetY = -100.0
 AppleMinSpacing = 60.0
 BranchAttachmentRadius = 50.0
 

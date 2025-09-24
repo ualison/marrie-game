@@ -562,9 +562,26 @@ public partial class Catapult : Node2D, IPausable
 		else if (_spoonPivot != null) startPos = _spoonPivot.GlobalPosition;
 		else startPos = GlobalPosition;
 
-		// Get gravity from project settings - use positive value since we're working in screen coordinates
-		float gravity = ProjectSettings.HasSetting("physics/2d/default_gravity") ? (float)ProjectSettings.GetSetting("physics/2d/default_gravity") : 980f;
-		gravity *= TrajectoryGravityScale;
+		// Determine the effective gravity that the Puff will experience so the preview
+		// matches the actual launch. Prefer the Puff instance's physics gravity when
+		// available (RigidBody2D.GravityScale or exported gravity_scale), otherwise
+		// fall back to project default multiplied by TrajectoryGravityScale.
+		float defaultGravity = ProjectSettings.HasSetting("physics/2d/default_gravity") ? (float)ProjectSettings.GetSetting("physics/2d/default_gravity") : 980f;
+		float gravity = defaultGravity * TrajectoryGravityScale;
+
+		try
+		{
+			var puffNodes = GetTree().GetNodesInGroup("puff");
+			if (puffNodes.Count > 0)
+			{
+				var maybeRigid = puffNodes[0] as RigidBody2D;
+				if (maybeRigid != null)
+				{
+					gravity = defaultGravity * maybeRigid.GravityScale;
+				}
+			}
+		}
+		catch { /* keep default gravity if anything goes wrong */ }
 
 		// Use the exported launch angle for catapult trajectory
 		float angleRad = Mathf.DegToRad(LaunchAngleDegrees);
