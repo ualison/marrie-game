@@ -18,3 +18,12 @@ texture = ExtResource("1_yaj4r")
 position = Vector2(0, -82)
 scale = Vector2(0.037623778, 0.033910327)
 texture = ExtResource("2_wnvcy")
+
+[node name="PromptLabel" type="Label" parent="."]
+offset_left = -54.0
+offset_top = -140.0
+offset_right = 59.0
+offset_bottom = -110.0
+text = "Press E to talk."
+horizontal_alignment = 1
+vertical_alignment = 1

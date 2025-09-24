@@ -60,6 +60,9 @@ namespace MarrieGame.Scripts.Dialog
         [JsonPropertyName("guardianStays")]
         public bool GuardianStays { get; set; }
         
+        [JsonPropertyName("hazeStays")]
+        public bool HazeStays { get; set; }
+        
         [JsonPropertyName("isCorrect")]
         public bool IsCorrect { get; set; }
     }

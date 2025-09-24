@@ -1,113 +1,73 @@
 {
   "dialogs": [
 	{
-	  "id": "guardian_encounter",
-	  "npcId": "haze_guardian",
-	  "text": "I am the mystical Haze. Answer my enigma correctly to claim the crystal treasure.",
+	  "id": "haze_encounter",
+	  "npcId": "haze_monster",
+	  "text": "I am the Haze Monster. You're trapped here now, where IT stalks between the trees, devouring all who enter. Answer my riddles or wander these woods until the creature finds you. No one survives the hunt.The shadows stir. It comes. Are you ready?",
 	  "askContinue": true,
 	  "choices": [
 		{
 		  "text": "YES",
-		  "nextDialog": "riddle_question"
+		  "nextDialog": "dark_questions"
 		},
 		{
 		  "text": "NO",
 		  "action": "cancel",
-		  "guardianStays": true
+		  "hazeStays": true
 		}
 	  ]
 	},
 	{
-	  "id": "riddle_question", 
-	  "npcId": "haze_guardian",
+	  "id": "dark_questions", 
+	  "npcId": "haze_monster",
 	  "questions": [
 		{
-		  "text": "What has keys but no locks, space but no room, and you can enter but not go inside?",
+		  "text": "I am born from your deepest fears, yet I have no form. I grow stronger when you resist me, weaker when you embrace me. What am I?",
 		  "choices": [
 			{
-			  "text": "A piano",
+			  "text": "Anxiety",
+			  "isCorrect": true,
+			  "nextDialog": "correct_passage"
+			},
+			{
+			  "text": "Death",
 			  "isCorrect": false,
 			  "action": "wrong_answer"
 			},
 			{
-			  "text": "A keyboard",
-			  "isCorrect": true,
-			  "nextDialog": "correct_reward"
-			},
-			{
-			  "text": "A map",
+			  "text": "Darkness",
 			  "isCorrect": false,
 			  "action": "wrong_answer"
 			}
 		  ]
 		},
 		{
-		  "text": "I speak without a mouth and hear without ears. What am I?",
+		  "text": "Three brothers walk together: the first devours all he sees, the second consumes memories, the third erases existence itself. Only when united do they bring peace. Who are they?",
 		  "choices": [
 			{
-			  "text": "A ghost",
+			  "text": "Past, Present, Future",
 			  "isCorrect": false,
 			  "action": "wrong_answer"
 			},
 			{
-			  "text": "An echo",
+			  "text": "Hunger, Amnesia, Death",
 			  "isCorrect": true,
-			  "nextDialog": "correct_reward"
+			  "nextDialog": "correct_passage"
 			},
 			{
-			  "text": "The wind",
+			  "text": "War, Plague, Famine",
 			  "isCorrect": false,
 			  "action": "wrong_answer"
 			}
 		  ]
 		},
 		{
-		  "text": "What gets wetter the more it dries?",
+		  "text": "I am the silence between screams, the pause between heartbeats, the space where hope dies. Yet without me, neither joy nor sorrow could exist. What am I?",
 		  "choices": [
 			{
-			  "text": "A sponge",
-			  "isCorrect": false,
-			  "action": "wrong_answer"
-			},
-			{
-			  "text": "A towel",
+			  "text": "Emptiness",
 			  "isCorrect": true,
-			  "nextDialog": "correct_reward"
-			},
-			{
-			  "text": "A mop",
-			  "isCorrect": false,
-			  "action": "wrong_answer"
-			}
-		  ]
-		},
-		{
-		  "text": "I am not alive, but I grow; I don't have lungs, but I need air; I don't have a mouth, but water kills me. What am I?",
-		  "choices": [
-			{
-			  "text": "A plant",
-			  "isCorrect": false,
-			  "action": "wrong_answer"
-			},
-			{
-			  "text": "Fire",
-			  "isCorrect": true,
-			  "nextDialog": "correct_reward"
-			},
-			{
-			  "text": "A crystal",
-			  "isCorrect": false,
-			  "action": "wrong_answer"
-			}
-		  ]
-		},
-		{
-		  "text": "The more you take, the more you leave behind. What am I?",
-		  "choices": [
-			{
-			  "text": "Memories",
-			  "isCorrect": false,
-			  "action": "wrong_answer"
+			  "nextDialog": "correct_passage"
 			},
 			{
 			  "text": "Time",
@@ -115,34 +75,174 @@
 			  "action": "wrong_answer"
 			},
 			{
-			  "text": "Footsteps",
+			  "text": "Peace",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			}
+		  ]
+		},
+		{
+		  "text": "I have witnessed the birth of stars and their death. I have seen civilizations rise from dust and return to it. I remember everything, yet I learn nothing. What am I?",
+		  "choices": [
+			{
+			  "text": "History",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "The Universe",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "Addiction",
 			  "isCorrect": true,
-			  "nextDialog": "correct_reward"
+			  "nextDialog": "correct_passage"
+			}
+		  ]
+		},
+		{
+		  "text": "I am the mirror that shows only lies, the door that opens to nowhere, the promise that betrays itself. Yet humans seek me desperately. What am I?",
+		  "choices": [
+			{
+			  "text": "False hope",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "Escape",
+			  "isCorrect": true,
+			  "nextDialog": "correct_passage"
+			},
+			{
+			  "text": "Dreams",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			}
+		  ]
+		},
+		{
+		  "text": "I am the child of choice and parent of regret. I feed on willpower and excrete shame. The more you fight me, the stronger I become. What am I?",
+		  "choices": [
+			{
+			  "text": "Guilt",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "Temptation",
+			  "isCorrect": true,
+			  "nextDialog": "correct_passage"
+			},
+			{
+			  "text": "Sin",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			}
+		  ]
+		},
+		{
+		  "text": "I am the prison with no walls, the chain with no metal, the cage built from whispered lies. My bars are made of 'just one more time.' What am I?",
+		  "choices": [
+			{
+			  "text": "Self-deception",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "Denial",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "Dependency",
+			  "isCorrect": true,
+			  "nextDialog": "correct_passage"
+			}
+		  ]
+		},
+		{
+		  "text": "I am the thief who steals by giving, the poison that tastes like medicine, the friend who destroys while embracing. What am I?",
+		  "choices": [
+			{
+			  "text": "Betrayal",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "Substance",
+			  "isCorrect": true,
+			  "nextDialog": "correct_passage"
+			},
+			{
+			  "text": "Love",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			}
+		  ]
+		},
+		{
+		  "text": "I am the eclipse of the soul, the shadow that devours light, the hunger that grows by feeding. I am both the question and the answer to human suffering. What am I?",
+		  "choices": [
+			{
+			  "text": "Despair",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "Evil",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "The void within",
+			  "isCorrect": true,
+			  "nextDialog": "correct_passage"
+			}
+		  ]
+		},
+		{
+		  "text": "I am the final riddle: I am born when you first say 'never again' and I die when you truly mean it. I am the distance between who you are and who you could be. What am I?",
+		  "choices": [
+			{
+			  "text": "Regret",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "The cycle of relapse",
+			  "isCorrect": true,
+			  "nextDialog": "correct_passage"
+			},
+			{
+			  "text": "Hope",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
 			}
 		  ]
 		}
 	  ]
 	},
 	{
-	  "id": "correct_reward",
-	  "npcId": "haze_guardian",
-	  "text": "Wisely answered! The puzzle crystal is yours to claim.",
+	  "id": "correct_passage",
+	  "npcId": "haze_monster",
+	  "text": "You have seen through the darkness and understood the shadows within. You may pass, enlightened one. The path ahead is clearer now.",
 	  "reward": {
-		"item": "puzzle_crystal",
+		"item": "shadow_insight",
 		"quantity": 1
 	  },
 	  "action": "complete_quest"
 	},
 	{
 	  "id": "wrong_answer_result",
-	  "text": "The Haze shimmers with disappointment and fades into the ethereal mist.",
-	  "action": "guardian_disappears"
+	  "text": "The haze thickens around you, and the monster's laughter echoes as you are consumed by the shadows of your own ignorance.",
+	  "action": "haze_consumes"
 	}
   ],
   "actions": {
-	"cancel": "Player can talk to Haze again later",
-	"wrong_answer": "Haze disappears permanently",
-	"guardian_disappears": "Remove Haze NPC from scene",
-	"complete_quest": "Haze gives puzzle crystal reward and completes quest"
+	"cancel": "Player can encounter haze monster again later",
+	"wrong_answer": "Player is consumed by the haze permanently",
+	"haze_consumes": "Player loses the encounter and faces consequences",
+	"complete_quest": "Haze monster grants passage and wisdom"
   }
 }

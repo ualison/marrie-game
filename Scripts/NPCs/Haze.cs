@@ -20,6 +20,11 @@ public partial class Haze : Node2D
     private bool _playerNearby = false;
     private bool _hasDisappeared = false;
     private bool _crystalSpawned = false;
+    
+    // Crystal animation state
+    private Tween _crystalFloatingTween;
+    private Tween _crystalBrightnessTween;
+    private Vector2 _originalCrystalPosition;
     #endregion
 
     #region Initialization
@@ -36,11 +41,22 @@ public partial class Haze : Node2D
         _hazeSprite = GetNodeOrNull<Sprite2D>("HazeSprite");
         _crystalSprite = GetNodeOrNull<Sprite2D>("CrystalSprite");
         
+        // Store original crystal position and start animations
+        if (_crystalSprite != null)
+        {
+            _originalCrystalPosition = _crystalSprite.Position;
+            _crystalSprite.Modulate = Colors.White;
+            StartCrystalAnimations();
+        }
+        
         // Load PuzzleCrystal scene if not set in editor
         if (_sceneSwitcherCrystalScene == null)
         {
             _sceneSwitcherCrystalScene = GD.Load<PackedScene>("res://Prefabs/SceneSwitcherCrystal.tscn");
         }
+        
+        // Get existing prompt label from prefab
+        _promptLabel = GetNodeOrNull<Label>("PromptLabel");
         
         // Create detection area
         _detectionArea = new Area2D();
@@ -55,20 +71,13 @@ public partial class Haze : Node2D
         collisionShape.Shape = circleShape;
         _detectionArea.AddChild(collisionShape);
         
-        // Create prompt label
-        _promptLabel = new Label();
-        _promptLabel.Name = "PromptLabel";
-        _promptLabel.Text = "Press E to talk";
-        _promptLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        _promptLabel.Position = new Vector2(-50, -120);
-        _promptLabel.Size = new Vector2(100, 30);
-        _promptLabel.Hide();
-        AddChild(_promptLabel);
-        
-        // Style the prompt label
-        _promptLabel.AddThemeColorOverride("font_color", Colors.White);
-        _promptLabel.AddThemeColorOverride("font_shadow_color", Colors.Black);
-        _promptLabel.AddThemeFontSizeOverride("font_size", 14);
+        // Style the existing prompt label
+        if (_promptLabel != null)
+        {
+            _promptLabel.AddThemeColorOverride("font_color", Colors.White);
+            _promptLabel.AddThemeColorOverride("font_shadow_color", Colors.Black);
+            _promptLabel.AddThemeFontSizeOverride("font_size", 14);
+        }
         
         // Connect signals and setup after everything is created
         ConnectSignals();
@@ -130,6 +139,14 @@ public partial class Haze : Node2D
             {
                 _promptLabel.Hide();
             }
+            
+            // Close any active dialog when player moves away
+            if (DialogManager.Instance != null && DialogManager.Instance.IsDialogActive())
+            {
+                DialogManager.Instance.CloseDialog();
+                GD.Print("Player left Haze - closing active dialog");
+            }
+            
             GD.Print("Player left Haze - hiding prompt");
         }
     }
@@ -141,7 +158,7 @@ public partial class Haze : Node2D
         if (DialogManager.Instance != null && !DialogManager.Instance.IsDialogActive())
         {
             _promptLabel.Hide();
-            DialogManager.Instance.StartDialog("guardian_encounter", this);
+            DialogManager.Instance.StartDialog("haze_encounter", this);
             GD.Print("Starting Haze dialog");
         }
     }
@@ -162,10 +179,97 @@ public partial class Haze : Node2D
     #endregion
 
     #region Visual Effects
+    private void StartCrystalAnimations()
+    {
+        if (_crystalSprite == null) return;
+        
+        StartCrystalFloatingAnimation();
+        StartCrystalBrightnessAnimation();
+    }
+    
+    private void StartCrystalFloatingAnimation()
+    {
+        if (_crystalSprite == null) return;
+        
+        // Stop existing tween
+        if (_crystalFloatingTween != null)
+        {
+            _crystalFloatingTween.Kill();
+            _crystalFloatingTween = null;
+        }
+        
+        // Create new floating tween
+        _crystalFloatingTween = CreateTween();
+        _crystalFloatingTween.SetLoops();
+        
+        // Reset to original position
+        _crystalSprite.Position = _originalCrystalPosition;
+        
+        // Floating motion: up -> down -> back to original
+        var floatingDistance = 5.0f;
+        var floatingDuration = 2.0f;
+        
+        var upPosition = new Vector2(_originalCrystalPosition.X, _originalCrystalPosition.Y - floatingDistance);
+        var downPosition = new Vector2(_originalCrystalPosition.X, _originalCrystalPosition.Y + floatingDistance);
+        
+        _crystalFloatingTween.TweenProperty(_crystalSprite, "position", upPosition, floatingDuration / 2.0f);
+        _crystalFloatingTween.TweenProperty(_crystalSprite, "position", downPosition, floatingDuration);
+        _crystalFloatingTween.TweenProperty(_crystalSprite, "position", _originalCrystalPosition, floatingDuration / 2.0f);
+    }
+    
+    private void StartCrystalBrightnessAnimation()
+    {
+        if (_crystalSprite == null) return;
+        
+        // Stop existing tween
+        if (_crystalBrightnessTween != null)
+        {
+            _crystalBrightnessTween.Kill();
+            _crystalBrightnessTween = null;
+        }
+        
+        // Create brightness pulsing tween
+        _crystalBrightnessTween = CreateTween();
+        _crystalBrightnessTween.SetLoops();
+        
+        var normal = Colors.White;
+        var bright = new Color(1.6f, 1.6f, 1.6f, 1.0f);
+        var pulseDuration = 1.5f;
+        
+        // Pulse: normal -> bright -> normal
+        _crystalBrightnessTween.TweenProperty(_crystalSprite, "modulate", bright, pulseDuration / 2.0f);
+        _crystalBrightnessTween.TweenProperty(_crystalSprite, "modulate", normal, pulseDuration / 2.0f);
+    }
+    
+    private void StopCrystalAnimations()
+    {
+        if (_crystalFloatingTween != null)
+        {
+            _crystalFloatingTween.Kill();
+            _crystalFloatingTween = null;
+        }
+        
+        if (_crystalBrightnessTween != null)
+        {
+            _crystalBrightnessTween.Kill();
+            _crystalBrightnessTween = null;
+        }
+        
+        // Reset crystal to original state
+        if (_crystalSprite != null)
+        {
+            _crystalSprite.Modulate = Colors.White;
+            _crystalSprite.Position = _originalCrystalPosition;
+        }
+    }
+
     private void DisappearWithAnimation()
     {
         _hasDisappeared = true;
         _promptLabel.Hide();
+        
+        // Stop crystal animations before fading out
+        StopCrystalAnimations();
         
         // Fade out animation
         var tween = CreateTween();
@@ -188,6 +292,9 @@ public partial class Haze : Node2D
     {
         _hasDisappeared = true;
         _promptLabel.Hide();
+        
+        // Stop crystal animations before fading out
+        StopCrystalAnimations();
         
         // Fade out animation
         var tween = CreateTween();
@@ -273,6 +380,9 @@ public partial class Haze : Node2D
             _detectionArea.BodyEntered -= OnPlayerEntered;
             _detectionArea.BodyExited -= OnPlayerExited;
         }
+        
+        // Clean up crystal animation tweens
+        StopCrystalAnimations();
     }
     #endregion
 }

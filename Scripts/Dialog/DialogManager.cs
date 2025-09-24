@@ -2,6 +2,7 @@ using Godot;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System;
 using MarrieGame.Scripts.Dialog;
 
 /// <summary>
@@ -123,11 +124,22 @@ public partial class DialogManager : Node
         _currentNPC = npc;
         
         ShowDialog(dialog);
+        GD.Print($"Started dialog: {dialogId}");
     }
 
     public bool IsDialogActive()
     {
         return _dialogUI != null && _dialogUI.Visible;
+    }
+
+    public void CloseDialog()
+    {
+        if (_dialogUI != null && _dialogUI.Visible)
+        {
+            _dialogUI.HideDialog();
+            OnDialogClosed();
+            GD.Print("Dialog closed by external request");
+        }
     }
     #endregion
 
@@ -148,7 +160,10 @@ public partial class DialogManager : Node
 
     private void OnChoiceSelected(string choice)
     {
-        switch (choice)
+        GD.Print($"Choice selected: {choice}");
+        
+        // Handle standard responses
+        switch (choice.ToUpper())
         {
             case "YES":
                 HandleYesChoice();
@@ -156,24 +171,95 @@ public partial class DialogManager : Node
             case "NO":
                 HandleNoChoice();
                 break;
-            case "correct":
-                HandleCorrectAnswer();
+            case "CONTINUE":
+                // Handle continue button for messages like correct_passage
+                CompleteCorrectAnswer();
                 break;
-            case "wrong":
-                HandleWrongAnswer();
+            default:
+                // Handle custom choices from the JSON (including answer choices)
+                HandleCustomChoice(choice);
                 break;
+        }
+    }
+    
+    private void HandleCustomChoice(string choiceText)
+    {
+        if (_currentDialog == null) return;
+        
+        // Find the choice in current dialog
+        DialogChoice selectedChoice = null;
+        
+        // Check if we're in a question phase
+        if (_currentDialog.Questions != null && _currentDialog.Questions.Count > 0)
+        {
+            // Find the choice in the current question
+            foreach (var question in _currentDialog.Questions)
+            {
+                selectedChoice = question.Choices.FirstOrDefault(c => c.Text == choiceText);
+                if (selectedChoice != null) break;
+            }
+        }
+        else
+        {
+            // Find the choice in the main dialog
+            selectedChoice = _currentDialog.Choices.FirstOrDefault(c => c.Text == choiceText);
+        }
+        
+        if (selectedChoice != null)
+        {
+            ProcessChoice(selectedChoice);
+        }
+        else
+        {
+            GD.PrintErr($"Choice not found: {choiceText}");
+        }
+    }
+    
+    private void ProcessChoice(DialogChoice choice)
+    {
+        GD.Print($"Processing choice: {choice.Text}, IsCorrect: {choice.IsCorrect}, Action: {choice.Action}");
+        
+        if (choice.IsCorrect)
+        {
+            HandleCorrectAnswer();
+        }
+        else if (choice.Action == "wrong_answer")
+        {
+            HandleWrongAnswer();
+        }
+        else if (choice.Action == "cancel")
+        {
+            HandleNoChoice();
+        }
+        else if (!string.IsNullOrEmpty(choice.NextDialog))
+        {
+            // Navigate to next dialog
+            var nextDialog = _dialogData.Dialogs.FirstOrDefault(d => d.Id == choice.NextDialog);
+            if (nextDialog != null)
+            {
+                _currentDialog = nextDialog;
+                ShowDialog(nextDialog);
+            }
         }
     }
 
     private void HandleYesChoice()
     {
-        // Move to the question phase
-        var questionDialog = _dialogData.Dialogs.FirstOrDefault(d => d.Id == "riddle_question");
+        // Move to the question phase - look for "dark_questions" dialog
+        var questionDialog = _dialogData.Dialogs.FirstOrDefault(d => d.Id == "dark_questions");
         if (questionDialog != null)
         {
             _currentDialog = questionDialog;
-            var randomQuestion = questionDialog.Questions[_random.Next(questionDialog.Questions.Count)];
-            _dialogUI.ShowQuestion(randomQuestion);
+            if (questionDialog.Questions != null && questionDialog.Questions.Count > 0)
+            {
+                var randomQuestion = questionDialog.Questions[_random.Next(questionDialog.Questions.Count)];
+                _dialogUI.ShowQuestion(randomQuestion);
+                GD.Print($"Showing random question: {randomQuestion.Text.Substring(0, Math.Min(50, randomQuestion.Text.Length))}...");
+            }
+        }
+        else
+        {
+            GD.PrintErr("dark_questions dialog not found");
         }
     }
 
@@ -185,6 +271,27 @@ public partial class DialogManager : Node
 
     private void HandleCorrectAnswer()
     {
+        // Check if there's a "correct_passage" dialog to show first
+        var correctPassageDialog = _dialogData.Dialogs.FirstOrDefault(d => d.Id == "correct_passage");
+        if (correctPassageDialog != null)
+        {
+            // Show the correct passage message first
+            _currentDialog = correctPassageDialog;
+            _dialogUI.ShowInitialDialog(correctPassageDialog.Text);
+            
+            // Wait a moment then complete the correct answer
+            var timer = GetTree().CreateTimer(3.0f);
+            timer.Timeout += CompleteCorrectAnswer;
+        }
+        else
+        {
+            // No passage dialog, handle immediately
+            CompleteCorrectAnswer();
+        }
+    }
+    
+    private void CompleteCorrectAnswer()
+    {
         // Player answered correctly - let NPC handle reward spawning
         _dialogUI.HideDialog();
         
@@ -193,6 +300,8 @@ public partial class DialogManager : Node
         {
             _currentNPC.Call("OnCorrectAnswer");
         }
+        
+        GD.Print("Correct answer processed - Haze should disappear and spawn crystal");
     }
 
     private void HandleWrongAnswer()
