@@ -252,9 +252,9 @@ namespace MarrieGame.AI
             _attackCooldownTimer.Timeout += OnAttackCooldownFinished;
             AddChild(_attackCooldownTimer);
 
-            // Launching timer - prevents AI from interfering with launch physics
+            // Launching timer - backup timeout for stuck launching states
             _launchingTimer = new Timer();
-            _launchingTimer.WaitTime = 1.0f; // 1 second should be enough for launch physics
+            _launchingTimer.WaitTime = 5.0f; // 5 seconds backup timeout - launching should end naturally when hitting ground
             _launchingTimer.OneShot = true;
             _launchingTimer.Timeout += OnLaunchingFinished;
             AddChild(_launchingTimer);
@@ -294,7 +294,7 @@ namespace MarrieGame.AI
             if (_player != null)
             {
                 float distanceFromPlayer = GlobalPosition.DistanceTo(_player.GlobalPosition);
-                if (distanceFromPlayer > 1000.0f) // If Puff is more than 1000 units away
+                if (distanceFromPlayer > 1000.0f && _currentState != PuffState.Launching) // Don't teleport during launch
                 {
                     Log.Warning($"PuffAI: Too far from player ({distanceFromPlayer:F1}), teleporting back", "PuffAI");
                     // Use the same logic as in following behavior to determine safe position
@@ -349,8 +349,8 @@ namespace MarrieGame.AI
                 _collisionShape.Disabled = false;
             }
 
-            // Validate position is not NaN or infinite
-            if (!GlobalPosition.IsFinite() || GlobalPosition.Length() > 50000)
+            // Validate position is not NaN or infinite (but allow launching trajectory)
+            if (!GlobalPosition.IsFinite() || (GlobalPosition.Length() > 50000 && _currentState != PuffState.Launching))
             {
                 Log.Warning($"PuffAI: CRITICAL - Invalid position detected ({GlobalPosition}), teleporting to player!", "PuffAI");
                 if (_player != null && _player.GlobalPosition.IsFinite())
@@ -362,6 +362,17 @@ namespace MarrieGame.AI
                 {
                     GlobalPosition = Vector2.Zero; // Fallback to origin
                     Velocity = Vector2.Zero;
+                }
+            }
+            // Special case: if launching and position is NaN/infinite, that's a serious error
+            else if (!GlobalPosition.IsFinite() && _currentState == PuffState.Launching)
+            {
+                Log.Error($"PuffAI: CRITICAL - Invalid position during launch ({GlobalPosition}), ending launch!", "PuffAI");
+                if (_player != null && _player.GlobalPosition.IsFinite())
+                {
+                    GlobalPosition = _player.GlobalPosition + Vector2.Right * 50;
+                    Velocity = Vector2.Zero;
+                    ReturnToAppropriateState();
                 }
             }
         }
@@ -603,7 +614,7 @@ namespace MarrieGame.AI
 
         private void UpdateState(double delta)
         {
-            // If following is disabled, force Idle state (except during attacks)
+            // If following is disabled, force Idle state (except during attacks and launching)
             if (!_isFollowingEnabled && _currentState == PuffState.Following)
             {
                 ChangeState(PuffState.Idle);
@@ -1320,8 +1331,13 @@ namespace MarrieGame.AI
 
         private void OnLaunchingFinished()
         {
-            Log.Debug("PuffAI: Launching timer finished, returning to appropriate state", "PuffAI");
-            ReturnToAppropriateState();
+            // This is a backup timeout - launching should normally end when Puff hits the ground
+            // Only trigger this if Puff is somehow stuck in launching state
+            if (_currentState == PuffState.Launching)
+            {
+                Log.Warning("PuffAI: Launching timer timeout - forcing return to appropriate state", "PuffAI");
+                ReturnToAppropriateState();
+            }
         }
         #endregion
 
@@ -1384,7 +1400,15 @@ namespace MarrieGame.AI
         {
             // During launching state, do absolutely nothing - let the catapult-applied physics work
             // The only velocity changes should be from gravity and the initial launch velocity
-            // The launching timer will handle transitioning back to appropriate state
+            // End launching state when Puff hits the ground or collects apples
+            
+            // Check if Puff has landed on the ground
+            if (IsOnFloor())
+            {
+                Log.Debug("PuffAI: Launching ended - Puff hit the ground", "PuffAI");
+                ReturnToAppropriateState();
+                return;
+            }
             
             // Don't apply any movement or following behavior - just let physics work
             // Gravity is already applied in ApplyGravity() called from _PhysicsProcess
@@ -1520,6 +1544,13 @@ namespace MarrieGame.AI
                     ConsumeBlueApple(); // All apples now give energy instead of health
                     apple.Call("DestroyApple");
                     Log.System("PuffAI: Consumed apple for energy", "PuffAI");
+                    
+                    // End launching state if collecting apple during launch
+                    if (_currentState == PuffState.Launching)
+                    {
+                        Log.Debug("PuffAI: Launching ended - Puff collected an apple", "PuffAI");
+                        ReturnToAppropriateState();
+                    }
                 }
             }
         }
