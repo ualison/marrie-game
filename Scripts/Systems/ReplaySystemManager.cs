@@ -214,30 +214,23 @@ public partial class ReplaySystemManager : Node
             _recorder.StartRecording(); // Start fresh recording
         }
         
-        // Always create gem on game restart if we have previous deaths
-        // This ensures gem appears only on next reload, not during GameOver UI
+        // Do NOT automatically create a new ReplayGem on game restart.
+        // Reuse an existing gem if present; otherwise only notify the player
+        // that a replay is available. This avoids duplicate/automatic gem
+        // creation and keeps gem visibility controlled by reality changes.
         if (lastDeath != null)
         {
-            // If this death has already been played back, and the triggering gem
-            // still exists, reuse it instead of creating a new gem.
-            if (_playedDeathIds.Contains(lastDeath.DeathId) && _currentGem != null && IsInstanceValid(_currentGem))
+            if (_currentGem != null && IsInstanceValid(_currentGem))
             {
-                Log.Replay($"Reusing existing ReplayGem for already-played death {lastDeath.DeathId}", "ReplaySystemManager");
-                // Move gem to spawn position to be consistent with placement behavior
+                Log.Replay($"Reusing existing ReplayGem for death {lastDeath.DeathId}", "ReplaySystemManager");
                 var spawnPos = PlayerStateManager.Instance != null ? PlayerStateManager.Instance.PlayerSpawnPosition : lastDeath.DeathPosition;
                 _currentGem.ShowGem(spawnPos);
             }
             else
             {
-                // Clean up any existing gem first (should not exist, but safety check)
-                CleanupCurrentGem();
-
-                // Place gem at player's spawn position (do not place at death position anymore)
-                var spawnPos = PlayerStateManager.Instance != null ? PlayerStateManager.Instance.PlayerSpawnPosition : lastDeath.DeathPosition;
-                CreateReplayGem(spawnPos);
-                Log.Replay($"ReplayGem created on game restart at spawn position {spawnPos} (last death at {lastDeath.DeathPosition})", "ReplaySystemManager");
-
-                // Inform player a replay exists
+                // No existing gem — don't auto-create one here. Let scene logic or
+                // player actions create/show gems when appropriate. Notify player.
+                Log.Replay($"Replay available for death {lastDeath.DeathId} but no existing gem found; not auto-creating on restart", "ReplaySystemManager");
                 try { UIManager.ShowGameplayMessage("A replay is available."); } catch { }
             }
         }
