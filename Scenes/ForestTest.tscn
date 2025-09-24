@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://2dfvproskxs7"]
+[gd_scene load_steps=15 format=3 uid="uid://2dfvproskxs7"]
 
 [ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="1_4idgl"]
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="2_sm6w1"]
@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="12_tpiq0"]
 [ext_resource type="PackedScene" uid="uid://byspjo0wirw6v" path="res://Prefabs/Catapult.tscn" id="13_4idgl"]
 [ext_resource type="PackedScene" uid="uid://dfauk4svx1fjh" path="res://Prefabs/Puff.tscn" id="13_sadiq"]
+[ext_resource type="PackedScene" uid="uid://dgmpsx8qec0pg" path="res://Prefabs/Haze.tscn" id="14_sm6w1"]
 
 [node name="Root" type="Node2D"]
 
@@ -65,7 +66,7 @@ position = Vector2(-250, 233)
 TargetScenePath = "uid://djkt6xtpabbyo"
 
 [node name="Puff" parent="." instance=ExtResource("13_sadiq")]
-position = Vector2(84, 239)
+position = Vector2(-185, 237)
 FollowSpeed = 100.0
 FollowDistance = 100.0
 MinFollowDistance = 75.0
@@ -80,10 +81,13 @@ MonsterAvoidanceForce = 150.0
 
 [node name="Catapult" parent="." instance=ExtResource("13_4idgl")]
 z_index = -1
-position = Vector2(363, 156)
+position = Vector2(-587, 156)
 PushForce = 1150.0
 WheelRotationSpeed = 55.0
 BodyGravityScale = 1.5
 LaunchSpeed = 750.0
 TrajectorySamples = 60
 TrajectorySampleDt = 0.07
+
+[node name="Haze" parent="." instance=ExtResource("14_sm6w1")]
+position = Vector2(168, 224)

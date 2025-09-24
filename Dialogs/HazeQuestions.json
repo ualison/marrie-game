@@ -1,0 +1,148 @@
+{
+  "dialogs": [
+	{
+	  "id": "guardian_encounter",
+	  "npcId": "haze_guardian",
+	  "text": "I am the mystical Haze. Answer my enigma correctly to claim the crystal treasure.",
+	  "askContinue": true,
+	  "choices": [
+		{
+		  "text": "YES",
+		  "nextDialog": "riddle_question"
+		},
+		{
+		  "text": "NO",
+		  "action": "cancel",
+		  "guardianStays": true
+		}
+	  ]
+	},
+	{
+	  "id": "riddle_question", 
+	  "npcId": "haze_guardian",
+	  "questions": [
+		{
+		  "text": "What has keys but no locks, space but no room, and you can enter but not go inside?",
+		  "choices": [
+			{
+			  "text": "A piano",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "A keyboard",
+			  "isCorrect": true,
+			  "nextDialog": "correct_reward"
+			},
+			{
+			  "text": "A map",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			}
+		  ]
+		},
+		{
+		  "text": "I speak without a mouth and hear without ears. What am I?",
+		  "choices": [
+			{
+			  "text": "A ghost",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "An echo",
+			  "isCorrect": true,
+			  "nextDialog": "correct_reward"
+			},
+			{
+			  "text": "The wind",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			}
+		  ]
+		},
+		{
+		  "text": "What gets wetter the more it dries?",
+		  "choices": [
+			{
+			  "text": "A sponge",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "A towel",
+			  "isCorrect": true,
+			  "nextDialog": "correct_reward"
+			},
+			{
+			  "text": "A mop",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			}
+		  ]
+		},
+		{
+		  "text": "I am not alive, but I grow; I don't have lungs, but I need air; I don't have a mouth, but water kills me. What am I?",
+		  "choices": [
+			{
+			  "text": "A plant",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "Fire",
+			  "isCorrect": true,
+			  "nextDialog": "correct_reward"
+			},
+			{
+			  "text": "A crystal",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			}
+		  ]
+		},
+		{
+		  "text": "The more you take, the more you leave behind. What am I?",
+		  "choices": [
+			{
+			  "text": "Memories",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "Time",
+			  "isCorrect": false,
+			  "action": "wrong_answer"
+			},
+			{
+			  "text": "Footsteps",
+			  "isCorrect": true,
+			  "nextDialog": "correct_reward"
+			}
+		  ]
+		}
+	  ]
+	},
+	{
+	  "id": "correct_reward",
+	  "npcId": "haze_guardian",
+	  "text": "Wisely answered! The puzzle crystal is yours to claim.",
+	  "reward": {
+		"item": "puzzle_crystal",
+		"quantity": 1
+	  },
+	  "action": "complete_quest"
+	},
+	{
+	  "id": "wrong_answer_result",
+	  "text": "The Haze shimmers with disappointment and fades into the ethereal mist.",
+	  "action": "guardian_disappears"
+	}
+  ],
+  "actions": {
+	"cancel": "Player can talk to Haze again later",
+	"wrong_answer": "Haze disappears permanently",
+	"guardian_disappears": "Remove Haze NPC from scene",
+	"complete_quest": "Haze gives puzzle crystal reward and completes quest"
+  }
+}

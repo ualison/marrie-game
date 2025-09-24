@@ -1,0 +1,20 @@
+[gd_scene load_steps=5 format=3 uid="uid://dgmpsx8qec0pg"]
+
+[ext_resource type="Texture2D" uid="uid://dm1g6uy2xcy1c" path="res://Art/Haze.png" id="1_yaj4r"]
+[ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="2_cbi2h"]
+[ext_resource type="Texture2D" uid="uid://du8wmkhu6j7p1" path="res://Art/DimensionCrystal.png" id="2_wnvcy"]
+[ext_resource type="Script" uid="uid://dxygaxuxh7p0i" path="res://Scripts/NPCs/Haze.cs" id="3_haze_script"]
+
+[node name="Haze" type="Node2D"]
+script = ExtResource("3_haze_script")
+_sceneSwitcherCrystalScene = ExtResource("2_cbi2h")
+
+[node name="HazeSprite" type="Sprite2D" parent="."]
+position = Vector2(1.0000005, -1.0000005)
+scale = Vector2(0.15015803, 0.15203747)
+texture = ExtResource("1_yaj4r")
+
+[node name="CrystalSprite" type="Sprite2D" parent="."]
+position = Vector2(0, -82)
+scale = Vector2(0.037623778, 0.033910327)
+texture = ExtResource("2_wnvcy")

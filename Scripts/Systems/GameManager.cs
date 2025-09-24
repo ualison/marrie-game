@@ -86,6 +86,7 @@ public partial class GameManager : Node
         EnsureManagerExists<PlayerStateManager>();     // Now managed by GameManager
         EnsureManagerExists<EnemyManager>();           // Add EnemyManager for consistency
         EnsureManagerExists<UIManager>();
+        EnsureManagerExists<DialogManager>();          // Dialog system for NPCs
         EnsureManagerExists<ReplaySystemManager>();
 
         Log.EndTimer("ManagerInitialization", "All managers initialized");
