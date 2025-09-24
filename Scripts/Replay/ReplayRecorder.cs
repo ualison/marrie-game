@@ -40,6 +40,7 @@ public partial class ReplayRecorder : Node
 
     #region Character References (Simple Caching)
     private Player _cachedPlayer;
+    private PlayerLife _playerLife;
     private Monster _cachedMonster;
     private AnimatedSprite2D _playerSprite;
     private AnimatedSprite2D _monsterSprite;
@@ -101,6 +102,13 @@ public partial class ReplayRecorder : Node
             SceneLifecycleManager.SceneReady -= OnSceneReady;
         }
         
+        // Disconnect player life handlers if connected
+        if (_playerLife != null)
+        {
+            try { _playerLife.LifeChanged -= OnPlayerLifeChanged; } catch { }
+            try { _playerLife.PlayerDied -= OnPlayerDied; } catch { }
+        }
+
         if (Instance == this) Instance = null;
     }
 
@@ -150,8 +158,20 @@ public partial class ReplayRecorder : Node
         
         if (wasRecording || _cachedPlayer != null)
         {
-            StartRecording();
-            Log.Debug("ReplayRecorder reinitialized and recording restarted for new scene", "ReplayRecorder");
+            if (CurrentRecordingMode == ReplayRecordingMode.PuzzleMode)
+            {
+                StartRecording();
+                Log.Debug("ReplayRecorder reinitialized and recording restarted for new scene (PuzzleMode)", "ReplayRecorder");
+            }
+            else if (CurrentRecordingMode == ReplayRecordingMode.DeathMode && _playerLife != null && _playerLife.CurrentLife <= 1)
+            {
+                StartRecording();
+                Log.Debug("ReplayRecorder reinitialized and recording restarted for new scene (DeathMode - low life)", "ReplayRecorder");
+            }
+            else
+            {
+                Log.Debug("ReplayRecorder reinitialized but did not restart recording (DeathMode - waiting for low life)", "ReplayRecorder");
+            }
         }
         else
         {
@@ -235,8 +255,20 @@ public partial class ReplayRecorder : Node
 
         if (_cachedPlayer != null)
         {
-            StartRecording();
-            Log.Debug("ReplayRecorder initialized and started", "ReplayRecorder");
+            if (CurrentRecordingMode == ReplayRecordingMode.PuzzleMode)
+            {
+                StartRecording();
+                Log.Debug("ReplayRecorder initialized and started (PuzzleMode)", "ReplayRecorder");
+            }
+            else if (CurrentRecordingMode == ReplayRecordingMode.DeathMode && _playerLife != null && _playerLife.CurrentLife <= 1)
+            {
+                StartRecording();
+                Log.Debug("ReplayRecorder initialized and started (DeathMode - low life)", "ReplayRecorder");
+            }
+            else
+            {
+                Log.Debug("ReplayRecorder initialized but did not start (DeathMode - waiting for low life)", "ReplayRecorder");
+            }
         }
         else
         {
@@ -259,6 +291,26 @@ public partial class ReplayRecorder : Node
     public void RefreshCharacterCache()
     {
         _cachedPlayer = GetTree().GetFirstNodeInGroup("player") as Player;
+
+        // Connect to player's life system so we can start/stop recording in DeathMode
+        try
+        {
+            // Disconnect previous handlers if any
+            if (_playerLife != null)
+            {
+                try { _playerLife.LifeChanged -= OnPlayerLifeChanged; } catch { }
+                try { _playerLife.PlayerDied -= OnPlayerDied; } catch { }
+            }
+        }
+        catch { }
+
+        _playerLife = _cachedPlayer?.LifeSystem;
+        if (_playerLife != null)
+        {
+            // Subscribe to life events
+            _playerLife.LifeChanged += OnPlayerLifeChanged;
+            _playerLife.PlayerDied += OnPlayerDied;
+        }
 
         var enemies = GetTree().GetNodesInGroup("enemies").OfType<Monster>();
         _cachedMonster = enemies.FirstOrDefault(m => m.EnableFollowerBehavior) ?? enemies.FirstOrDefault();
@@ -291,6 +343,32 @@ public partial class ReplayRecorder : Node
             {
                 Log.Warning($"No visual component (AnimatedSprite2D or Sprite2D) found for monster {_cachedMonster.Name}", "ReplayRecorder");
             }
+        }
+    }
+
+    private void OnPlayerLifeChanged(int currentLife, int maxLife)
+    {
+        // Only apply the special DeathMode behaviour
+        if (CurrentRecordingMode != ReplayRecordingMode.DeathMode) return;
+
+        // Start recording when player reaches 1 life
+        if (currentLife <= 1)
+        {
+            if (!IsRecording && !_playerLife.IsDead)
+            {
+                Log.Debug($"Player reached low life ({currentLife}) - starting replay recording", "ReplayRecorder");
+                StartRecording();
+            }
+        }
+    }
+
+    private void OnPlayerDied()
+    {
+        // Ensure we stop recording when the player dies so a complete recording is available
+        if (IsRecording)
+        {
+            Log.Debug("Player died - stopping replay recording", "ReplayRecorder");
+            StopRecording();
         }
     }
 
@@ -344,6 +422,16 @@ public partial class ReplayRecorder : Node
     // UPDATED METHOD: Initialize monster recording state
     public void StartRecording()
     {
+        // In DeathMode we only start recording when player is at 1 life. In PuzzleMode start immediately.
+        if (CurrentRecordingMode == ReplayRecordingMode.DeathMode)
+        {
+            if (_playerLife == null || _playerLife.CurrentLife > 1)
+            {
+                Log.Debug("StartRecording deferred: DeathMode requires player at 1 life to start", "ReplayRecorder");
+                return;
+            }
+        }
+
         ClearRecording();
         IsRecording = true;
         _recordTimer = 0f;

@@ -65,7 +65,7 @@ position = Vector2(-250, 233)
 TargetScenePath = "uid://djkt6xtpabbyo"
 
 [node name="Puff" parent="." instance=ExtResource("13_sadiq")]
-position = Vector2(84, 240)
+position = Vector2(84, 239)
 FollowSpeed = 100.0
 FollowDistance = 100.0
 MinFollowDistance = 75.0

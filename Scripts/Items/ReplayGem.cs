@@ -84,6 +84,9 @@ public partial class ReplayGem : Node2D
         };
 
         Log.Replay("ReplayGem ready - hidden until activated", "ReplayGem");
+
+        // Register this gem in a group so managers can find/hide/show them collectively
+        AddToGroup("replay_gem");
     }
 
     //UPDATED METHOD: Improved connection to RealityManager
@@ -204,14 +207,19 @@ public partial class ReplayGem : Node2D
             return;
         }
 
-        // Consume 1 mana for replay
-        if (!playerMana.UseMana(1))
-        {
-            Log.Warning("Failed to consume mana for replay", "ReplayGem");
-            return;
-        }
 
-        Log.Replay("Consumed 1 mana for replay activation", "ReplayGem");
+            // Check for available last death record before consuming mana
+            var deathRecord = GetDeathRecord();
+            if (deathRecord == null)
+            {
+                // Show UI message when no death record is available
+                Log.Warning("No death record available for replay", "ReplayGem");
+                return;
+            }
+
+            // Consume 1 mana for replay
+            playerMana.UseMana(1);
+            Log.Replay("Consumed 1 mana for replay activation", "ReplayGem");
 
         // Change reality to PastReality when starting replay
         Log.Replay($"Attempting to start replay - RealityManager availability: {RealityManager.IsInstanceAvailable}", "ReplayGem");
@@ -228,8 +236,7 @@ public partial class ReplayGem : Node2D
             Log.Warning("Check that RealityManager is properly added to the scene tree before ReplayGem activation.", "ReplayGem");
         }
 
-        // Get death record and start replay through orchestrator
-        var deathRecord = GetDeathRecord();
+        // Use the previously obtained deathRecord (checked before consuming mana)
         if (deathRecord == null)
         {
             // In PuzzleMode, missing death records are expected initially
@@ -242,6 +249,8 @@ public partial class ReplayGem : Node2D
             else
             {
                 Log.Warning("No death record available for replay", "ReplayGem");
+                // Inform the player via UI that no replay is available
+                UIManager.ShowGameplayMessage("No replay available.");
             }
             
             // Refund mana if replay fails
@@ -395,7 +404,7 @@ public partial class ReplayGem : Node2D
     }
 
     // NEW METHOD: Force complete hiding of gem
-    private void ForceHideCompletely()
+    public void ForceHideCompletely()
     {
         // Disable all interaction first
         if (_detectionArea != null)

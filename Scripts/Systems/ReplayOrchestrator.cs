@@ -81,6 +81,17 @@ public partial class ReplayOrchestrator : Node
 
         _activeGem = triggeringGem;
 
+        // Inform system manager that this death has been played so it can avoid
+        // creating duplicate gems for the same death in future restarts.
+        try
+        {
+            if (ReplaySystemManager.Instance != null && deathRecord != null)
+            {
+                ReplaySystemManager.Instance.NotifyReplayPlayed(deathRecord.DeathId);
+            }
+        }
+        catch { }
+
         Log.Info($"=== StartReplay called by {triggeringGem?.Name ?? "unknown"} ===", "ReplayOrchestrator");
         Log.Debug($"Using death record: {deathRecord.DeathId} at {deathRecord.DeathPosition} with {deathRecord.PlayerFrames.Count} player frames, {deathRecord.MonsterFrames.Count} monster frames", "ReplayOrchestrator");
 

@@ -24,6 +24,9 @@ public partial class ReplaySystemManager : Node
     private readonly Dictionary<string, DeathRecord> _deathRecords = new();
     private string _currentDeathId = "";
     private ReplayRecordingMode _currentRecordingMode = ReplayRecordingMode.DeathMode;
+    // Track which death IDs have already been played back so we don't create a
+    // new gem for them after a replay has already occurred.
+    private readonly HashSet<string> _playedDeathIds = new();
     #endregion
 
     #region Lifecycle
@@ -110,6 +113,12 @@ public partial class ReplaySystemManager : Node
         
         // Debug level - system initialization is routine
         Log.Debug($"ReplaySystemManager initialized - Mode: {_currentRecordingMode}", "ReplaySystemManager");
+
+        // Connect to reality changes to broadcast hide/show to all gems
+        if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
+        {
+            RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
+        }
     }
     #endregion
 
@@ -162,6 +171,10 @@ public partial class ReplaySystemManager : Node
     _recorder.StopRecording();
     SaveDeathRecord(death.Position);
 
+    // Defensive: ensure no ReplayGem is left at the player's death position.
+    // Gems should only appear on game restart (or be placed manually in scenes).
+    CleanupCurrentGem();
+
     // Important event - player deaths should be tracked for debugging
     Log.Info($"Player death recorded at {death.Position} (Total deaths: {_deathRecords.Count})", "ReplaySystemManager");
     }
@@ -169,7 +182,10 @@ public partial class ReplaySystemManager : Node
     private void OnGameRestart()
     {
         // Clean up current replay visuals and gems
-        CleanupCurrentGem();
+        // If there is an active gem that was used to trigger a replay previously,
+        // reuse it instead of creating a new one. Otherwise cleanup existing gem
+        // and create a new one if appropriate.
+        // We'll decide below whether to create a new gem.
         
         // Stop any ongoing replays through orchestrator
         if (_orchestrator != null)
@@ -202,11 +218,28 @@ public partial class ReplaySystemManager : Node
         // This ensures gem appears only on next reload, not during GameOver UI
         if (lastDeath != null)
         {
-            // Clean up any existing gem first (should not exist, but safety check)
-            CleanupCurrentGem();
-            
-            CreateReplayGem(lastDeath.DeathPosition);
-            Log.Replay($"ReplayGem created on game restart at LAST death position {lastDeath.DeathPosition}", "ReplaySystemManager");
+            // If this death has already been played back, and the triggering gem
+            // still exists, reuse it instead of creating a new gem.
+            if (_playedDeathIds.Contains(lastDeath.DeathId) && _currentGem != null && IsInstanceValid(_currentGem))
+            {
+                Log.Replay($"Reusing existing ReplayGem for already-played death {lastDeath.DeathId}", "ReplaySystemManager");
+                // Move gem to spawn position to be consistent with placement behavior
+                var spawnPos = PlayerStateManager.Instance != null ? PlayerStateManager.Instance.PlayerSpawnPosition : lastDeath.DeathPosition;
+                _currentGem.ShowGem(spawnPos);
+            }
+            else
+            {
+                // Clean up any existing gem first (should not exist, but safety check)
+                CleanupCurrentGem();
+
+                // Place gem at player's spawn position (do not place at death position anymore)
+                var spawnPos = PlayerStateManager.Instance != null ? PlayerStateManager.Instance.PlayerSpawnPosition : lastDeath.DeathPosition;
+                CreateReplayGem(spawnPos);
+                Log.Replay($"ReplayGem created on game restart at spawn position {spawnPos} (last death at {lastDeath.DeathPosition})", "ReplaySystemManager");
+
+                // Inform player a replay exists
+                try { UIManager.ShowGameplayMessage("A replay is available."); } catch { }
+            }
         }
         
         Log.Replay($"Game restarted - recorder reset, death records preserved ({_deathRecords.Count} deaths)", "ReplaySystemManager");
@@ -228,6 +261,10 @@ public partial class ReplaySystemManager : Node
 
         var stats = _recorder.GetStats();
         Log.Replay($"Death record saved: {record.TotalFrames} frames, {stats.duration:F1}s duration at position {deathPosition}", "ReplaySystemManager");
+        
+        // NOTE: Do not notify the player here (at death) — notifications should appear
+        // when the scene/session is (re)started so the player sees replay availability
+        // at a predictable time. UI notification moved to OnGameRestart/CreateReplayGem flow.
     }
 
     private string GenerateDeathId()
@@ -271,6 +308,41 @@ public partial class ReplaySystemManager : Node
             }
             _currentGem = null;
         }
+    }
+
+    private void OnRealityChanged(Reality newReality)
+    {
+        // Broadcast hide/show to all ReplayGem instances in the scene
+        var allGems = GetTree().GetNodesInGroup("replay_gem");
+        foreach (Node n in allGems)
+        {
+            if (n is ReplayGem gem && IsInstanceValid(gem))
+            {
+                try
+                {
+                    if (newReality == Reality.PastReality)
+                    {
+                        gem.ForceHideCompletely();
+                    }
+                    else
+                    {
+                        // Restore visibility state - ShowGemAfterReplay will ensure proper restore for active gem
+                        gem.Show();
+                    }
+                }
+                catch { }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Mark a death id as having been played back so we can avoid recreating
+    /// a new gem for the same death later.
+    /// </summary>
+    public void NotifyReplayPlayed(string deathId)
+    {
+        if (string.IsNullOrEmpty(deathId)) return;
+        _playedDeathIds.Add(deathId);
     }
     #endregion
 
@@ -328,7 +400,7 @@ public partial class ReplaySystemManager : Node
                         PlayerFrames = playerFrames,
                         MonsterFrames = monsterFrames
                     };
-                    
+
                     Log.Debug($"Created virtual death record for PuzzleMode with {playerFrames.Count} player frames", "ReplaySystemManager");
                     return virtualRecord;
                 }
@@ -354,6 +426,8 @@ public partial class ReplaySystemManager : Node
         if (_currentRecordingMode == ReplayRecordingMode.DeathMode)
         {
             Log.Warning("No death records available", "ReplaySystemManager");
+            // Also surface this to the player via the message UI
+            try { UIManager.ShowGameplayMessage("No replay available."); } catch { }
         }
         return null;
     }
