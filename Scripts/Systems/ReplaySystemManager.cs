@@ -253,9 +253,8 @@ public partial class ReplaySystemManager : Node
             else
             {
                 // No existing gem — don't auto-create one here. Let scene logic or
-                // player actions create/show gems when appropriate. Notify player.
+                // player actions create/show gems when appropriate.
                 Log.Replay($"Replay available for death {lastDeath.DeathId} but no existing gem found; not auto-creating on restart", "ReplaySystemManager");
-                try { UIManager.ShowGameplayMessage("A replay is available."); } catch { }
             }
         }
         

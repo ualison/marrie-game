@@ -40,7 +40,8 @@ RequiredReality = 1
 [node name="GhostMonsterLife" type="Node2D" parent="CharacterBody2D"]
 position = Vector2(-2, -221)
 script = ExtResource("4_6ib6h")
-MaxPurple = 2
+MaxPurple = 5
+StartingPurple = 3
 
 [node name="GhostMonsterSprite" type="Sprite2D" parent="CharacterBody2D"]
 position = Vector2(-3.9999905, 59.000004)
