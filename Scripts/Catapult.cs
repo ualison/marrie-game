@@ -22,9 +22,7 @@ public partial class Catapult : Node2D, IPausable
 	[Export] public float WheelRotationSpeed = 200.0f;
 	// Gravity scale applied to the RigidBody2D (0 disables gravity, 1 = project default multiplier)
 	[Export] public float BodyGravityScale = 1.0f;
-	// Damping settings (exposed so instances can override). Use Godot's defaults by default.
-	[Export] public float BodyLinearDamp = 0.5f;
-	[Export] public float BodyAngularDamp = 2.0f;
+// Note: damping should be configured in the scene/prefab. Do not override damping at runtime.
 	[Export] public NodePath WheelLeftPath = "RigidBody2D/Sprites/WheelLeft";
 	[Export] public NodePath WheelRightPath = "RigidBody2D/Sprites/WheelRight";
 	[Export] public NodePath DetectionAreaPath = "RigidBody2D/DetectionArea";
@@ -86,6 +84,9 @@ public partial class Catapult : Node2D, IPausable
 	private float _currentSpeed = 0.0f;
 	private bool _playerInRange = false;
 	private Color _originalModulate = Colors.White;
+	// Track whether collisions with the player are currently enabled to avoid
+	// logging the same debug message every frame.
+	private bool _playerCollisionEnabled = false;
 	#endregion
 
 	public override void _Ready()
@@ -325,9 +326,7 @@ public partial class Catapult : Node2D, IPausable
 		
 		// Set up RigidBody2D properties for realistic physics
 		_rigidBody.GravityScale = BodyGravityScale;
-		// Allow scene/prefab to control damping via exports for consistency across instances
-		_rigidBody.LinearDamp = BodyLinearDamp;
-		_rigidBody.AngularDamp = BodyAngularDamp;
+		// Do not override linear/angular damping here; respect authoring-time values
 		// Do NOT override collision layers/masks here; respect prefab/scene instance settings
 	}
 
@@ -354,17 +353,25 @@ public partial class Catapult : Node2D, IPausable
 
 	private void HandlePlayerInteraction()
 	{
+		// Check if player is pressing push button (check this regardless of range)
+		bool wantsToPush = Input.IsActionPressed("push_catapult");
+		
+		// If player is not in range or null, they can't push
 		if (_player == null || !_playerInRange)
 		{
-			// Ensure collisions remain disabled when player is not in range
+			// Debug log state changes - player left range while pushing
+			if (_isBeingPushed)
+			{
+				Log.Info("Player stopped pushing catapult (left range)", "Catapult");
+			}
+			
+			// Reset pushing state and ensure collisions remain disabled when player is not in range
+			_isBeingPushed = false;
 			DisablePlayerCollision();
 			// Also handle handle-area prompt/logic when player is not in primary detection area
 			HandleHandleAreaInput();
 			return;
 		}
-		
-		// Check if player is pressing push button
-		bool wantsToPush = Input.IsActionPressed("push_catapult");
 		
 		// Debug log state changes
 		if (wantsToPush && !_isBeingPushed)
@@ -720,9 +727,13 @@ public partial class Catapult : Node2D, IPausable
 
 		if (_player is PhysicsBody2D phys)
 		{
-			// Remove exception so physics will consider collisions
-			_rigidBody.RemoveCollisionExceptionWith(phys);
-			Log.Debug("Enabled collisions with player", "Catapult");
+			// Only change state and log when collisions are currently disabled
+			if (!_playerCollisionEnabled)
+			{
+				_rigidBody.RemoveCollisionExceptionWith(phys);
+				_playerCollisionEnabled = true;
+				Log.Debug("Enabled collisions with player", "Catapult");
+			}
 		}
 	}
 
@@ -732,9 +743,13 @@ public partial class Catapult : Node2D, IPausable
 
 		if (_player is PhysicsBody2D phys)
 		{
-			// Ensure catapult and player do not collide
-			_rigidBody.AddCollisionExceptionWith(phys);
-			Log.Debug("Disabled collisions with player", "Catapult");
+			// Only change state and log when collisions are currently enabled
+			if (_playerCollisionEnabled)
+			{
+				_rigidBody.AddCollisionExceptionWith(phys);
+				_playerCollisionEnabled = false;
+				Log.Debug("Disabled collisions with player", "Catapult");
+			}
 		}
 	}
 
@@ -742,26 +757,63 @@ public partial class Catapult : Node2D, IPausable
 	{
 		if (_player == null || _rigidBody == null) return;
 		
-		// Calculate push direction based on player position relative to catapult
-		Vector2 playerPos = _player.GlobalPosition;
-		Vector2 catapultPos = GlobalPosition;
-		
-		// Determine push direction: if player is to the left, push right, and vice versa
-		Vector2 pushDirection;
-		if (playerPos.X < catapultPos.X)
+		// Get the player's velocity to determine push direction and strength
+		Vector2 playerVelocity = _player.Velocity;
+		float playerSpeed = playerVelocity.Length();
+		// Read horizontal input once (used both for speed estimation and direction)
+		float inputAxis = Input.GetAxis("ui_left", "ui_right");
+
+		// If player's physics velocity is very small (e.g. they're stuck against the
+		// catapult because of collision resolution), fall back to the player's input
+		// axis so holding C + walking still pushes the catapult.
+		if (playerSpeed < 10.0f)
 		{
-			pushDirection = Vector2.Right;
+			if (Mathf.Abs(inputAxis) > 0.05f)
+			{
+				// Estimate player speed from their input and configured Speed value
+				float estimatedSpeed = Mathf.Abs(inputAxis) * (_player?.Speed ?? 120.0f);
+				playerSpeed = estimatedSpeed;
+				Log.Debug($"Player velocity low; using input-based estimated speed {playerSpeed:F1} for pushing", "Catapult");
+			}
+			else
+			{
+				// No meaningful input and no velocity — still apply a base push while
+				// the player is holding the push action so the catapult moves until
+				// the player releases C.
+				playerSpeed = 0.0f;
+				Log.Debug("Player holding push with no movement input; applying base push", "Catapult");
+			}
+		}
+		// Determine push direction: prefer the player's horizontal input direction so
+		// holding left/right consistently pushes that way. If there's no horizontal
+		// input, fall back to a position-based direction (player -> catapult).
+		Vector2 pushDirection;
+		if (Mathf.Abs(inputAxis) > 0.05f)
+		{
+			pushDirection = new Vector2(Mathf.Sign(inputAxis), 0f);
 		}
 		else
 		{
-			pushDirection = Vector2.Left;
+			Vector2 playerPos = _player.GlobalPosition;
+			Vector2 catapultPos = _rigidBody.GlobalPosition;
+			pushDirection = (catapultPos - playerPos).Normalized();
 		}
 		
-		// Apply the force
-		_rigidBody.ApplyForce(pushDirection * PushForce);
+		// Calculate force magnitude based on player's speed and the configured PushForce
+		float forceMagnitude = Mathf.Clamp(
+			PushForce + (playerSpeed * 2.0f), // Scale with player speed
+			50.0f,  // Minimum force
+			PushForce * 2.0f  // Maximum force (double the configured value)
+		);
+		
+		// Apply the force as a continuous force (not impulse) since this is called every frame while pushing
+		Vector2 forceVector = pushDirection * forceMagnitude;
+		_rigidBody.ApplyCentralForce(forceVector);
 		
 		// Add a small upward component to prevent getting stuck on ground
-		_rigidBody.ApplyForce(Vector2.Up * PushForce * 0.1f);
+		_rigidBody.ApplyCentralForce(Vector2.Up * forceMagnitude * 0.1f);
+		
+		Log.Debug($"Applied push force {forceVector.Length():F1} to catapult (player speed: {playerSpeed:F1})", "Catapult");
 	}
 
 	private void UpdateWheelRotation(float delta)

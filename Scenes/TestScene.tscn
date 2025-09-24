@@ -61,11 +61,11 @@ script = ExtResource("11_1vcy8")
 [node name="Catapult" parent="." instance=ExtResource("12_65o0v")]
 z_index = -1
 position = Vector2(209, 110)
-PushForce = 950.0
-WheelRotationSpeed = 50.0
+PushForce = 1150.0
+WheelRotationSpeed = 55.0
 BodyGravityScale = 1.5
-BodyLinearDamp = 1.0
-BodyAngularDamp = 1.5
+BodyLinearDamp = 0.0
+BodyAngularDamp = 0.0
 LaunchSpeed = 1100.0
 LaunchAngleDegrees = 60.0
 
