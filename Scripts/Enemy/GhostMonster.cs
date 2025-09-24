@@ -898,59 +898,48 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
     // NOTE: Recursive descendant search replaced by NodeHelpers.FindChildOfType and other helpers.
 
 
-    // UPDATED: Simplified TakeRockDamage without individual auto-return
+    // UPDATED: Send damage to global ghost life system
     public bool TakeRockDamage(int damage = 1)
     {
         Reality currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
         Log.Debug($"GhostMonster.TakeRockDamage called - CurrentReality: {currentReality}", "GhostMonster");
-
-        // Direct local handling - no life pool system
-        if (_ghostLife == null && _monsterLife == null)
-        {
-            Log.Debug($"GhostMonster.TakeRockDamage: no local life components available", "GhostMonster");
-            return false;
-        }
-
-        bool localDamaged = false;
 
         switch (currentReality)
         {
             case Reality.CurrentReality:
                 // Ghosts don't take damage in current reality (Monster handles that)
                 Log.Warning($"Rock hit GhostMonster in Current Reality but ghosts shouldn't take damage in current reality", "GhostMonster");
-                break;
+                return false;
 
             case Reality.PastReality:
-                // Rocks only damage purple hearts in past reality for ghosts
-                if (_ghostLife != null)
+                // Send damage to global ghost life system
+                if (GlobalGhostLifeManager.Instance != null)
                 {
-                    localDamaged = _ghostLife.TakeRockDamageInPastReality(damage);
-                }
-                else if (_monsterLife != null)
-                {
-                    localDamaged = _monsterLife.TakeRockDamageInPastReality(damage);
-                }
-
-                if (localDamaged)
-                {
-                    PlayDamageEffect(Colors.Purple);
-                    Log.Info($"Rock hit GhostMonster in Past Reality - damaged purple hearts locally", "GhostMonster");
-
-                    // Check for death
-                    bool isDead = false;
-                    if (_ghostLife != null) isDead = _ghostLife.IsDead;
-                    else if (_monsterLife != null) isDead = _monsterLife.IsDead;
-
-                    if (isDead)
+                    bool globalDamaged = GlobalGhostLifeManager.Instance.TakeRockDamageInPastReality(damage);
+                    
+                    if (globalDamaged)
                     {
-                        Log.Debug("GhostMonster local death detected after rock damage - invoking OnGhostDeath", "GhostMonster");
-                        OnGhostDeath(); // This now delegates everything to EnemyManager
+                        PlayDamageEffect(Colors.Purple);
+                        Log.Info($"Rock hit GhostMonster in Past Reality - damaged global ghost life", "GhostMonster");
+                        
+                        // If global ghost life is defeated, show message and destroy all ghosts
+                        if (GlobalGhostLifeManager.Instance.IsDefeated)
+                        {
+                            Log.Debug("Global ghost life defeated - handling ghost destruction", "GhostMonster");
+                            OnGhostDeath(); // This will handle individual ghost destruction
+                        }
                     }
+                    
+                    return globalDamaged;
                 }
-                break;
+                else
+                {
+                    Log.Warning("GlobalGhostLifeManager not available for damage", "GhostMonster");
+                    return false;
+                }
         }
 
-        return localDamaged;
+        return false;
     }
     //NEW METHOD: Centralized death handling with auto-return
     private void HandleGhostDeathAndAutoReturn()
@@ -1143,57 +1132,43 @@ public partial class GhostMonster : CharacterBody2D, IPoolable
     }
 
 
-    // Enhanced TakeMagicalDamage for consistency with centralized system
+    // Enhanced TakeMagicalDamage - sends damage to global ghost life system
     public bool TakeMagicalDamage(int damage = 1)
     {
-        // Direct local handling - prefer ghost-specific life component for magical damage
-        if (_ghostLife != null)
+        // Send damage to global ghost life system
+        if (GlobalGhostLifeManager.Instance != null)
         {
-            Log.Debug($"GhostMonster TakeMagicalDamage - CurrentLife: {_ghostLife.CurrentLife}", "GhostMonster");
-            bool localDamagedGhost = _ghostLife.TakeMagicalDamage(damage);
-            if (localDamagedGhost)
+            bool globalDamaged = GlobalGhostLifeManager.Instance.TakeMagicalDamage(damage);
+            
+            if (globalDamaged)
             {
                 PlayDamageEffect(Colors.Purple);
-                Log.Debug($"GhostMonster took {damage} magical damage on GhostMonsterLife", "GhostMonster");
-                if (_ghostLife.IsDead)
+                Log.Debug($"GhostMonster took {damage} magical damage on global ghost life", "GhostMonster");
+                
+                // If global ghost life is defeated, handle ghost destruction
+                if (GlobalGhostLifeManager.Instance.IsDefeated)
                 {
+                    Log.Debug("Global ghost life defeated - handling ghost destruction", "GhostMonster");
                     OnGhostDeath();
                 }
             }
-            return localDamagedGhost;
+            
+            return globalDamaged;
         }
-
-        // Legacy fallback: use MonsterLife if present
-        if (_monsterLife != null)
+        else
         {
-            Log.Debug($"GhostMonster TakeMagicalDamage (legacy) - CurrentLife: {_monsterLife.CurrentLife}", "GhostMonster");
-            bool localDamaged = _monsterLife.TakeMagicalDamage(damage);
-            if (localDamaged)
-            {
-                PlayDamageEffect(Colors.Purple);
-                Log.Debug($"GhostMonster took {damage} magical damage locally (legacy)", "GhostMonster");
-                if (_monsterLife.IsDead)
-                {
-                    OnGhostDeath();
-                }
-            }
-            return localDamaged;
+            Log.Warning("GlobalGhostLifeManager not available for magical damage", "GhostMonster");
+            return false;
         }
-
-        return false;
     }
 
     public int CurrentPurpleHearts
     {
         get
         {
-            // Prefer GhostMonsterLife if available (dedicated purple heart system)
-            if (_ghostLife != null && IsInstanceValid(_ghostLife))
-                return _ghostLife.CurrentPurpleHearts;
-
-            // Fallback to MonsterLife purple hearts for backward compatibility
-            if (_monsterLife != null && IsInstanceValid(_monsterLife))
-                return _monsterLife.CurrentPurpleHearts;
+            // Use global ghost life system
+            if (GlobalGhostLifeManager.Instance != null)
+                return GlobalGhostLifeManager.Instance.CurrentPurpleHearts;
 
             return 0;
         }

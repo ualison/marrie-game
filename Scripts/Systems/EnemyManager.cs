@@ -167,12 +167,12 @@ public partial class EnemyManager : Node
     {
         if (pair == null) return;
 
-        Log.Warning($"Ghost died - hiding pair for {GlobalHideTime}s (global timer overrides any local)", "EnemyManager");
+        Log.Warning($"Ghost died - damage sent to global ghost life system", "EnemyManager");
 
-        // Global timer always overrides local timer
+        // NO MORE GLOBAL TIMER - Ghost monsters are now handled by global life system
         CancelRespawn(pair);
 
-        // Hide both ghost and monster
+        // Disable the ghost immediately
         if (IsInstanceValid(pair.Ghost))
         {
             try
@@ -187,33 +187,9 @@ public partial class EnemyManager : Node
             }
         }
 
-        // Only hide the monster immediately if we're currently in CurrentReality.
-        // If we're in PastReality (e.g. ghost died during replay), keep the monster's
-        // hide state as the source-of-truth and defer any additional hide calls until
-        // reality returns to CurrentReality. This ensures the global respawn timer
-        // is the authoritative timing for when the monster should be unavailable.
-        if (IsInstanceValid(pair.Monster))
-        {
-            var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
-            if (currentReality == Reality.CurrentReality)
-            {
-                HideMonster(pair.Monster);
-            }
-            else
-            {
-                Log.Debug($"Ghost died in PastReality - deferring immediate hide for monster {pair.Monster.Name}, will remain hidden by respawn timer", "EnemyManager");
-                // Ensure ReplayRecorder knows the monster is considered hidden by pair state
-                if (ReplayRecorder.Instance != null)
-                {
-                    ReplayRecorder.Instance.OnMonsterVisibilityChanged(pair.Monster, false);
-                }
-            }
-        }
-
-        pair.IsHidden = true;
-
-        // Schedule full pair respawn (global timer)
-        ScheduleRespawn(pair, GlobalHideTime, RespawnType.FullPair);
+        // Monster in current reality keeps its local hide behavior
+        // No global hiding - only local hide time when monster depleted
+        pair.IsHidden = false; // Reset pair hidden state since we don't use global timer anymore
 
         // NEW: Check if we should auto-return to CurrentReality
         CheckForAutoReturn();
@@ -386,14 +362,26 @@ public partial class EnemyManager : Node
     {
         Log.System($"Reality changed to {newReality}", "EnemyManager");
 
+        // Check if global ghost life is defeated
+        bool isGlobalGhostLifeDefeated = GlobalGhostLifeManager.Instance?.IsDefeated ?? false;
+
         foreach (var pair in _pairs)
         {
             if (!IsInstanceValid(pair.Monster)) continue;
 
             if (newReality == Reality.CurrentReality)
             {
-                if (pair.Monster.LifeSystem?.CurrentRedHearts > 0 && !pair.IsHidden)
+                // Only show monster if global ghost life is NOT defeated
+                if (!isGlobalGhostLifeDefeated && pair.Monster.LifeSystem?.CurrentRedHearts > 0 && !pair.IsHidden)
+                {
                     pair.Monster.ForceShow();
+                }
+                else if (isGlobalGhostLifeDefeated)
+                {
+                    // Keep monster hidden if global ghost life is defeated
+                    pair.Monster.ForceHide();
+                    Log.Debug($"Monster {pair.Monster.Name} kept hidden - global ghost life defeated", "EnemyManager");
+                }
 
                 if (IsInstanceValid(pair.Ghost))
                     pair.Ghost.FadeOutAndDestroy();
@@ -598,6 +586,46 @@ public partial class EnemyManager : Node
         }
 
         Log.System("Game restarted", "EnemyManager");
+    }
+
+    /// <summary>
+    /// Called when the global ghost life system is defeated
+    /// Destroys all ghost monsters permanently until game restart
+    /// </summary>
+    public void OnGlobalGhostLifeDefeated()
+    {
+        Log.System("Global Ghost Life defeated - destroying all ghost monsters and hiding all monsters permanently", "EnemyManager");
+        
+        foreach (var pair in _pairs)
+        {
+            if (IsInstanceValid(pair.Ghost))
+            {
+                // Stop any ongoing replays
+                try { pair.Ghost.StopReplay(); } catch { }
+                
+                // Permanently remove the ghost
+                try { pair.Ghost.QueueFree(); } catch { }
+                pair.Ghost = null;
+            }
+            
+            // Also hide the monster in current reality since the source ghost life is defeated
+            if (IsInstanceValid(pair.Monster))
+            {
+                HideMonster(pair.Monster);
+                Log.Debug($"Monster {pair.Monster.Name} hidden permanently - global ghost life defeated", "EnemyManager");
+            }
+            
+            // Cancel any respawn timers since ghosts are permanently defeated
+            CancelRespawn(pair);
+            
+            // Keep pair hidden state as true since monsters should stay hidden
+            pair.IsHidden = true;
+        }
+        
+        // Clear ghost lookup since all ghosts are destroyed
+        _ghostLookup.Clear();
+        
+        Log.System("All ghost monsters permanently destroyed", "EnemyManager");
     }
     #endregion
 

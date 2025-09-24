@@ -82,6 +82,7 @@ public partial class GameManager : Node
         // Ensure all managers exist as children - order matters!
         EnsureManagerExists<SceneLifecycleManager>();  // First - needed for scene events
         EnsureManagerExists<RealityManager>();         // Early - needed for reality-based game logic
+        EnsureManagerExists<GlobalGhostLifeManager>(); // Global ghost life system
         EnsureManagerExists<PlayerStateManager>();     // Now managed by GameManager
         EnsureManagerExists<EnemyManager>();           // Add EnemyManager for consistency
         EnsureManagerExists<UIManager>();

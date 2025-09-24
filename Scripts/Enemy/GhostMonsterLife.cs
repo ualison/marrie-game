@@ -1,7 +1,9 @@
 using Godot;
 using MarrieGame.Core.Interfaces;
+using MarrieGame.Core.Utils;
 
-// Ghost-specific life that only tracks purple hearts (magical)
+// Ghost-specific life that delegates to the global ghost life system
+// This acts as a proxy to the global system for backward compatibility
 public partial class GhostMonsterLife : Node, IHealthSystem
 {
     #region Signals
@@ -21,47 +23,47 @@ public partial class GhostMonsterLife : Node, IHealthSystem
     #endregion
 
     #region Properties
-    public int CurrentLife => _currentPurpleHearts;
-    public bool IsInvulnerable { get; private set; }
-    public bool IsDead => CurrentLife <= 0;
+    public int CurrentLife => GlobalGhostLifeManager.Instance?.CurrentLife ?? 0;
+    public bool IsInvulnerable => GlobalGhostLifeManager.Instance?.IsInvulnerable ?? false;
+    public bool IsDead => GlobalGhostLifeManager.Instance?.IsDead ?? true;
 
     // IHealthSystem
     public int CurrentHealth => CurrentLife;
-    public int MaxHealth => MaxPurple;
+    public int MaxHealth => GlobalGhostLifeManager.Instance?.MaxHealth ?? MaxPurple;
 
-    public int PurpleHearts => MaxPurple;
-    public int CurrentPurpleHearts => _currentPurpleHearts;
+    public int PurpleHearts => GlobalGhostLifeManager.Instance?.PurpleHearts ?? MaxPurple;
+    public int CurrentPurpleHearts => GlobalGhostLifeManager.Instance?.CurrentPurpleHearts ?? 0;
     #endregion
 
     public override void _Ready()
     {
-        MaxPurple = Mathf.Max(0, MaxPurple);
-
-        int startPurple = Mathf.Clamp(StartingPurple, 0, MaxPurple);
-        _currentPurpleHearts = startPurple;
-
-        _invulnerabilityTimer = new Timer { WaitTime = InvulnerabilityTime, OneShot = true };
-        _invulnerabilityTimer.Timeout += EndInvulnerability;
-        AddChild(_invulnerabilityTimer);
-
-        NotifyLifeChanged();
+        // Wait for GlobalGhostLifeManager to be ready
+        CallDeferred(nameof(InitializeAfterGlobalManager));
     }
 
-    #region Damage / Healing
+    private void InitializeAfterGlobalManager()
+    {
+        // Connect to the global ghost life manager's signals for UI updates
+        if (GlobalGhostLifeManager.Instance != null)
+        {
+            GlobalGhostLifeManager.Instance.GhostLifeChanged += OnGlobalLifeChanged;
+            GlobalGhostLifeManager.Instance.GhostMonsterDefeated += OnGlobalGhostDefeated;
+            NotifyLifeChanged();
+        }
+        else
+        {
+            Log.Warning("GlobalGhostLifeManager not available when initializing GhostMonsterLife", "GhostMonsterLife");
+        }
+    }
+
+    #region Damage / Healing - Delegate to Global System
     public bool TakePurpleHeartDamage(int damage = 1)
     {
-        if (IsDead || IsInvulnerable) return false;
-
-        int actual = Mathf.Min(damage, _currentPurpleHearts);
-        if (actual <= 0) return false;
-
-        _currentPurpleHearts = Mathf.Max(0, _currentPurpleHearts - actual);
-
-        StartInvulnerability();
-        NotifyLifeChanged();
-
-        if (IsDead) EmitSignal("MonsterDied");
-        return true;
+        if (GlobalGhostLifeManager.Instance != null)
+        {
+            return GlobalGhostLifeManager.Instance.TakePurpleHeartDamage(damage);
+        }
+        return false;
     }
 
     // IHealthSystem generic damage entry - for ghosts this maps to purple-heart damage
@@ -77,50 +79,57 @@ public partial class GhostMonsterLife : Node, IHealthSystem
 
     public void Heal(int amount)
     {
-        if (IsDead) return;
-        int can = MaxPurple - _currentPurpleHearts;
-        int use = Mathf.Min(can, amount);
-        _currentPurpleHearts += use;
-        NotifyLifeChanged();
+        if (GlobalGhostLifeManager.Instance != null)
+        {
+            GlobalGhostLifeManager.Instance.Heal(amount);
+        }
     }
 
     public void Reset()
     {
-        int startPurple = Mathf.Clamp(StartingPurple, 0, MaxPurple);
-        _currentPurpleHearts = startPurple;
-        IsInvulnerable = false;
-        NotifyLifeChanged();
+        if (GlobalGhostLifeManager.Instance != null)
+        {
+            GlobalGhostLifeManager.Instance.Reset();
+        }
     }
     #endregion
 
-    #region Invulnerability
-    private void StartInvulnerability()
+    #region Event Handlers
+    private void OnGlobalLifeChanged(int currentLife, int maxLife, int purpleHearts)
     {
-        IsInvulnerable = true;
-        if (_invulnerabilityTimer != null)
-            _invulnerabilityTimer.Start();
+        // Forward the signal to maintain compatibility with existing UI connections
+        EmitSignal("LifeChanged", currentLife, maxLife, purpleHearts);
     }
 
-    private void EndInvulnerability()
+    private void OnGlobalGhostDefeated()
     {
-        IsInvulnerable = false;
+        // Forward the signal to maintain compatibility
+        EmitSignal("MonsterDied");
     }
     #endregion
 
     private void NotifyLifeChanged()
     {
-        Log.Debug($"GhostMonsterLife.NotifyLifeChanged: Current={CurrentLife}, Max={MaxPurple}, Purple={_currentPurpleHearts}", "GhostMonsterLife");
-        EmitSignal("LifeChanged", CurrentLife, MaxPurple, _currentPurpleHearts);
+        Log.Debug($"GhostMonsterLife.NotifyLifeChanged: Current={CurrentLife}, Max={MaxHealth}, Purple={CurrentPurpleHearts}", "GhostMonsterLife");
+        EmitSignal("LifeChanged", CurrentLife, MaxHealth, CurrentPurpleHearts);
     }
 
     // Matches MonsterLife signature for compatibility - red param ignored
     public void SetHearts(int redHearts, int purpleHearts)
     {
-        int newPurple = Mathf.Clamp(purpleHearts, 0, MaxPurple);
-        if (newPurple == _currentPurpleHearts) return;
-        _currentPurpleHearts = newPurple;
-        Log.Debug($"GhostMonsterLife.SetHearts: P={newPurple}", "GhostMonsterLife");
-        NotifyLifeChanged();
-        if (IsDead) EmitSignal("MonsterDied");
+        if (GlobalGhostLifeManager.Instance != null)
+        {
+            GlobalGhostLifeManager.Instance.SetHearts(redHearts, purpleHearts);
+        }
+    }
+
+    public override void _ExitTree()
+    {
+        // Disconnect from global signals
+        if (GlobalGhostLifeManager.Instance != null)
+        {
+            GlobalGhostLifeManager.Instance.GhostLifeChanged -= OnGlobalLifeChanged;
+            GlobalGhostLifeManager.Instance.GhostMonsterDefeated -= OnGlobalGhostDefeated;
+        }
     }
 }
