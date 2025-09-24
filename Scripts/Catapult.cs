@@ -443,13 +443,23 @@ public partial class Catapult : Node2D, IPausable
 					else
 					{
 						// Initial press: command Puff to move to PuffPosition
-						puffAI.SetStockPosition(puffPosNode.GlobalPosition);
-						Log.Debug("Sent SetStockPosition to Puff (typed call)", "Catapult");
-						// Start/restart stock timer
-						try { _stockTimer.WaitTime = StockTimeoutSeconds; } catch {}
-						try { _stockTimer.Start(); } catch {}
-						// Start polling Puff position; when Puff arrives we'll mark it stocked
-						StartPuffPositionPoll(puffNode as Node2D, puffPosNode.GlobalPosition);
+						// Do not request Puff to stock if it's currently launching
+						bool puffIsLaunching = false;
+						try { puffIsLaunching = puffAI.GetCurrentState() == MarrieGame.AI.PuffAI.PuffState.Launching; } catch {}
+						if (puffIsLaunching)
+						{
+							Log.Debug("Ignored SetStockPosition because Puff is launching", "Catapult");
+						}
+						else
+						{
+							puffAI.SetStockPosition(puffPosNode.GlobalPosition);
+							Log.Debug("Sent SetStockPosition to Puff (typed call)", "Catapult");
+							// Start/restart stock timer
+							try { _stockTimer.WaitTime = StockTimeoutSeconds; } catch {}
+							try { _stockTimer.Start(); } catch {}
+							// Start polling Puff position; when Puff arrives we'll mark it stocked
+							StartPuffPositionPoll(puffNode as Node2D, puffPosNode.GlobalPosition);
+						}
 					}
 				}
 				else
@@ -711,6 +721,14 @@ public partial class Catapult : Node2D, IPausable
 		// Reset catapult state
 		_puffIsStocked = false;
 		_spoonHasRotated = false;
+
+		// Rotate spoon and handle back to neutral after a short delay so the catapult
+		// is visually ready for the next stock/launch sequence.
+		var resetVisualsTimer = GetTree().CreateTimer(0.25f);
+		resetVisualsTimer.Timeout += () => {
+			TryRotateSpoonBack(SpoonRotationDuration);
+			TryRotateHandleBack(HandleRotationDuration);
+		};
 		
 		// Hide trajectory after a short delay to show the launch path briefly
 		var hideTimer = GetTree().CreateTimer(0.5f);
