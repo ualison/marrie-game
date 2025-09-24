@@ -28,6 +28,7 @@ SmoothSpeed = 10.0
 [node name="GameEntities" type="Node2D" parent="."]
 
 [node name="Player" parent="GameEntities" instance=ExtResource("4_t0xha")]
+z_index = 1
 position = Vector2(-62, 130)
 
 [node name="GameSystems" type="Node" parent="."]
@@ -60,7 +61,7 @@ autoplay = true
 script = ExtResource("11_efeo8")
 
 [node name="SceneSwicherCrystal" parent="." instance=ExtResource("12_tpiq0")]
-position = Vector2(-184, 232)
+position = Vector2(-250, 233)
 TargetScenePath = "uid://djkt6xtpabbyo"
 
 [node name="Puff" parent="." instance=ExtResource("13_sadiq")]
@@ -79,7 +80,7 @@ MonsterAvoidanceForce = 150.0
 
 [node name="Catapult" parent="." instance=ExtResource("13_4idgl")]
 z_index = -1
-position = Vector2(310, 155)
+position = Vector2(363, 156)
 PushForce = 1150.0
 WheelRotationSpeed = 55.0
 BodyGravityScale = 1.5

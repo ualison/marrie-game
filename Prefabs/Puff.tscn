@@ -52,3 +52,6 @@ ActiveEnergyOverride = 3
 position = Vector2(-3, 4)
 scale = Vector2(0.176, 0.16)
 texture = ExtResource("1_daoqv")
+
+[node name="PuffAppleAttached" type="Node2D" parent="."]
+position = Vector2(35, 23)

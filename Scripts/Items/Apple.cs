@@ -55,6 +55,16 @@ public partial class Apple : Node2D
     private Vector2 _originalScale; // Store original scale for transitions
     private bool _isFalling = false; // Track if apple is falling
     private bool _hasLanded = false; // Track if apple has landed on ground
+    // When Puff picks up an apple from the tree (special behaviour), track it here
+    private bool _isAttachedToPuff = false;
+    private Node2D _carryingPuff = null;
+    // Keep reference to original parent so we can reparent the apple back when dropped
+    private Node _originalParent = null;
+    // Used to defer attaching to Puff (avoid removing nodes during physics callbacks)
+    private Node2D _pendingAttachPuff = null;
+    // Used to defer detaching from Puff when Puff touches ground
+    private Node2D _pendingDetachPuff = null;
+    
     #endregion
 
     #region Initialization
@@ -517,7 +527,16 @@ public partial class Apple : Node2D
 
     private void OnGroundCollision(Node2D body)
     {
-        // Check if apple hit the ground (StaticBody2D)
+        // If apple is attached to Puff and Puff touches ground, detach and make the apple fall to ground
+        if (body is StaticBody2D && _isAttachedToPuff)
+        {
+            // Defer the detach to avoid changing the scene tree during physics callbacks
+            _pendingDetachPuff = _carryingPuff;
+            CallDeferred(nameof(DeferredDetachFromPuff));
+            return;
+        }
+
+        // Check if apple hit the ground (StaticBody2D) in a normal falling case
         if (body is StaticBody2D && _isFalling && !_hasLanded)
         {
             Log.System("Apple landed on ground", "Apple");
@@ -530,21 +549,63 @@ public partial class Apple : Node2D
     {
         // Debug: Log all collision attempts
         Log.Debug($"Apple: Body collision detected - Name: {body.Name}, Groups: [{string.Join(", ", body.GetGroups())}], Current State: {_currentState}", "Apple");
-        
-        // Check if Puff collided with apple in YellowEnergy state
-        if (body.IsInGroup("puff") && _currentState == AppleState.YellowEnergy)
+        // If the colliding body is Puff, handle Puff-specific interactions
+        if (body.IsInGroup("puff"))
         {
-            Log.System($"Puff collided with YellowEnergy apple - restoring {EnergyRestoreAmount} energy", "Apple");
-            RestoreEnergyToPuff();
+            // If apple is already attached to Puff, ignore
+            if (_isAttachedToPuff)
+                return;
+
+            // Puff should not consume apples that are still on a tree
+            if (_currentPosition == ApplePosition.OnTree)
+            {
+                // If the apple is GrayKnockable and on the tree, Puff should attach and carry it
+                if (_currentState == AppleState.GrayKnockable)
+                {
+                    Log.System("Puff collided with GrayKnockable apple on tree - attaching to Puff", "Apple");
+
+                    // Store original parent/index so we can reparent back later
+                    _originalParent = GetParent();
+                    // original parent stored for later reparenting
+                    // note: we avoid storing child index to keep compatibility across engines
+                    // and rely on adding back to the parent normally
+                    // _originalIndex intentionally omitted
+
+                    // Reparent to the Puff's attachment node so it moves with Puff
+                    _carryingPuff = body;
+                    // Defer the actual reparenting to avoid modifying the scene tree during physics callbacks
+                    _carryingPuff = body;
+                    _pendingAttachPuff = _carryingPuff;
+                    CallDeferred(nameof(DeferredAttachToPuff));
+
+                    // Reset local position so it appears attached to Puff
+                    Position = Vector2.Zero;
+
+                    // Disable physics while attached
+                    if (_rigidBody != null)
+                    {
+                        // Freeze physics while attached to Puff
+                        _rigidBody.Freeze = true;
+                        _rigidBody.GravityScale = 0.0f;
+                        _rigidBody.LinearVelocity = Vector2.Zero;
+                    }
+                }
+
+                // Do not allow Puff to consume apples that are still on the tree
+                return;
+            }
+
+            // If apple is on ground and in YellowEnergy state it is collectible by Puff
+            if (_currentPosition == ApplePosition.OnGround && _currentState == AppleState.YellowEnergy)
+            {
+                Log.System($"Puff collided with YellowEnergy apple - restoring {EnergyRestoreAmount} energy", "Apple");
+                RestoreEnergyToPuff();
+            }
+
+            return;
         }
-        else if (body.IsInGroup("puff") && _currentState != AppleState.YellowEnergy)
-        {
-            Log.Debug($"Puff collided with apple but apple is in {_currentState} state (not YellowEnergy)", "Apple");
-        }
-        else if (!body.IsInGroup("puff"))
-        {
-            Log.Debug($"Non-Puff collision detected - Body: {body.Name}", "Apple");
-        }
+
+        // Non-Puff bodies are ignored here
     }
 
     public void MakeAppleFall()
@@ -558,6 +619,101 @@ public partial class Apple : Node2D
         
         // Use call_deferred to change physics properties safely during collision detection
         CallDeferred(nameof(DeferredMakeAppleFall));
+    }
+
+    private void DeferredAttachToPuff()
+    {
+        if (_pendingAttachPuff == null)
+            return;
+
+        // Remove from original parent safely (this is now deferred, outside physics callback)
+        if (_originalParent != null)
+        {
+            try { _originalParent.RemoveChild(this); } catch { }
+        }
+
+        // Attach to Puff's attach node if present
+        Node2D attachNode = _pendingAttachPuff.GetNodeOrNull<Node2D>("PuffAppleAttached");
+        if (attachNode != null)
+        {
+            attachNode.AddChild(this);
+            Position = Vector2.Zero;
+        }
+        else
+        {
+            _pendingAttachPuff.AddChild(this);
+            Position = Vector2.Zero;
+        }
+
+        // Disable physics while attached
+        if (_rigidBody != null)
+        {
+            _rigidBody.Freeze = true;
+            _rigidBody.GravityScale = 0.0f;
+            _rigidBody.LinearVelocity = Vector2.Zero;
+        }
+
+        _carryingPuff = _pendingAttachPuff;
+        _isAttachedToPuff = true;
+        _pendingAttachPuff = null;
+    }
+
+    private void DeferredDetachFromPuff()
+    {
+        if (_pendingDetachPuff == null)
+            return;
+
+        var puffNode = _pendingDetachPuff;
+
+        // Record the apple's current global position before reparenting so it can be restored
+        Vector2 detachGlobalPos = GlobalPosition;
+
+        // If parent is the puff or its attach node, remove the apple safely
+        // Try to get the SceneTree and target root BEFORE removing the node from its parent.
+        var tree = GetTree();
+        if (tree == null)
+        {
+            // SceneTree not available - clear state and abort but keep node safe
+            Log.Warning("SceneTree missing during DeferredDetachFromPuff; clearing attachment state without reparent", "Apple");
+            _isAttachedToPuff = false;
+            _carryingPuff = null;
+            _originalParent = null;
+            _pendingDetachPuff = null;
+            return;
+        }
+
+        // Determine a sensible root to reparent to (prefer current scene)
+        Node root = tree.GetCurrentScene();
+        if (root == null)
+            root = tree.Root;
+
+        // If parent is the puff or its attach node, remove the apple safely
+        try { if (GetParent() != null) GetParent().RemoveChild(this); } catch { }
+
+        // Reparent to the determined root if not already parented there.
+        try
+        {
+            if (GetParent() == null && root != null)
+            {
+                root.AddChild(this);
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Log.Warning($"Failed to reparent apple during DeferredDetachFromPuff: {ex.Message}", "Apple");
+        }
+
+        // Restore the apple to the position it had while attached so it drops exactly where Puff was
+        GlobalPosition = detachGlobalPos;
+
+        // Clear attachment state and original parent reference
+        _isAttachedToPuff = false;
+        _carryingPuff = null;
+        _originalParent = null;
+        _pendingDetachPuff = null;
+
+        // Trigger normal fall behaviour so the apple becomes a ground apple
+        MakeAppleFall();
     }
     
     private void DeferredMakeAppleFall()
