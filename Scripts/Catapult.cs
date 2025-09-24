@@ -31,8 +31,11 @@ public partial class Catapult : Node2D, IPausable
 	[Export] public NodePath RigidBodyPath = "RigidBody2D";
 	[Export] public NodePath SpritesRootPath = "RigidBody2D/Sprites";
 	[Export] public NodePath SpoonPivotPath = "RigidBody2D/Sprites/SpoonPivot";
+	[Export] public NodePath HandleSpritePath = "RigidBody2D/Sprites/Handle";
 	[Export] public float SpoonTargetAngleDegrees { get; set; } = 45.0f;
 	[Export] public float SpoonRotationDuration { get; set; } = 0.2f;
+	[Export] public float HandleTargetAngleDegrees { get; set; } = 45.0f;
+	[Export] public float HandleRotationDuration { get; set; } = 0.2f;
 
 	// Trajectory preview settings (shown when player first presses E)
 	[Export] public float LaunchSpeed { get; set; } = 400.0f;
@@ -49,6 +52,8 @@ public partial class Catapult : Node2D, IPausable
 	private Sprite2D _wheelRight;
 	private Node2D _spoonPivot;
 	private object _spoonTween;
+	private Sprite2D _handleSprite;
+	private object _handleTween;
 	private Timer _puffPollTimer;
 	private Node2D _puffNodeRefForPoll;
 	private Vector2 _puffTargetPosForPoll = Vector2.Zero;
@@ -189,6 +194,19 @@ public partial class Catapult : Node2D, IPausable
 		{
 			// Ensure pivot starts at zero rotation
 			try { _spoonPivot.RotationDegrees = 0f; } catch {}
+		}
+
+		// Cache handle sprite (used for visual rotation when catapult is operated)
+		_handleSprite = _rigidBody.GetNodeOrNull<Sprite2D>(HandleSpritePath) ?? _rigidBody.GetNodeOrNull<Sprite2D>("Sprites/Handle");
+		if (_handleSprite != null)
+		{
+			// Ensure handle starts at zero rotation
+			try { _handleSprite.RotationDegrees = 0f; } catch {}
+			Log.Debug("Handle sprite found and initialized", "Catapult");
+		}
+		else
+		{
+			Log.Warning("Handle sprite not found - handle rotation will not work", "Catapult");
 		}
 	}
 
@@ -405,9 +423,10 @@ public partial class Catapult : Node2D, IPausable
 						if (!_spoonHasRotated)
 						{
 							TryRotateSpoonTo(SpoonTargetAngleDegrees, SpoonRotationDuration);
+							TryRotateHandleTo(HandleTargetAngleDegrees, HandleRotationDuration);
 							LaunchPuff(puffNode as Node2D, puffAI);
 							_spoonHasRotated = true;
-							Log.Debug("Spoon rotated and Puff launched by player", "Catapult");
+							Log.Debug("Spoon and handle rotated, Puff launched by player", "Catapult");
 						}
 						else
 						{
@@ -604,15 +623,17 @@ public partial class Catapult : Node2D, IPausable
 			return;
 		}
 
+		// Get launch position - use the same position as trajectory calculation
+		Vector2 launchPos = puffNode.GlobalPosition;
+		
 		// Calculate launch velocity using same physics as trajectory
 		float angleRad = Mathf.DegToRad(LaunchAngleDegrees);
 		
 		// Determine launch direction based on player position or default to right
+		// Use the same logic as trajectory calculation for consistency
 		float direction = 1.0f; // Default to right
 		if (_player != null)
 		{
-			// Get launch position
-			Vector2 launchPos = puffNode.GlobalPosition;
 			// Launch away from player (if player is on left, launch right, and vice versa)
 			if (_player.GlobalPosition.X < launchPos.X)
 				direction = 1.0f; // Launch right
@@ -620,32 +641,65 @@ public partial class Catapult : Node2D, IPausable
 				direction = -1.0f; // Launch left
 		}
 		
-		// Calculate initial velocity components matching the trajectory
+		// Calculate initial velocity components matching the trajectory exactly
 		float initialSpeedX = LaunchSpeed * Mathf.Cos(angleRad) * direction;
 		float initialSpeedY = -LaunchSpeed * Mathf.Sin(angleRad); // Negative for upward launch in Godot coordinates
 		
 		Vector2 launchVelocity = new Vector2(initialSpeedX, initialSpeedY);
+		
+		Log.Info($"Launching Puff from {launchPos} with velocity {launchVelocity} (angle: {LaunchAngleDegrees}°, direction: {direction})", "Catapult");
 
-		// Apply the launch velocity to Puff
+		// Apply the launch velocity to Puff FIRST before changing AI state
 		if (puffNode is CharacterBody2D characterBody)
 		{
 			// For CharacterBody2D, set the velocity directly
 			characterBody.Velocity = launchVelocity;
-			Log.Info($"Launched Puff (CharacterBody2D) with velocity: {launchVelocity}", "Catapult");
+			Log.Info($"Applied velocity to CharacterBody2D: {launchVelocity}", "Catapult");
+			
+			// Keep reapplying the velocity for a short time to ensure it sticks
+			var maintainTimer = GetTree().CreateTimer(0.5f);
+			float reapplyInterval = 0.02f;
+			int reapplyCount = 0;
+			var reapplyTimer = new Timer();
+			reapplyTimer.WaitTime = reapplyInterval;
+			reapplyTimer.OneShot = false;
+			reapplyTimer.Timeout += () => {
+				reapplyCount++;
+				if (IsInstanceValid(characterBody) && reapplyCount < 25) // Reapply for 0.5 seconds
+				{
+					// Only reapply if velocity is being overridden (getting too small)
+					if (characterBody.Velocity.Length() < launchVelocity.Length() * 0.8f)
+					{
+						characterBody.Velocity = launchVelocity;
+						Log.Debug($"Reapplied velocity to CharacterBody2D: {characterBody.Velocity}", "Catapult");
+					}
+				}
+				else
+				{
+					reapplyTimer.QueueFree();
+				}
+			};
+			AddChild(reapplyTimer);
+			reapplyTimer.Start();
 		}
 		else if (puffNode is RigidBody2D rigidBody)
 		{
 			// For RigidBody2D, apply impulse
 			rigidBody.LinearVelocity = launchVelocity;
-			Log.Info($"Launched Puff (RigidBody2D) with velocity: {launchVelocity}", "Catapult");
+			Log.Info($"Applied velocity to RigidBody2D: {launchVelocity}", "Catapult");
 		}
 		else
 		{
 			Log.Warning($"Puff node type {puffNode.GetType()} not supported for launching", "Catapult");
 		}
 
-		// Clear Puff from catapult stock state
-		puffAI.ClearStockPosition();
+		// Clear Puff from catapult stock state AFTER applying velocity and with delay
+		// This prevents the AI from immediately overriding the physics
+		var delayTimer = GetTree().CreateTimer(0.1f);
+		delayTimer.Timeout += () => {
+			puffAI.StartLaunching();
+			Log.Debug("Puff state cleared after launch delay", "Catapult");
+		};
 		
 		// Reset catapult state
 		_puffIsStocked = false;
@@ -790,6 +844,43 @@ public partial class Catapult : Node2D, IPausable
 	private void TryRotateSpoonBack(float duration)
 	{
 		TryRotateSpoonTo(0f, duration);
+		// Also rotate handle back to neutral when spoon returns to neutral
+		TryRotateHandleBack(HandleRotationDuration);
+	}
+
+	/// <summary>
+	/// Try to rotate the Handle to a target angle (degrees) over duration seconds.
+	/// Uses the scene tree tween API and cancels any previous handle tween.
+	/// </summary>
+	private void TryRotateHandleTo(float targetDegrees, float duration)
+	{
+		if (_handleSprite == null) return;
+		// Cancel existing tween if any
+		try
+		{
+			if (_handleTween is Tween existingTween)
+			{
+				existingTween.Kill();
+			}
+		}
+		catch {}
+		// Create new tween
+		try
+		{
+			var tween = GetTree().CreateTween();
+			tween.TweenProperty(_handleSprite, "rotation_degrees", targetDegrees, duration).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+			_handleTween = tween;
+			Log.Debug($"Started handle rotation to {targetDegrees} degrees over {duration} seconds", "Catapult");
+		}
+		catch (System.Exception ex)
+		{
+			Log.Warning($"Failed rotating handle sprite: {ex.Message}", "Catapult");
+		}
+	}
+
+	private void TryRotateHandleBack(float duration)
+	{
+		TryRotateHandleTo(0f, duration);
 	}
 
 	#region Detection Area Events

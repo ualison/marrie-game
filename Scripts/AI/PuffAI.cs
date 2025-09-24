@@ -21,7 +21,8 @@ namespace MarrieGame.AI
             Jump,
             Idle,
             FaceLeft,
-            FaceRight
+            FaceRight,
+            Launching
         }
         #endregion
 
@@ -68,6 +69,14 @@ namespace MarrieGame.AI
             ReturnToAppropriateState();
         }
 
+        public void StartLaunching()
+        {
+            // Called by catapult when launching Puff - prevents AI from interfering with launch physics
+            _hasStockPosition = false;
+            Log.Debug("PuffAI: Starting launching state", "PuffAI");
+            ChangeState(PuffState.Launching);
+        }
+
         #endregion
 
         #region Exported Properties
@@ -94,6 +103,7 @@ namespace MarrieGame.AI
         private PuffState _previousState = PuffState.Following;
         private Timer _stateTimer;
         private Timer _attackCooldownTimer;
+        private Timer _launchingTimer;
         #endregion
 
         #region Components
@@ -241,6 +251,13 @@ namespace MarrieGame.AI
             _attackCooldownTimer.OneShot = true;
             _attackCooldownTimer.Timeout += OnAttackCooldownFinished;
             AddChild(_attackCooldownTimer);
+
+            // Launching timer - prevents AI from interfering with launch physics
+            _launchingTimer = new Timer();
+            _launchingTimer.WaitTime = 1.0f; // 1 second should be enough for launch physics
+            _launchingTimer.OneShot = true;
+            _launchingTimer.Timeout += OnLaunchingFinished;
+            AddChild(_launchingTimer);
         }
 
         private void InitializeEnergy()
@@ -576,6 +593,11 @@ namespace MarrieGame.AI
                 case PuffState.FaceRight:
                     // Facing states are brief - just used for orientation
                     break;
+                case PuffState.Launching:
+                    // Don't modify velocity - let catapult launch physics work
+                    Log.Debug("PuffAI: Entered Launching state, starting launch timer", "PuffAI");
+                    _launchingTimer.Start();
+                    break;
             }
         }
 
@@ -610,6 +632,9 @@ namespace MarrieGame.AI
                     break;
                 case PuffState.FaceRight:
                     UpdateFacingBehavior();
+                    break;
+                case PuffState.Launching:
+                    UpdateLaunchingBehavior();
                     break;
             }
         }
@@ -1292,6 +1317,12 @@ namespace MarrieGame.AI
         {
             _canAttack = true;
         }
+
+        private void OnLaunchingFinished()
+        {
+            Log.Debug("PuffAI: Launching timer finished, returning to appropriate state", "PuffAI");
+            ReturnToAppropriateState();
+        }
         #endregion
 
         #region Jump Behavior
@@ -1347,6 +1378,16 @@ namespace MarrieGame.AI
             {
                 ReturnToAppropriateState();
             }
+        }
+
+        private void UpdateLaunchingBehavior()
+        {
+            // During launching state, do absolutely nothing - let the catapult-applied physics work
+            // The only velocity changes should be from gravity and the initial launch velocity
+            // The launching timer will handle transitioning back to appropriate state
+            
+            // Don't apply any movement or following behavior - just let physics work
+            // Gravity is already applied in ApplyGravity() called from _PhysicsProcess
         }
         #endregion
 
