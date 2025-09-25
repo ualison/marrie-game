@@ -1,43 +1,49 @@
-[gd_scene load_steps=3 format=3 uid="uid://bjv4m5whn2djf"]
+[gd_scene load_steps=4 format=3 uid="uid://bjv4m5whn2djf"]
 
 [ext_resource type="Script" uid="uid://b31msy55cstja" path="res://Scripts/UI/GameMessage.cs" id="1_gamemessage"]
-[ext_resource type="Texture2D" uid="uid://dgt1qlw7a46lr" path="res://Art/TextBoxMessage.png" id="2_textboxbg"]
+[ext_resource type="Texture2D" uid="uid://cupek236utd7e" path="res://Art/DialogBackground.png" id="2_q6mr5"]
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_negf2"]
+texture = ExtResource("2_q6mr5")
 
 [node name="GameMessage" type="Control" groups=["game_message_ui"]]
 layout_mode = 3
-anchors_preset = 0
-offset_right = 400.0
-offset_bottom = 100.0
-script = ExtResource("1_gamemessage")
-
-[node name="MessageBackground" type="NinePatchRect" parent="."]
-layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-texture = ExtResource("2_textboxbg")
-patch_margin_left = 32
-patch_margin_top = 32
-patch_margin_right = 32
-patch_margin_bottom = 32
+script = ExtResource("1_gamemessage")
+
+[node name="MessageBackground" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -134.5
+offset_right = 400.0
+offset_bottom = 134.5
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxTexture_negf2")
 
 [node name="MessageLabel" type="Label" parent="MessageBackground"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 16.0
-offset_top = 16.0
-offset_right = -16.0
-offset_bottom = -16.0
+offset_left = 67.0
+offset_top = 67.0
+offset_right = -71.0
+offset_bottom = -58.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
-theme_override_font_sizes/font_size = 18
-text = "Message Text"
+theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
+theme_override_font_sizes/font_size = 16
+text = "MESSAGE"
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3

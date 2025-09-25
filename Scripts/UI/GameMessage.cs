@@ -15,7 +15,7 @@ public partial class GameMessage : Control
     #endregion
 
     #region UI Components
-    private NinePatchRect _messageBackground;
+    private Panel _messageBackground;
     private Label _messageLabel;
     private Timer _displayTimer;
     private Tween _animationTween;
@@ -41,12 +41,12 @@ public partial class GameMessage : Control
     private void InitializeComponents()
     {
         // Get UI components with error handling via NodeHelpers
-    _messageBackground = NodeHelpers.GetNodeOrNull<NinePatchRect>(this, null, "MessageBackground");
+    _messageBackground = NodeHelpers.GetNodeOrNull<Panel>(this, null, "MessageBackground");
     _messageLabel = NodeHelpers.GetNodeOrNull<Label>(this, null, "MessageBackground/MessageLabel");
         
         if (_messageBackground == null)
         {
-            Log.Error("MessageBackground (NinePatchRect) not found!", "GameMessage");
+            Log.Error("MessageBackground (Panel) not found!", "GameMessage");
         }
         
         if (_messageLabel == null)
@@ -133,19 +133,13 @@ public partial class GameMessage : Control
     {
         _isShowing = true;
         
-        // Position at screen center with offset
+        // Position the GameMessage control to fill the screen so MessageBackground can center properly
         var viewport = GetViewport();
         if (viewport != null)
         {
             var screenSize = viewport.GetVisibleRect().Size;
-            var centerPos = screenSize / 2 + MessageOffset;
-            // Center the message based on its size
-            if (_messageBackground != null)
-            {
-                centerPos.X -= _messageBackground.Size.X / 2;
-                centerPos.Y -= _messageBackground.Size.Y / 2;
-            }
-            Position = centerPos;
+            Position = Vector2.Zero;
+            Size = screenSize;
         }
         
         Show();
