@@ -90,4 +90,4 @@ TrajectorySamples = 60
 TrajectorySampleDt = 0.07
 
 [node name="Haze" parent="." instance=ExtResource("14_sm6w1")]
-position = Vector2(168, 224)
+position = Vector2(191, 219)

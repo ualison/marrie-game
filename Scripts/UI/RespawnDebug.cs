@@ -147,7 +147,7 @@ public partial class RespawnDebug : Control
             localDisplay = activeLocalLeft > 0 ? $"{activeLocalLeft:F1}s (active)" : $"{EnemyManager.Instance.LocalHideTime:F1}s (config)";
         }
 
-        _headerLabel.Text = $"Reality: {currentReality}\nMonster Global Time: {globalDisplay}\nMonster Local Time: {localDisplay}";
+        _headerLabel.Text = $"Reality: {currentReality}\nMonster Local Time: {localDisplay}";
     }
 
     private void UpdatePairsList()

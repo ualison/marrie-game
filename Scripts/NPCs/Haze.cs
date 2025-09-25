@@ -30,8 +30,8 @@ public partial class Haze : Node2D
     #region Initialization
     public override void _Ready()
     {
-        // Use CallDeferred to avoid node setup conflicts
-        CallDeferred(nameof(InitializeComponents));
+        GD.Print("Haze: _Ready called");
+        InitializeComponents();
         SetProcess(true);
     }
 
@@ -58,18 +58,16 @@ public partial class Haze : Node2D
         // Get existing prompt label from prefab
         _promptLabel = GetNodeOrNull<Label>("PromptLabel");
         
-        // Create detection area
-        _detectionArea = new Area2D();
-        _detectionArea.Name = "DetectionArea";
-        _detectionArea.CollisionMask = 2; // Player layer
-        AddChild(_detectionArea);
-        
-        // Create collision shape for detection
-        var collisionShape = new CollisionShape2D();
-        var circleShape = new CircleShape2D();
-        circleShape.Radius = 80.0f; // Detection radius
-        collisionShape.Shape = circleShape;
-        _detectionArea.AddChild(collisionShape);
+        // Get the detection area from the scene
+        _detectionArea = GetNodeOrNull<Area2D>("DetectionArea");
+        if (_detectionArea == null)
+        {
+            GD.PrintErr("DetectionArea not found in Haze scene!");
+        }
+        else
+        {
+            GD.Print("DetectionArea found successfully");
+        }
         
         // Style the existing prompt label
         if (_promptLabel != null)
@@ -77,19 +75,50 @@ public partial class Haze : Node2D
             _promptLabel.AddThemeColorOverride("font_color", Colors.White);
             _promptLabel.AddThemeColorOverride("font_shadow_color", Colors.Black);
             _promptLabel.AddThemeFontSizeOverride("font_size", 14);
+            _promptLabel.Hide(); // Make sure it starts hidden
         }
         
         // Connect signals and setup after everything is created
         ConnectSignals();
         SetupPromptLabel();
+        
+        GD.Print("Haze initialized successfully");
     }
 
     private void ConnectSignals()
     {
         if (_detectionArea != null)
         {
-            _detectionArea.BodyEntered += OnPlayerEntered;
-            _detectionArea.BodyExited += OnPlayerExited;
+            // Try C# event subscription first
+            try
+            {
+                _detectionArea.BodyEntered += OnPlayerEntered;
+                _detectionArea.BodyExited += OnPlayerExited;
+                GD.Print("Haze: Signals connected via C# events");
+            }
+            catch (System.Exception e)
+            {
+                GD.PrintErr($"Haze: C# event subscription failed: {e.Message}");
+            }
+
+            // Fallback: use Godot Connect to ensure signal arrives
+            try
+            {
+                _detectionArea.Connect("body_entered", new Callable(this, nameof(OnPlayerEntered)));
+                _detectionArea.Connect("body_exited", new Callable(this, nameof(OnPlayerExited)));
+                GD.Print("Haze: Signals connected via Connect() fallback");
+            }
+            catch (System.Exception e)
+            {
+                GD.PrintErr($"Haze: Connect() fallback failed: {e.Message}");
+            }
+
+            // Print detection area properties for debugging
+            GD.Print($"Haze: DetectionArea.monitoring={_detectionArea.Monitoring}, monitorable={_detectionArea.Monitorable}, collision_layer={_detectionArea.CollisionLayer}, collision_mask={_detectionArea.CollisionMask}");
+        }
+        else
+        {
+            GD.PrintErr("Haze: Cannot connect signals - DetectionArea is null!");
         }
     }
 
@@ -99,6 +128,11 @@ public partial class Haze : Node2D
         {
             _promptLabel.HorizontalAlignment = HorizontalAlignment.Center;
             _promptLabel.Hide();
+            GD.Print("Haze: Prompt label setup complete");
+        }
+        else
+        {
+            GD.PrintErr("Haze: PromptLabel not found!");
         }
     }
     #endregion
@@ -106,12 +140,16 @@ public partial class Haze : Node2D
     #region Input Processing
     public override void _Process(double delta)
     {
-        if (_hasDisappeared || !_playerNearby)
+        if (_hasDisappeared)
             return;
 
-        if (Input.IsActionJustPressed("interact"))
+        if (_playerNearby)
         {
-            StartDialog();
+            if (Input.IsActionJustPressed("interact"))
+            {
+                GD.Print("Haze: Interact key pressed, starting dialog");
+                StartDialog();
+            }
         }
     }
     #endregion
@@ -119,20 +157,38 @@ public partial class Haze : Node2D
     #region Player Detection
     private void OnPlayerEntered(Node2D body)
     {
-        if (body.IsInGroup("player") && !_hasDisappeared)
+        GD.Print($"Haze: Body entered - {body.Name} (Groups: {string.Join(", ", body.GetGroups())})");
+        
+        // Try multiple ways to detect the player
+        bool isPlayer = body.IsInGroup("player") || 
+                       body.Name.ToString().ToLower().Contains("player") ||
+                       body.GetType().Name.ToLower().Contains("player");
+        
+        if (isPlayer && !_hasDisappeared)
         {
             _playerNearby = true;
             if (_promptLabel != null)
             {
                 _promptLabel.Show();
+                GD.Print("Player nearby Haze - showing prompt");
             }
-            GD.Print("Player nearby Haze - showing prompt");
+            else
+            {
+                GD.Print("Player nearby but prompt label is null!");
+            }
         }
     }
 
     private void OnPlayerExited(Node2D body)
     {
-        if (body.IsInGroup("player"))
+        GD.Print($"Haze: Body exited - {body.Name}");
+        
+        // Try multiple ways to detect the player
+        bool isPlayer = body.IsInGroup("player") || 
+                       body.Name.ToString().ToLower().Contains("player") ||
+                       body.GetType().Name.ToLower().Contains("player");
+        
+        if (isPlayer)
         {
             _playerNearby = false;
             if (_promptLabel != null)
@@ -155,11 +211,23 @@ public partial class Haze : Node2D
     #region Dialog System
     private void StartDialog()
     {
-        if (DialogManager.Instance != null && !DialogManager.Instance.IsDialogActive())
+        GD.Print("Haze: Attempting to start dialog...");
+        
+        if (DialogManager.Instance == null)
         {
-            _promptLabel.Hide();
+            GD.PrintErr("Haze: DialogManager.Instance is null!");
+            return;
+        }
+        
+        if (!DialogManager.Instance.IsDialogActive())
+        {
+            _promptLabel?.Hide();
             DialogManager.Instance.StartDialog("haze_encounter", this);
-            GD.Print("Starting Haze dialog");
+            GD.Print("Haze: Dialog started successfully");
+        }
+        else
+        {
+            GD.Print("Haze: Dialog already active, not starting new one");
         }
     }
 
@@ -377,8 +445,24 @@ public partial class Haze : Node2D
     {
         if (_detectionArea != null)
         {
-            _detectionArea.BodyEntered -= OnPlayerEntered;
-            _detectionArea.BodyExited -= OnPlayerExited;
+            try
+            {
+                _detectionArea.BodyEntered -= OnPlayerEntered;
+                _detectionArea.BodyExited -= OnPlayerExited;
+            }
+            catch { }
+
+            // Attempt to disconnect Godot-style signals if connected
+            try
+            {
+                _detectionArea.Disconnect("body_entered", new Callable(this, nameof(OnPlayerEntered)));
+            }
+            catch { }
+            try
+            {
+                _detectionArea.Disconnect("body_exited", new Callable(this, nameof(OnPlayerExited)));
+            }
+            catch { }
         }
         
         // Clean up crystal animation tweens

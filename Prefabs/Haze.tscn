@@ -1,9 +1,12 @@
-[gd_scene load_steps=5 format=3 uid="uid://dgmpsx8qec0pg"]
+[gd_scene load_steps=6 format=3 uid="uid://dgmpsx8qec0pg"]
 
 [ext_resource type="Texture2D" uid="uid://dm1g6uy2xcy1c" path="res://Art/Haze.png" id="1_yaj4r"]
 [ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="2_cbi2h"]
 [ext_resource type="Texture2D" uid="uid://du8wmkhu6j7p1" path="res://Art/DimensionCrystal.png" id="2_wnvcy"]
 [ext_resource type="Script" uid="uid://dxygaxuxh7p0i" path="res://Scripts/NPCs/Haze.cs" id="3_haze_script"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_1"]
+radius = 80.0
 
 [node name="Haze" type="Node2D"]
 script = ExtResource("3_haze_script")
@@ -19,7 +22,14 @@ position = Vector2(0, -82)
 scale = Vector2(0.037623778, 0.033910327)
 texture = ExtResource("2_wnvcy")
 
+[node name="DetectionArea" type="Area2D" parent="."]
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DetectionArea"]
+shape = SubResource("CircleShape2D_1")
+
 [node name="PromptLabel" type="Label" parent="."]
+visible = false
 offset_left = -54.0
 offset_top = -140.0
 offset_right = 59.0

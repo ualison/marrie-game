@@ -49,8 +49,9 @@ public partial class DialogManager : Node
         canvasLayer.Layer = 100; // High layer to render on top
         GetTree().Root.CallDeferred("add_child", canvasLayer);
         
-        // Create dialog UI and add it to the canvas layer with deferred call
-        _dialogUI = new DialogUI();
+        // Load and instantiate the DialogUI prefab scene
+        var dialogUIScene = GD.Load<PackedScene>("res://Prefabs/DialogUI.tscn");
+        _dialogUI = dialogUIScene.Instantiate<DialogUI>();
         _dialogUI.Name = "DialogUI";
         canvasLayer.CallDeferred("add_child", _dialogUI);
         

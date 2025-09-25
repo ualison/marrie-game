@@ -1,0 +1,199 @@
+[gd_scene load_steps=8 format=3 uid="uid://j4f3eruffbm4"]
+
+[ext_resource type="Script" uid="uid://m4rkiv08ru77" path="res://Scripts/Dialog/DialogUI.cs" id="1_n3mxg"]
+[ext_resource type="Texture2D" uid="uid://cupek236utd7e" path="res://Art/DialogBackground.png" id="2_dialog_bg"]
+[ext_resource type="Texture2D" uid="uid://b048utqew270k" path="res://Art/DialogButtonUnactive.png" id="4_dialog_btn_inactive"]
+[ext_resource type="Texture2D" uid="uid://jospwn0er7na" path="res://Art/DialogButtonActive.png" id="5_dialog_btn_active"]
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_1"]
+texture = ExtResource("2_dialog_bg")
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_2"]
+texture = ExtResource("4_dialog_btn_inactive")
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_3"]
+texture = ExtResource("5_dialog_btn_active")
+
+[node name="DialogUI" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_n3mxg")
+
+[node name="BackgroundPanel" type="Panel" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -350.0
+offset_top = -200.0
+offset_right = 350.0
+offset_bottom = 50.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxTexture_1")
+
+[node name="PhraseLabel" type="Label" parent="BackgroundPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 53.0
+offset_top = 44.0
+offset_right = -51.0
+offset_bottom = -81.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
+theme_override_font_sizes/font_size = 16
+text = "SAY A PHRASE
+ASK IF WANT CONTINUE"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="ButtonContainer" type="HBoxContainer" parent="BackgroundPanel"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 204.0
+offset_top = -81.0
+offset_right = -214.0
+offset_bottom = -31.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 15
+alignment = 1
+
+[node name="YesButton" type="Button" parent="BackgroundPanel/ButtonContainer"]
+custom_minimum_size = Vector2(100, 30)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxTexture_2")
+theme_override_styles/pressed = SubResource("StyleBoxTexture_3")
+theme_override_styles/hover = SubResource("StyleBoxTexture_3")
+text = "YES"
+
+[node name="NoButton" type="Button" parent="BackgroundPanel/ButtonContainer"]
+custom_minimum_size = Vector2(100, 30)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxTexture_2")
+theme_override_styles/pressed = SubResource("StyleBoxTexture_3")
+theme_override_styles/hover = SubResource("StyleBoxTexture_3")
+text = "NO"
+
+[node name="QuestionPanel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -175.0
+offset_right = 400.0
+offset_bottom = 94.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxTexture_1")
+
+[node name="QuestionLabel" type="Label" parent="QuestionPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 58.0
+offset_top = 58.0
+offset_right = -62.0
+offset_bottom = -118.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
+theme_override_font_sizes/font_size = 16
+text = "QUESTION/ENIGMA"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="TimerLabel" type="Label" parent="QuestionPanel"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 58.0
+offset_top = -113.0
+offset_right = -62.0
+offset_bottom = -93.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 0.7, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+text = "Time: 30s"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="AnswersContainer" type="HBoxContainer" parent="QuestionPanel"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 83.0
+offset_top = -86.0
+offset_right = -87.0
+offset_bottom = -36.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 15
+alignment = 1
+
+[node name="Answer1Button" type="Button" parent="QuestionPanel/AnswersContainer"]
+clip_contents = true
+custom_minimum_size = Vector2(200, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxTexture_2")
+theme_override_styles/pressed = SubResource("StyleBoxTexture_3")
+theme_override_styles/hover = SubResource("StyleBoxTexture_3")
+text = "ANSWER 1"
+autowrap_mode = 3
+
+[node name="Answer2Button" type="Button" parent="QuestionPanel/AnswersContainer"]
+clip_contents = true
+custom_minimum_size = Vector2(200, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxTexture_2")
+theme_override_styles/pressed = SubResource("StyleBoxTexture_3")
+theme_override_styles/hover = SubResource("StyleBoxTexture_3")
+text = "ANSWER 2"
+autowrap_mode = 3
+
+[node name="Answer3Button" type="Button" parent="QuestionPanel/AnswersContainer"]
+clip_contents = true
+custom_minimum_size = Vector2(200, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxTexture_2")
+theme_override_styles/pressed = SubResource("StyleBoxTexture_3")
+theme_override_styles/hover = SubResource("StyleBoxTexture_3")
+text = "ANSWER 3"
+autowrap_mode = 3
