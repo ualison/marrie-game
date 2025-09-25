@@ -23,6 +23,9 @@ public partial class DialogManager : Node
     private DialogEntry _currentDialog;
     private Node2D _currentNPC;
     private System.Random _random = new System.Random();
+    private bool _playerAgreedToQuestions = false; // Track if player said YES but hasn't answered yet
+    private DialogEntry _initialDialog; // Store the initial dialog to access textWhenGoOut
+    private bool _isHandlingExit = false; // Prevent multiple exit handling
     #endregion
 
     #region Initialization
@@ -63,9 +66,22 @@ public partial class DialogManager : Node
     {
         if (_dialogUI != null)
         {
-            _dialogUI.DialogClosed += OnDialogClosed;
+            _dialogUI.DialogClosed += OnDialogUICloseRequested;
             _dialogUI.ChoiceSelected += OnChoiceSelected;
         }
+    }
+    
+    private void OnDialogUICloseRequested()
+    {
+        // This is called when the UI requests to close (like when message timer expires)
+        GD.Print("DialogUI requested close - cleaning up state");
+        // Don't call OnDialogClosed() here since we already cleaned up state in HandlePlayerExitWithoutAnswering
+        // Just ensure the state is properly reset
+        _currentDialog = null;
+        _currentNPC = null;
+        _initialDialog = null;
+        _playerAgreedToQuestions = false;
+        _isHandlingExit = false;
     }
 
     private void LoadDialogData()
@@ -123,6 +139,8 @@ public partial class DialogManager : Node
 
         _currentDialog = dialog;
         _currentNPC = npc;
+        _initialDialog = dialog; // Store initial dialog for textWhenGoOut access
+        _playerAgreedToQuestions = false; // Reset state
         
         ShowDialog(dialog);
         GD.Print($"Started dialog: {dialogId}");
@@ -137,9 +155,23 @@ public partial class DialogManager : Node
     {
         if (_dialogUI != null && _dialogUI.Visible)
         {
+            GD.Print($"CloseDialog called - _playerAgreedToQuestions: {_playerAgreedToQuestions}, _initialDialog != null: {_initialDialog != null}, _isHandlingExit: {_isHandlingExit}");
+            
+            // Check if player agreed to questions but is leaving without answering
+            if (_playerAgreedToQuestions && _initialDialog != null && !_isHandlingExit)
+            {
+                GD.Print("Detected player exit without answering - calling HandlePlayerExitWithoutAnswering");
+                HandlePlayerExitWithoutAnswering();
+                return;
+            }
+            
             _dialogUI.HideDialog();
             OnDialogClosed();
             GD.Print("Dialog closed by external request");
+        }
+        else
+        {
+            GD.Print("CloseDialog called but dialog UI is null or not visible");
         }
     }
     #endregion
@@ -220,6 +252,12 @@ public partial class DialogManager : Node
     {
         GD.Print($"Processing choice: {choice.Text}, IsCorrect: {choice.IsCorrect}, Action: {choice.Action}");
         
+        // If this is an answer to a question, reset the agreed flag since player has now answered
+        if (_playerAgreedToQuestions && (choice.IsCorrect || choice.Action == "wrong_answer"))
+        {
+            _playerAgreedToQuestions = false;
+        }
+        
         if (choice.IsCorrect)
         {
             HandleCorrectAnswer();
@@ -246,6 +284,10 @@ public partial class DialogManager : Node
 
     private void HandleYesChoice()
     {
+        // Player agreed to answer questions
+        _playerAgreedToQuestions = true;
+        GD.Print("HandleYesChoice called - set _playerAgreedToQuestions = true");
+        
         // Move to the question phase - look for "dark_questions" dialog
         var questionDialog = _dialogData.Dialogs.FirstOrDefault(d => d.Id == "dark_questions");
         if (questionDialog != null)
@@ -294,6 +336,7 @@ public partial class DialogManager : Node
     private void CompleteCorrectAnswer()
     {
         // Player answered correctly - let NPC handle reward spawning
+        _playerAgreedToQuestions = false; // Reset flag since interaction is complete
         _dialogUI.HideDialog();
         
         // Make Haze disappear and handle its own crystal spawning
@@ -308,6 +351,7 @@ public partial class DialogManager : Node
     private void HandleWrongAnswer()
     {
         // Player answered wrong - Haze disappears
+        _playerAgreedToQuestions = false; // Reset flag since interaction is complete
         _dialogUI.HideDialog();
         
         if (_currentNPC != null && _currentNPC.HasMethod("OnWrongAnswer"))
@@ -316,10 +360,59 @@ public partial class DialogManager : Node
         }
     }
 
+    private void HandlePlayerExitWithoutAnswering()
+    {
+        // Prevent multiple calls
+        if (_isHandlingExit) return;
+        _isHandlingExit = true;
+        
+        // Player said YES but left without answering - show textWhenGoOut message and make Haze disappear
+        GD.Print("HandlePlayerExitWithoutAnswering called - showing exit message");
+        
+        string exitMessage = "You left without answering..."; // Default message
+        
+        // Get textWhenGoOut from the initial dialog
+        if (_initialDialog != null && !string.IsNullOrEmpty(_initialDialog.TextWhenGoOut))
+        {
+            exitMessage = _initialDialog.TextWhenGoOut;
+            GD.Print($"Using textWhenGoOut: {exitMessage}");
+        }
+        else
+        {
+            GD.Print("Using default exit message");
+        }
+        
+        // Show the exit message using the MessagePanel with configurable display time
+        float messageDisplayTime = 4.0f; // 4 seconds display time
+        GD.Print($"Showing exit message: {exitMessage} for {messageDisplayTime} seconds");
+        _dialogUI.ShowMessage(exitMessage, messageDisplayTime);
+        
+        // Make Haze disappear immediately, don't wait for the message timer
+        GD.Print("Making Haze disappear immediately after showing exit message");
+        if (_currentNPC != null && _currentNPC.HasMethod("OnPlayerExitWithoutAnswering"))
+        {
+            _currentNPC.Call("OnPlayerExitWithoutAnswering");
+        }
+        else if (_currentNPC != null && _currentNPC.HasMethod("OnWrongAnswer"))
+        {
+            // Fallback to wrong answer method if the specific method doesn't exist
+            _currentNPC.Call("OnWrongAnswer");
+        }
+        
+        // Clean up dialog state immediately
+        OnDialogClosed();
+        
+        _playerAgreedToQuestions = false; // Reset flag
+    }
+
     private void OnDialogClosed()
     {
+        GD.Print("OnDialogClosed called - cleaning up dialog state");
         _currentDialog = null;
         _currentNPC = null;
+        _initialDialog = null;
+        _playerAgreedToQuestions = false;
+        _isHandlingExit = false; // Reset the exit handling flag
     }
     #endregion
 

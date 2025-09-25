@@ -188,7 +188,7 @@ public partial class Haze : Node2D
                        body.Name.ToString().ToLower().Contains("player") ||
                        body.GetType().Name.ToLower().Contains("player");
         
-        if (isPlayer)
+        if (isPlayer && !_hasDisappeared)
         {
             _playerNearby = false;
             if (_promptLabel != null)
@@ -204,6 +204,10 @@ public partial class Haze : Node2D
             }
             
             GD.Print("Player left Haze - hiding prompt");
+        }
+        else if (isPlayer && _hasDisappeared)
+        {
+            GD.Print("Player left area but Haze has already disappeared - ignoring");
         }
     }
     #endregion
@@ -242,6 +246,13 @@ public partial class Haze : Node2D
     public void OnWrongAnswer()
     {
         GD.Print("Haze: Player answered wrong! Disappearing...");
+        DisappearWithAnimation();
+    }
+
+    // Called by DialogManager when player exits without answering after agreeing to questions
+    public void OnPlayerExitWithoutAnswering()
+    {
+        GD.Print("Haze: Player left without answering after agreeing! Disappearing...");
         DisappearWithAnimation();
     }
     #endregion

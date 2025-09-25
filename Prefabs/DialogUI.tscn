@@ -24,7 +24,6 @@ grow_vertical = 2
 script = ExtResource("1_n3mxg")
 
 [node name="BackgroundPanel" type="Panel" parent="."]
-visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -94,6 +93,7 @@ theme_override_styles/hover = SubResource("StyleBoxTexture_3")
 text = "NO"
 
 [node name="QuestionPanel" type="Panel" parent="."]
+visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -196,4 +196,38 @@ theme_override_styles/normal = SubResource("StyleBoxTexture_2")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_3")
 theme_override_styles/hover = SubResource("StyleBoxTexture_3")
 text = "ANSWER 3"
+autowrap_mode = 3
+
+[node name="MessagePanel" type="Panel" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -175.0
+offset_right = 400.0
+offset_bottom = 94.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxTexture_1")
+
+[node name="MessageLabel" type="Label" parent="MessagePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 67.0
+offset_top = 67.0
+offset_right = -71.0
+offset_bottom = -58.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
+theme_override_font_sizes/font_size = 16
+text = "QUESTION/ENIGMA"
+horizontal_alignment = 1
+vertical_alignment = 1
 autowrap_mode = 3

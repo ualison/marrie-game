@@ -31,6 +31,10 @@ public partial class DialogUI : Control
     [Export] private Button _answer1Button;
     [Export] private Button _answer2Button;
     [Export] private Button _answer3Button;
+    
+    // Message UI elements
+    [Export] private Panel _messagePanel;
+    [Export] private Label _messageLabel;
     #endregion
 
     #region State
@@ -72,6 +76,10 @@ public partial class DialogUI : Control
         _answer1Button = GetNode<Button>("QuestionPanel/AnswersContainer/Answer1Button");
         _answer2Button = GetNode<Button>("QuestionPanel/AnswersContainer/Answer2Button");
         _answer3Button = GetNode<Button>("QuestionPanel/AnswersContainer/Answer3Button");
+        
+        // Message panel nodes
+        _messagePanel = GetNode<Panel>("MessagePanel");
+        _messageLabel = GetNode<Label>("MessagePanel/MessageLabel");
     }
 
     private void SetupStyling()
@@ -88,6 +96,7 @@ public partial class DialogUI : Control
         // Initialize panels as invisible for fade effects
         _backgroundPanel.Modulate = new Color(1, 1, 1, 0);
         _questionPanel.Modulate = new Color(1, 1, 1, 0);
+        _messagePanel.Modulate = new Color(1, 1, 1, 0);
     }
 
     private void ConnectSignals()
@@ -103,14 +112,33 @@ public partial class DialogUI : Control
     #region Public API
     public void ShowInitialDialog(string text)
     {
+        GD.Print($"ShowInitialDialog called with text: {text}");
         _phraseLabel.Text = text;
-        _backgroundPanel.Show();
-        _questionPanel.Hide();
         _isShowingQuestion = false;
         Show();
         
-        // Fade in the background panel
-        FadeInPanel(_backgroundPanel);
+        // Stop any running timer first
+        StopTimer();
+        
+        // If question panel is currently visible, fade it out first, then show background
+        if (_questionPanel.Visible)
+        {
+            GD.Print("Question panel is visible, fading it out first");
+            FadeOutPanel(_questionPanel, () => {
+                _questionPanel.Hide();
+                _backgroundPanel.Show();
+                GD.Print("Showing background panel with exit message");
+                FadeInPanel(_backgroundPanel);
+            });
+        }
+        else
+        {
+            // Question panel not visible, just show background panel
+            GD.Print("Question panel not visible, directly showing background panel");
+            _questionPanel.Hide();
+            _backgroundPanel.Show();
+            FadeInPanel(_backgroundPanel);
+        }
     }
 
     public void ShowQuestion(DialogQuestion question)
@@ -146,12 +174,74 @@ public partial class DialogUI : Control
         ShowQuestion(question);
     }
 
+    public void ShowMessage(string text, float displayTime = 3.0f)
+    {
+        GD.Print($"ShowMessage called with text: {text}, displayTime: {displayTime}");
+        _messageLabel.Text = text;
+        _isShowingQuestion = false;
+        Show();
+        
+        // Stop any running timer first
+        StopTimer();
+        
+        // Hide other panels and show message panel
+        if (_questionPanel.Visible)
+        {
+            GD.Print("Question panel is visible, fading it out first");
+            FadeOutPanel(_questionPanel, () => {
+                _questionPanel.Hide();
+                _backgroundPanel.Hide();
+                _messagePanel.Show();
+                GD.Print("Showing message panel");
+                FadeInPanel(_messagePanel);
+            });
+        }
+        else if (_backgroundPanel.Visible)
+        {
+            GD.Print("Background panel is visible, fading it out first");
+            FadeOutPanel(_backgroundPanel, () => {
+                _backgroundPanel.Hide();
+                _questionPanel.Hide();
+                _messagePanel.Show();
+                GD.Print("Showing message panel");
+                FadeInPanel(_messagePanel);
+            });
+        }
+        else
+        {
+            // No other panels visible, just show message panel
+            GD.Print("No other panels visible, directly showing message panel");
+            _backgroundPanel.Hide();
+            _questionPanel.Hide();
+            _messagePanel.Show();
+            FadeInPanel(_messagePanel);
+        }
+        
+        // Auto-hide after specified time
+        if (displayTime > 0)
+        {
+            var timer = GetTree().CreateTimer(displayTime);
+            timer.Timeout += () => {
+                GD.Print($"Message display time ({displayTime}s) expired - hiding message");
+                HideDialog();
+                // Emit dialog closed signal to properly clean up state
+                EmitSignal(SignalName.DialogClosed);
+            };
+        }
+    }
+
     public void HideDialog()
     {
         StopTimer();
         
         // Fade out current visible panel
-        if (_isShowingQuestion && _questionPanel.Visible)
+        if (_messagePanel.Visible)
+        {
+            FadeOutPanel(_messagePanel, () => {
+                CompleteHideDialog();
+            });
+        }
+        else if (_isShowingQuestion && _questionPanel.Visible)
         {
             FadeOutPanel(_questionPanel, () => {
                 CompleteHideDialog();
@@ -174,6 +264,7 @@ public partial class DialogUI : Control
         Hide();
         _backgroundPanel.Hide();
         _questionPanel.Hide();
+        _messagePanel.Hide();
         _isShowingQuestion = false;
     }
     #endregion

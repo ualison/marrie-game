@@ -4,6 +4,7 @@
 	  "id": "haze_encounter",
 	  "npcId": "haze_monster",
 	  "text": "I am the Haze Monster. You're trapped here now, where IT stalks between the trees, devouring all who enter. Answer my riddles or wander these woods until the creature finds you. No one survives the hunt.The shadows stir. It comes. Are you ready?",
+	  "textWhenGoOut": "Ok. See you! or not...",
 	  "askContinue": true,
 	  "choices": [
 		{
