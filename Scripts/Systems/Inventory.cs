@@ -13,6 +13,7 @@ public partial class Inventory : Node
     #region State
     private int _rockCount = 10;
     private int _keyCount = 0; // Number of PuffCageKeys collected
+    private int _purpleAppleCount = 2; // Number of Purple Apples collected
     #endregion
 
     #region Signals
@@ -21,6 +22,9 @@ public partial class Inventory : Node
     
     [Signal]
     public delegate void KeyCountChangedEventHandler(int newCount);
+    
+    [Signal]
+    public delegate void PurpleAppleCountChangedEventHandler(int newCount);
     #endregion
 
     #region Initialization
@@ -224,6 +228,94 @@ public partial class Inventory : Node
     }
     #endregion
 
+    #region Purple Apple Management
+    /// <summary>
+    /// Adds Purple Apples to the inventory
+    /// </summary>
+    /// <param name="amount">Number of Purple Apples to add</param>
+    /// <returns>True if Purple Apples were added successfully</returns>
+    public bool AddPurpleApples(int amount)
+    {
+        if (amount <= 0)
+        {
+            Log.Warning($"Invalid Purple Apple amount: {amount}", "Inventory");
+            return false;
+        }
+
+        _purpleAppleCount += amount;
+        Log.Debug($"Added {amount} Purple Apples. Total: {_purpleAppleCount}", "Inventory");
+
+        // Emit signal for UI updates
+        EmitSignal(SignalName.PurpleAppleCountChanged, _purpleAppleCount);
+        return true;
+    }
+
+    /// <summary>
+    /// Removes Purple Apples from the inventory
+    /// </summary>
+    /// <param name="amount">Number of Purple Apples to remove</param>
+    /// <returns>True if Purple Apples were removed successfully</returns>
+    public bool RemovePurpleApples(int amount)
+    {
+        if (amount <= 0)
+        {
+            Log.Warning($"Invalid Purple Apple amount: {amount}", "Inventory");
+            return false;
+        }
+
+        if (_purpleAppleCount < amount)
+        {
+            Log.UI($"Not enough Purple Apples - have {_purpleAppleCount}, need {amount}", "Inventory");
+            return false;
+        }
+
+        _purpleAppleCount -= amount;
+        Log.UI($"Removed {amount} Purple Apples. Total: {_purpleAppleCount}", "Inventory");
+
+        // Emit signal for UI updates
+        EmitSignal(SignalName.PurpleAppleCountChanged, _purpleAppleCount);
+        return true;
+    }
+
+    /// <summary>
+    /// Gets the current Purple Apple count
+    /// </summary>
+    /// <returns>Current number of Purple Apples</returns>
+    public int GetPurpleAppleCount()
+    {
+        return _purpleAppleCount;
+    }
+
+    /// <summary>
+    /// Checks if the player has enough Purple Apples
+    /// </summary>
+    /// <param name="amount">Number of Purple Apples to check for</param>
+    /// <returns>True if player has enough Purple Apples</returns>
+    public bool HasPurpleApples(int amount = 1)
+    {
+        return _purpleAppleCount >= amount;
+    }
+
+    /// <summary>
+    /// Sets the Purple Apple count directly (useful for loading saved games)
+    /// </summary>
+    /// <param name="count">New Purple Apple count</param>
+    public void SetPurpleAppleCount(int count)
+    {
+        if (count < 0)
+        {
+            Log.Warning($"Invalid Purple Apple count: {count}", "Inventory");
+            return;
+        }
+
+        _purpleAppleCount = count;
+        Log.System($"Purple Apple count set to {_purpleAppleCount}", "Inventory");
+
+        // Emit signal for UI updates
+        EmitSignal(SignalName.PurpleAppleCountChanged, _purpleAppleCount);
+    }
+    #endregion
+
     #region Public API
     /// <summary>
     /// Gets a summary of the inventory contents
@@ -231,7 +323,7 @@ public partial class Inventory : Node
     /// <returns>String representation of inventory</returns>
     public string GetInventorySummary()
     {
-        return $"Rocks: {_rockCount}/{MaxRocks}, Keys: {_keyCount}";
+        return $"Rocks: {_rockCount}/{MaxRocks}, Keys: {_keyCount}, Purple Apples: {_purpleAppleCount}";
     }
 
     /// <summary>

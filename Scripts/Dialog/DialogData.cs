@@ -32,6 +32,9 @@ namespace MarrieGame.Scripts.Dialog
         [JsonPropertyName("textWhenGoOut")]
         public string TextWhenGoOut { get; set; }
         
+        [JsonPropertyName("textWhenPlayerDoesNotHavePurpleApples")]
+        public string TextWhenPlayerDoesNotHavePurpleApples { get; set; }
+        
         [JsonPropertyName("askContinue")]
         public bool AskContinue { get; set; }
         

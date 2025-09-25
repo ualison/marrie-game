@@ -352,4 +352,27 @@ private void ResetSpriteDirection()
     public void Pause() => PausePlayer();
     public void Resume() => ResumePlayer();
     #endregion
+
+    #region Debug Methods
+    public override void _Input(InputEvent @event)
+    {
+        // Debug: Give Purple Apple when pressing P key
+        if (@event is InputEventKey keyEvent && keyEvent.Pressed)
+        {
+            if (keyEvent.Keycode == Key.P)
+            {
+                var inventory = GetTree().GetFirstNodeInGroup("inventory") as Inventory;
+                if (inventory != null)
+                {
+                    inventory.AddPurpleApples(1);
+                    GD.Print("DEBUG: Added 1 Purple Apple to inventory");
+                }
+                else
+                {
+                    GD.Print("DEBUG: Inventory not found!");
+                }
+            }
+        }
+    }
+    #endregion
 }

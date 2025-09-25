@@ -293,25 +293,51 @@ public partial class DialogManager : Node
 
     private void HandleYesChoice()
     {
-        // Player agreed to answer questions
-        _playerAgreedToQuestions = true;
-        GD.Print("HandleYesChoice called - set _playerAgreedToQuestions = true");
+        // Player said yes to the riddles - check if they have Purple Apples
+        var inventory = GetTree().GetFirstNodeInGroup("inventory") as Inventory;
         
-        // Move to the question phase - look for "dark_questions" dialog
-        var questionDialog = _dialogData.Dialogs.FirstOrDefault(d => d.Id == "dark_questions");
-        if (questionDialog != null)
+        if (inventory == null || !inventory.HasPurpleApples())
         {
-            _currentDialog = questionDialog;
-            if (questionDialog.Questions != null && questionDialog.Questions.Count > 0)
+            // Player doesn't have Purple Apples - show rejection message
+            var rejectionMessage = _initialDialog?.TextWhenPlayerDoesNotHavePurpleApples ?? 
+                                 "You do not have what I need. Come back when you do.";
+            
+            GD.Print($"Player doesn't have Purple Apples - showing rejection message: {rejectionMessage}");
+            _dialogUI.ShowMessage(rejectionMessage);
+            
+            // Don't close dialog immediately, let the message timer handle it
+            return;
+        }
+        
+        // Player has Purple Apples - consume one and proceed to questions
+        if (inventory.RemovePurpleApples(1))
+        {
+            GD.Print("Purple Apple consumed - proceeding to questions");
+            
+            // Player agreed to answer questions
+            _playerAgreedToQuestions = true;
+            GD.Print("HandleYesChoice called - set _playerAgreedToQuestions = true");
+            
+            // Move to the question phase - look for "dark_questions" dialog
+            var questionDialog = _dialogData.Dialogs.FirstOrDefault(d => d.Id == "dark_questions");
+            if (questionDialog != null)
             {
-                var randomQuestion = questionDialog.Questions[_random.Next(questionDialog.Questions.Count)];
-                _dialogUI.ShowQuestion(randomQuestion);
-                GD.Print($"Showing random question: {randomQuestion.Text.Substring(0, Math.Min(50, randomQuestion.Text.Length))}...");
+                _currentDialog = questionDialog;
+                if (questionDialog.Questions != null && questionDialog.Questions.Count > 0)
+                {
+                    var randomQuestion = questionDialog.Questions[_random.Next(questionDialog.Questions.Count)];
+                    _dialogUI.ShowQuestion(randomQuestion);
+                    GD.Print($"Showing random question: {randomQuestion.Text.Substring(0, Math.Min(50, randomQuestion.Text.Length))}...");
+                }
+            }
+            else
+            {
+                GD.PrintErr("dark_questions dialog not found");
             }
         }
         else
         {
-            GD.PrintErr("dark_questions dialog not found");
+            GD.PrintErr("Failed to remove Purple Apple from inventory!");
         }
     }
 
