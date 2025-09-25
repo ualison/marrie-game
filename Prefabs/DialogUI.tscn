@@ -22,6 +22,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_n3mxg")
+_messageDisplayTime = 5.0
 
 [node name="BackgroundPanel" type="Panel" parent="."]
 layout_mode = 1

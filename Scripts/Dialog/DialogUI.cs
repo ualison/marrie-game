@@ -44,9 +44,13 @@ public partial class DialogUI : Control
     
     // Timer and fade system
     [Export] private float _questionTimeLimit = 30.0f; // Default 30 seconds
+    [Export] private float _messageDisplayTime = 3.0f; // Default message display time
     private Timer _questionTimer;
     private float _timeRemaining;
     private Tween _fadeTween;
+    
+    // Public property to access message display time
+    public float MessageDisplayTime => _messageDisplayTime;
     #endregion
 
     #region Initialization
@@ -174,8 +178,12 @@ public partial class DialogUI : Control
         ShowQuestion(question);
     }
 
-    public void ShowMessage(string text, float displayTime = 3.0f)
+    public void ShowMessage(string text, float displayTime = -1.0f)
     {
+        // Use the exported debug parameter if displayTime is not specified
+        if (displayTime < 0)
+            displayTime = _messageDisplayTime;
+            
         GD.Print($"ShowMessage called with text: {text}, displayTime: {displayTime}");
         _messageLabel.Text = text;
         _isShowingQuestion = false;
@@ -227,6 +235,50 @@ public partial class DialogUI : Control
                 // Emit dialog closed signal to properly clean up state
                 EmitSignal(SignalName.DialogClosed);
             };
+        }
+    }
+
+    public void ShowMessageWithoutAutoHide(string text)
+    {
+        GD.Print($"ShowMessageWithoutAutoHide called with text: {text}");
+        _messageLabel.Text = text;
+        _isShowingQuestion = false;
+        Show();
+        
+        // Stop any running timer first
+        StopTimer();
+        
+        // Hide other panels and show message panel
+        if (_questionPanel.Visible)
+        {
+            GD.Print("Question panel is visible, fading it out first");
+            FadeOutPanel(_questionPanel, () => {
+                _questionPanel.Hide();
+                _backgroundPanel.Hide();
+                _messagePanel.Show();
+                GD.Print("Showing message panel");
+                FadeInPanel(_messagePanel);
+            });
+        }
+        else if (_backgroundPanel.Visible)
+        {
+            GD.Print("Background panel is visible, fading it out first");
+            FadeOutPanel(_backgroundPanel, () => {
+                _backgroundPanel.Hide();
+                _questionPanel.Hide();
+                _messagePanel.Show();
+                GD.Print("Showing message panel");
+                FadeInPanel(_messagePanel);
+            });
+        }
+        else
+        {
+            // No other panels visible, just show message panel
+            GD.Print("No other panels visible, directly showing message panel");
+            _backgroundPanel.Hide();
+            _questionPanel.Hide();
+            _messagePanel.Show();
+            FadeInPanel(_messagePanel);
         }
     }
 

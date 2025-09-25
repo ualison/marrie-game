@@ -75,13 +75,22 @@ public partial class DialogManager : Node
     {
         // This is called when the UI requests to close (like when message timer expires)
         GD.Print("DialogUI requested close - cleaning up state");
-        // Don't call OnDialogClosed() here since we already cleaned up state in HandlePlayerExitWithoutAnswering
-        // Just ensure the state is properly reset
-        _currentDialog = null;
-        _currentNPC = null;
-        _initialDialog = null;
-        _playerAgreedToQuestions = false;
-        _isHandlingExit = false;
+        
+        // Only clean up state if we're not in the middle of handling a correct answer
+        // (CompleteCorrectAnswer will handle its own cleanup)
+        if (_currentDialog == null || _currentDialog.Id != "correct_passage")
+        {
+            _currentDialog = null;
+            _currentNPC = null;
+            _initialDialog = null;
+            _playerAgreedToQuestions = false;
+            _isHandlingExit = false;
+            GD.Print("State cleaned up by OnDialogUICloseRequested");
+        }
+        else
+        {
+            GD.Print("Skipping state cleanup - correct answer in progress");
+        }
     }
 
     private void LoadDialogData()
@@ -318,12 +327,12 @@ public partial class DialogManager : Node
         var correctPassageDialog = _dialogData.Dialogs.FirstOrDefault(d => d.Id == "correct_passage");
         if (correctPassageDialog != null)
         {
-            // Show the correct passage message first
+            // Show the correct passage message without auto-hide
             _currentDialog = correctPassageDialog;
-            _dialogUI.ShowInitialDialog(correctPassageDialog.Text);
+            _dialogUI.ShowMessageWithoutAutoHide(correctPassageDialog.Text);
             
-            // Wait a moment then complete the correct answer
-            var timer = GetTree().CreateTimer(3.0f);
+            // Wait for the message display time, then complete the correct answer
+            var timer = GetTree().CreateTimer(_dialogUI.MessageDisplayTime);
             timer.Timeout += CompleteCorrectAnswer;
         }
         else
@@ -335,14 +344,32 @@ public partial class DialogManager : Node
     
     private void CompleteCorrectAnswer()
     {
-        // Player answered correctly - let NPC handle reward spawning
-        _playerAgreedToQuestions = false; // Reset flag since interaction is complete
+        GD.Print("CompleteCorrectAnswer called");
+        
+        // Store the current NPC reference before clearing state
+        var npc = _currentNPC;
+        
+        // Reset flags since interaction is complete
+        _playerAgreedToQuestions = false;
+        
+        // Hide the dialog UI
         _dialogUI.HideDialog();
         
-        // Make Haze disappear and handle its own crystal spawning
-        if (_currentNPC != null && _currentNPC.HasMethod("OnCorrectAnswer"))
+        // Clean up state
+        _currentDialog = null;
+        _currentNPC = null;
+        _initialDialog = null;
+        _isHandlingExit = false;
+        
+        // Now call the NPC's OnCorrectAnswer method with the stored reference
+        if (npc != null && npc.HasMethod("OnCorrectAnswer"))
         {
-            _currentNPC.Call("OnCorrectAnswer");
+            GD.Print("Calling OnCorrectAnswer on NPC");
+            npc.Call("OnCorrectAnswer");
+        }
+        else
+        {
+            GD.PrintErr("Failed to call OnCorrectAnswer - NPC is null or doesn't have the method");
         }
         
         GD.Print("Correct answer processed - Haze should disappear and spawn crystal");
