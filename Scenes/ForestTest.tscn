@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://2dfvproskxs7"]
+[gd_scene load_steps=16 format=3 uid="uid://2dfvproskxs7"]
 
 [ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="1_4idgl"]
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="2_sm6w1"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="7_m7gvu"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="8_tvg5r"]
 [ext_resource type="Script" uid="uid://sdqhqn52n3xp" path="res://Scripts/Systems/InfiniteForestManager.cs" id="9_elyxe"]
+[ext_resource type="Script" uid="uid://dfa7ulolnkeko" path="res://Scripts/Systems/HazeMonsterManager.cs" id="9_ibdem"]
 [ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="10_0rdwx"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="11_efeo8"]
 [ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="12_tpiq0"]
@@ -51,6 +52,13 @@ script = ExtResource("9_elyxe")
 EnvironmentChunkPrefab = ExtResource("3_ibdem")
 PlayerCamera = NodePath("../../../CameraFollower")
 
+[node name="HazeMonsterManager" type="Node" parent="GameSystems/Managers"]
+script = ExtResource("9_ibdem")
+MinSpawnDistance = 400.0
+MaxSpawnDistance = 500.0
+HazePrefab = ExtResource("14_sm6w1")
+DespawnDistance = 800.0
+
 [node name="AudioSystem" type="Node" parent="GameSystems"]
 
 [node name="AudioSystem" type="Node" parent="."]
@@ -67,7 +75,7 @@ TargetScenePath = "uid://djkt6xtpabbyo"
 
 [node name="Puff" parent="." instance=ExtResource("13_sadiq")]
 position = Vector2(-185, 237)
-FollowSpeed = 100.0
+FollowSpeed = 200.0
 FollowDistance = 100.0
 MinFollowDistance = 75.0
 AttackRange = 150.0
@@ -88,6 +96,3 @@ BodyGravityScale = 1.5
 LaunchSpeed = 750.0
 TrajectorySamples = 60
 TrajectorySampleDt = 0.07
-
-[node name="Haze" parent="." instance=ExtResource("14_sm6w1")]
-position = Vector2(191, 219)

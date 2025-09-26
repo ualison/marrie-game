@@ -85,6 +85,7 @@ public partial class GameManager : Node
         EnsureManagerExists<GlobalGhostLifeManager>(); // Global ghost life system
         EnsureManagerExists<PlayerStateManager>();     // Now managed by GameManager
         EnsureManagerExists<EnemyManager>();           // Add EnemyManager for consistency
+        EnsureManagerExists<HazeMonsterManager>();     // Haze Monster spawning and puzzle progression
         EnsureManagerExists<UIManager>();
         EnsureManagerExists<DialogManager>();          // Dialog system for NPCs
         EnsureManagerExists<ReplaySystemManager>();
@@ -94,7 +95,16 @@ public partial class GameManager : Node
 
     private void EnsureManagerExists<T>() where T : Node, new()
     {
-        if (GetChildren().OfType<T>().FirstOrDefault() == null)
+        // First, check direct children of GameManager (fast path)
+        var existing = GetChildren().OfType<T>().FirstOrDefault();
+
+        // If not found, perform a full tree search to avoid creating duplicate managers
+        if (existing == null && GetTree() != null && GetTree().Root != null)
+        {
+            existing = FindNodeOfType<T>(GetTree().Root);
+        }
+
+        if (existing == null)
         {
             var manager = new T();
             AddChild(manager);
@@ -110,8 +120,26 @@ public partial class GameManager : Node
         }
         else
         {
-            Log.System($"{typeof(T).Name} already exists", "GameManager");
+            Log.System($"{typeof(T).Name} already exists (found in scene)", "GameManager");
         }
+    }
+
+    // Recursively search for a node of type T in the scene tree
+    private T FindNodeOfType<T>(Node root) where T : Node
+    {
+        if (root == null) return null;
+
+        foreach (Node child in root.GetChildren())
+        {
+            if (child is T found)
+                return found;
+
+            var deeper = FindNodeOfType<T>(child);
+            if (deeper != null)
+                return deeper;
+        }
+
+        return null;
     }
 
     private void VerifyRealityManagerInitialization()

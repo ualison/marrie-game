@@ -31,6 +31,7 @@ public partial class Haze : Node2D
     public override void _Ready()
     {
         GD.Print("Haze: _Ready called");
+        AddToGroup("haze"); // Ensure Haze is in the haze group
         InitializeComponents();
         SetProcess(true);
     }
@@ -415,6 +416,18 @@ public partial class Haze : Node2D
                 // Position at Haze's location
                 puzzleCrystal.GlobalPosition = GlobalPosition;
                 
+                // Configure SceneSwitcher with next puzzle scene through HazeMonsterManager
+                if (HazeMonsterManager.Instance != null)
+                {
+                    string nextPuzzleScene = HazeMonsterManager.Instance.GetNextPuzzleScene();
+                    var switcher = puzzleCrystal.GetScript().AsGodotObject();
+                    if (switcher != null && switcher.HasMethod("set"))
+                    {
+                        switcher.Call("set", "TargetScenePath", nextPuzzleScene);
+                        GD.Print($"SceneSwitcher target set to: {nextPuzzleScene}");
+                    }
+                }
+                
                 // Start with crystal invisible
                 puzzleCrystal.Modulate = new Color(1, 1, 1, 0);
                 
@@ -448,6 +461,8 @@ public partial class Haze : Node2D
         
         Hide();
         GD.Print("Haze has completely disappeared");
+        // Free the node after it has finished disappearing so it doesn't linger in the scene
+        QueueFree();
     }
     #endregion
 
