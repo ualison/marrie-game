@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3 uid="uid://2dfvproskxs7"]
+[gd_scene load_steps=15 format=3 uid="uid://2dfvproskxs7"]
 
 [ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="1_4idgl"]
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="2_sm6w1"]
@@ -11,7 +11,6 @@
 [ext_resource type="Script" uid="uid://dfa7ulolnkeko" path="res://Scripts/Systems/HazeMonsterManager.cs" id="9_ibdem"]
 [ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="10_0rdwx"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="11_efeo8"]
-[ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="12_tpiq0"]
 [ext_resource type="PackedScene" uid="uid://byspjo0wirw6v" path="res://Prefabs/Catapult.tscn" id="13_4idgl"]
 [ext_resource type="PackedScene" uid="uid://dfauk4svx1fjh" path="res://Prefabs/Puff.tscn" id="13_sadiq"]
 [ext_resource type="PackedScene" uid="uid://dgmpsx8qec0pg" path="res://Prefabs/Haze.tscn" id="14_sm6w1"]
@@ -54,12 +53,13 @@ PlayerCamera = NodePath("../../../CameraFollower")
 
 [node name="HazeMonsterManager" type="Node" parent="GameSystems/Managers"]
 script = ExtResource("9_ibdem")
-MinSpawnDistance = 700.0
-MaxSpawnDistance = 800.0
+MinSpawnDistance = 1000.0
+MaxSpawnDistance = 1300.0
 HazePrefab = ExtResource("14_sm6w1")
-DespawnDistance = 800.0
-MinSpawnDistanceFromCrystal = 800.0
-CrystalDespawnDistance = 800.0
+DespawnDistance = 1300.0
+RespawnDelay = 3.0
+MinSpawnDistanceFromCrystal = 1300.0
+CrystalDespawnDistance = 1300.0
 
 [node name="AudioSystem" type="Node" parent="GameSystems"]
 
@@ -70,10 +70,6 @@ stream = ExtResource("10_0rdwx")
 volume_db = 6.038
 autoplay = true
 script = ExtResource("11_efeo8")
-
-[node name="SceneSwicherCrystal" parent="." instance=ExtResource("12_tpiq0")]
-position = Vector2(-250, 233)
-TargetScenePath = "uid://djkt6xtpabbyo"
 
 [node name="Puff" parent="." instance=ExtResource("13_sadiq")]
 position = Vector2(-185, 237)
