@@ -1,7 +1,8 @@
-[gd_scene load_steps=8 format=3 uid="uid://j4f3eruffbm4"]
+[gd_scene load_steps=9 format=3 uid="uid://j4f3eruffbm4"]
 
 [ext_resource type="Script" uid="uid://m4rkiv08ru77" path="res://Scripts/Dialog/DialogUI.cs" id="1_n3mxg"]
 [ext_resource type="Texture2D" uid="uid://cupek236utd7e" path="res://Art/DialogBackground.png" id="2_dialog_bg"]
+[ext_resource type="FontFile" uid="uid://dfikg8e04shh3" path="res://Fonts/graveyrd.ttf" id="3_8krse"]
 [ext_resource type="Texture2D" uid="uid://b048utqew270k" path="res://Art/DialogButtonUnactive.png" id="4_dialog_btn_inactive"]
 [ext_resource type="Texture2D" uid="uid://jospwn0er7na" path="res://Art/DialogButtonActive.png" id="5_dialog_btn_active"]
 
@@ -25,6 +26,7 @@ script = ExtResource("1_n3mxg")
 _messageDisplayTime = 5.0
 
 [node name="BackgroundPanel" type="Panel" parent="."]
+visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -51,7 +53,8 @@ offset_bottom = -81.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_fonts/font = ExtResource("3_8krse")
+theme_override_font_sizes/font_size = 22
 text = "SAY A PHRASE
 ASK IF WANT CONTINUE"
 horizontal_alignment = 1
@@ -77,7 +80,8 @@ alignment = 1
 custom_minimum_size = Vector2(100, 30)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_fonts/font = ExtResource("3_8krse")
+theme_override_font_sizes/font_size = 22
 theme_override_styles/normal = SubResource("StyleBoxTexture_2")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_3")
 theme_override_styles/hover = SubResource("StyleBoxTexture_3")
@@ -87,14 +91,14 @@ text = "YES"
 custom_minimum_size = Vector2(100, 30)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_fonts/font = ExtResource("3_8krse")
+theme_override_font_sizes/font_size = 22
 theme_override_styles/normal = SubResource("StyleBoxTexture_2")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_3")
 theme_override_styles/hover = SubResource("StyleBoxTexture_3")
 text = "NO"
 
 [node name="QuestionPanel" type="Panel" parent="."]
-visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -121,7 +125,8 @@ offset_bottom = -118.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_fonts/font = ExtResource("3_8krse")
+theme_override_font_sizes/font_size = 22
 text = "QUESTION/ENIGMA"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -140,7 +145,8 @@ offset_bottom = -93.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_colors/font_color = Color(1, 0.7, 0.3, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_fonts/font = ExtResource("3_8krse")
+theme_override_font_sizes/font_size = 20
 text = "Time: 30s"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -166,7 +172,8 @@ custom_minimum_size = Vector2(200, 50)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_fonts/font = ExtResource("3_8krse")
+theme_override_font_sizes/font_size = 22
 theme_override_styles/normal = SubResource("StyleBoxTexture_2")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_3")
 theme_override_styles/hover = SubResource("StyleBoxTexture_3")
@@ -179,7 +186,8 @@ custom_minimum_size = Vector2(200, 50)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_fonts/font = ExtResource("3_8krse")
+theme_override_font_sizes/font_size = 22
 theme_override_styles/normal = SubResource("StyleBoxTexture_2")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_3")
 theme_override_styles/hover = SubResource("StyleBoxTexture_3")
@@ -192,7 +200,8 @@ custom_minimum_size = Vector2(200, 50)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(1, 0.9, 0.8, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_fonts/font = ExtResource("3_8krse")
+theme_override_font_sizes/font_size = 22
 theme_override_styles/normal = SubResource("StyleBoxTexture_2")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_3")
 theme_override_styles/hover = SubResource("StyleBoxTexture_3")

@@ -55,7 +55,7 @@ public partial class DialogManager : Node
         GetTree().Root.CallDeferred("add_child", canvasLayer);
         
         // Load and instantiate the DialogUI prefab scene
-        var dialogUIScene = GD.Load<PackedScene>("res://Prefabs/DialogUI.tscn");
+        var dialogUIScene = GD.Load<PackedScene>("res://Prefabs/UI/DialogUI.tscn");
         _dialogUI = dialogUIScene.Instantiate<DialogUI>();
         _dialogUI.Name = "DialogUI";
         canvasLayer.CallDeferred("add_child", _dialogUI);

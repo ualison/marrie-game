@@ -4,7 +4,7 @@ using Godot;
 /// Makes a CanvasLayer follow the camera so UI elements move with the camera
 /// Attach this to your UserInterface CanvasLayer node
 /// </summary>
-public partial class CanvasCameraFollower : CanvasLayer
+public partial class CanvasCameraFollower : Control
 {
     [Export] public bool FollowCamera { get; set; } = true;
     [Export] public bool DebugCameraFollow { get; set; } = false;
@@ -34,8 +34,20 @@ public partial class CanvasCameraFollower : CanvasLayer
 
         if (cameraMoved)
         {
-            // Make the entire canvas layer offset follow the camera
-            Offset = camera.GlobalPosition;
+            // Only move HUD elements with the camera, not overlay elements
+            var hudNode = GetNodeOrNull("HUD");
+            if (hudNode is Control hud)
+            {
+                hud.Position = camera.GlobalPosition;
+            }
+            
+            // Keep overlays fixed to screen (don't move with camera)
+            var overlaysNode = GetNodeOrNull("Overlays");
+            if (overlaysNode is Control overlays)
+            {
+                overlays.Position = Vector2.Zero; // Always keep at screen origin
+            }
+            
             _lastCameraPos = cameraPos;
 
             if (DebugCameraFollow)
@@ -44,7 +56,7 @@ public partial class CanvasCameraFollower : CanvasLayer
                 if (_debugAccum >= 1.0)
                 {
                     _debugAccum = 0.0;
-                    GD.Print($"CanvasLayer following camera: {camera.Name} at {camera.GlobalPosition}");
+                    GD.Print($"CanvasLayer camera follow - HUD: {camera.GlobalPosition}, Overlays: Fixed");
                 }
             }
         }

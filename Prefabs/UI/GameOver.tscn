@@ -1,6 +1,20 @@
-[gd_scene load_steps=2 format=3 uid="uid://56gc36rfogg8"]
+[gd_scene load_steps=10 format=3 uid="uid://56gc36rfogg8"]
 
 [ext_resource type="Script" uid="uid://nvwxmerrunk" path="res://Scripts/UI/GameOver.cs" id="1_k52d1"]
+[ext_resource type="FontFile" uid="uid://d1dsdbmcemewf" path="res://Fonts/JFWilwod.ttf" id="2_4f23q"]
+[ext_resource type="Texture2D" uid="uid://cupek236utd7e" path="res://Art/DialogBackground.png" id="2_nc4eo"]
+[ext_resource type="FontFile" uid="uid://dfikg8e04shh3" path="res://Fonts/graveyrd.ttf" id="3_nc4eo"]
+[ext_resource type="Texture2D" uid="uid://jospwn0er7na" path="res://Art/DialogButtonActive.png" id="4_active"]
+[ext_resource type="Texture2D" uid="uid://b048utqew270k" path="res://Art/DialogButtonUnactive.png" id="5_unactive"]
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_ov8ti"]
+texture = ExtResource("2_nc4eo")
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_button_normal"]
+texture = ExtResource("5_unactive")
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_button_hover"]
+texture = ExtResource("4_active")
 
 [node name="Main" type="Control" groups=["game_over_ui"]]
 layout_mode = 3
@@ -18,13 +32,34 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(1, 1, 1, 0.623529)
+color = Color(0.056291588, 0.056291603, 0.056291595, 0.59607846)
+
+[node name="MessageBackground" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -389.0
+offset_top = -198.0
+offset_right = 386.0
+offset_bottom = 180.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxTexture_ov8ti")
 
 [node name="CenterContainer" type="VBoxContainer" parent="."]
 layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -248.0
+offset_top = -150.0
+offset_right = 235.0
+offset_bottom = 150.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 25
@@ -32,16 +67,25 @@ alignment = 1
 
 [node name="GameOverLabel" type="Label" parent="CenterContainer"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.591773, 0.0396483, 0.150928, 1)
-theme_override_font_sizes/font_size = 48
+theme_override_colors/font_color = Color(0.24600765, 0.20622054, 0.1421121, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.2901961)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_constants/shadow_outline_size = 1
+theme_override_fonts/font = ExtResource("2_4f23q")
+theme_override_font_sizes/font_size = 36
 text = "GAME OVER"
 horizontal_alignment = 1
 
 [node name="SubMessageLabel" type="Label" parent="CenterContainer"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 0.847059)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 0
+theme_override_constants/shadow_outline_size = 0
+theme_override_fonts/font = ExtResource("3_nc4eo")
+theme_override_font_sizes/font_size = 25
 text = "As interferências temporais te consumiram.."
 horizontal_alignment = 1
 
@@ -53,11 +97,23 @@ alignment = 1
 [node name="RestartButton" type="Button" parent="CenterContainer/ButtonContainer"]
 custom_minimum_size = Vector2(220, 40)
 layout_mode = 2
+theme_override_fonts/font = ExtResource("3_nc4eo")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxTexture_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxTexture_button_hover")
+theme_override_styles/hover = SubResource("StyleBoxTexture_button_hover")
+theme_override_styles/focus = SubResource("StyleBoxTexture_button_hover")
 text = "Tentar Novamente"
 
 [node name="QuitButton" type="Button" parent="CenterContainer/ButtonContainer"]
 custom_minimum_size = Vector2(220, 40)
 layout_mode = 2
+theme_override_fonts/font = ExtResource("3_nc4eo")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxTexture_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxTexture_button_hover")
+theme_override_styles/hover = SubResource("StyleBoxTexture_button_hover")
+theme_override_styles/focus = SubResource("StyleBoxTexture_button_hover")
 text = "Sair do Jogo"
 
 [connection signal="QuitRequested" from="." to="." method="OnQuitRequested"]

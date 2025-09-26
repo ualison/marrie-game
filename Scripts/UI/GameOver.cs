@@ -40,20 +40,20 @@ public partial class GameOver : Control
     {
         // Prefer editor-assigned NodePaths when available
             if (GameOverLabelPath != null && GameOverLabelPath.ToString() != "")
-                _gameOverLabel = MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Label>(this, GameOverLabelPath, "VBoxContainer/GameOverLabel");
-            _gameOverLabel ??= MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Label>(this, null, "VBoxContainer/GameOverLabel") ?? FindUIElement<Label>("GameOverLabel");
+                _gameOverLabel = MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Label>(this, GameOverLabelPath, "CenterContainer/GameOverLabel");
+            _gameOverLabel ??= MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Label>(this, null, "CenterContainer/GameOverLabel") ?? FindUIElement<Label>("GameOverLabel");
 
         if (SubMessageLabelPath != null && SubMessageLabelPath.ToString() != "")
             _subMessageLabel = GetNodeOrNull<Label>(SubMessageLabelPath);
-        _subMessageLabel ??= GetNodeOrNull<Label>("VBoxContainer/SubMessageLabel") ?? FindUIElement<Label>("SubMessageLabel");
+        _subMessageLabel ??= GetNodeOrNull<Label>("CenterContainer/SubMessageLabel") ?? FindUIElement<Label>("SubMessageLabel");
 
         if (RestartButtonPath != null && RestartButtonPath.ToString() != "")
             _restartButton = GetNodeOrNull<Button>(RestartButtonPath);
-        _restartButton ??= MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Button>(this, null, "VBoxContainer/ButtonContainer/RestartButton") ?? FindUIElement<Button>("RestartButton");
+        _restartButton ??= MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Button>(this, null, "CenterContainer/ButtonContainer/RestartButton") ?? FindUIElement<Button>("RestartButton");
 
         if (QuitButtonPath != null && QuitButtonPath.ToString() != "")
             _quitButton = GetNodeOrNull<Button>(QuitButtonPath);
-        _quitButton ??= MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Button>(this, null, "VBoxContainer/ButtonContainer/QuitButton") ?? FindUIElement<Button>("QuitButton");
+        _quitButton ??= MarrieGame.Core.Utils.NodeHelpers.GetNodeOrNull<Button>(this, null, "CenterContainer/ButtonContainer/QuitButton") ?? FindUIElement<Button>("QuitButton");
 
         LogDiscoveredElements();
     }
@@ -117,11 +117,16 @@ public partial class GameOver : Control
 
     private void ShowWithFadeIn()
     {
+        // Ensure this UI fits the screen before showing
+        EnsureFitsScreen();
+        
         // Show with smooth fade-in transition
         Show();
         Modulate = new Color(1, 1, 1, 0);
         var tween = CreateTween();
         tween.TweenProperty(this, "modulate:a", 1.0f, 0.5f);
+        
+        Log.Debug("GameOver UI shown with fade-in transition", "GameOverUI");
     }
 
     private void FocusRestartButton()
@@ -145,6 +150,8 @@ public partial class GameOver : Control
     }
     #endregion
 
+
+
     #region Event Handlers
     private void OnRestartPressed()
     {
@@ -164,7 +171,43 @@ public partial class GameOver : Control
         // Handle quit button press
         EmitSignal(SignalName.QuitRequested);
     }
+
+    // Signal handler methods that match the .tscn connections
+    private void OnRestartRequested()
+    {
+        OnRestartPressed();
+    }
+
+    private void OnQuitRequested()
+    {
+        OnQuitPressed();
+    }
     #endregion
+
+    private void EnsureFitsScreen()
+    {
+        // Since this GameOver UI is in the Overlays container managed by CanvasCameraFollower,
+        // the Overlays container stays fixed to screen coordinates (Vector2.Zero).
+        // We just need to ensure this Control fills the viewport and stays on top.
+        var viewport = GetViewport();
+        if (viewport != null)
+        {
+            var viewportSize = viewport.GetVisibleRect().Size;
+            
+            // Set anchors to fill the entire screen viewport
+            SetAnchorsPreset(Control.LayoutPreset.FullRect);
+            
+            // Since we're in the Overlays container that's fixed to screen origin,
+            // we should keep our position at zero relative to that container
+            Position = Vector2.Zero;
+            Size = viewportSize;
+            
+            // Make sure it's rendered on top of other overlay elements
+            ZIndex = 100;
+            
+            Log.Debug($"GameOver UI configured for viewport: {viewportSize}, positioned at origin within Overlays container", "GameOverUI");
+        }
+    }
 
     #region Debug Utilities
     private void LogDiscoveredElements()
@@ -177,6 +220,16 @@ public partial class GameOver : Control
         Log.Debug($"- RestartButton: {(_restartButton != null ? "✓" : "✗")}", "GameOverUI");
         Log.Debug($"- QuitButton: {(_quitButton != null ? "✓" : "✗")}", "GameOverUI");
         #endif
+    }
+
+    /// <summary>
+    /// Debug method to manually test GameOver UI positioning
+    /// Call this from the debug console or via code to test UI appearance
+    /// </summary>
+    public void TestShow()
+    {
+        Log.Debug("TestShow() called - forcing GameOver UI to appear", "GameOverUI");
+        ShowGameOver("DEBUG: Test Game Over", "This is a test of the GameOver UI positioning");
     }
     #endregion
 }

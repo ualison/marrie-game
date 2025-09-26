@@ -239,6 +239,9 @@ public partial class UIManager : Node
         {
             Log.UI("Showing GameOverUI with fade transition", "UIManager");
             
+            // Ensure GameOver UI fits within viewport
+            EnsureGameOverUIFitsScreen();
+            
             // Start invisible and fade in
             _gameOverUI.Modulate = new Color(1, 1, 1, 0);
             _gameOverUI.Show();
@@ -252,6 +255,17 @@ public partial class UIManager : Node
         {
             Log.Error("Cannot show game over - GameOverUI not found!", "UIManager");
         }
+    }
+    
+    private void EnsureGameOverUIFitsScreen()
+    {
+        if (_gameOverUI == null) return;
+        
+        // Let the GameOver UI handle its own positioning logic
+        // Just ensure it's on top of other UI elements
+        _gameOverUI.ZIndex = 100;
+        
+        Log.Debug($"GameOver UI Z-index set for top rendering", "UIManager");
     }
     
     private void ShowGameOverUI()
