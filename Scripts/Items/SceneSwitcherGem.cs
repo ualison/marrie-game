@@ -94,11 +94,20 @@ namespace MarrieGame.Scripts.Items
 
         private void TrySwitchScene()
         {
+            // Debug: always print current target before attempting
+            Log.Debug($"SceneSwitcherGem '{GetPath()}' attempting switch. Current TargetScenePath='{TargetScenePath}'", nameof(SceneSwitcherGem));
+
             if (string.IsNullOrWhiteSpace(TargetScenePath))
             {
                 UIManager.ShowGameplayMessage("No target scene set for crystal");
                 Log.Warning("SceneSwitcherGem: TargetScenePath is empty", nameof(SceneSwitcherGem));
                 return;
+            }
+
+            // Notify HazeMonsterManager of puzzle entry (if applicable) BEFORE switching
+            if (HazeMonsterManager.Instance != null)
+            {
+                HazeMonsterManager.Instance.NotifyEnteringPuzzle(TargetScenePath);
             }
 
             var result = GetTree().ChangeSceneToFile(TargetScenePath);
@@ -199,6 +208,13 @@ namespace MarrieGame.Scripts.Items
                 _detectionArea.BodyEntered -= OnBodyEntered;
                 _detectionArea.BodyExited -= OnBodyExited;
             }
+        }
+
+        // Explicit setter to support deferred assignment reliability
+        public void SetTargetScenePath(string path)
+        {
+            TargetScenePath = path ?? string.Empty;
+            Log.Debug($"SceneSwitcherGem '{GetPath()}' SetTargetScenePath called. New value='{TargetScenePath}'", nameof(SceneSwitcherGem));
         }
     }
 }

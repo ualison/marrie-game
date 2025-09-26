@@ -237,6 +237,7 @@ public partial class Haze : Node2D
     }
 
     // Called by DialogManager when player answers correctly
+    // DialogManager invokes this via typed call or npc.Call("OnCorrectAnswer")
     public void OnCorrectAnswer()
     {
         GD.Print("Haze: Player answered correctly! Disappearing and spawning PuzzleCrystal...");
@@ -244,6 +245,7 @@ public partial class Haze : Node2D
     }
 
     // Called by DialogManager when player answers incorrectly
+    // Called when player answers incorrectly
     public void OnWrongAnswer()
     {
         GD.Print("Haze: Player answered wrong! Disappearing...");
@@ -251,6 +253,7 @@ public partial class Haze : Node2D
     }
 
     // Called by DialogManager when player exits without answering after agreeing to questions
+    // Called when player exits without answering
     public void OnPlayerExitWithoutAnswering()
     {
         GD.Print("Haze: Player left without answering after agreeing! Disappearing...");
@@ -420,11 +423,27 @@ public partial class Haze : Node2D
                 if (HazeMonsterManager.Instance != null)
                 {
                     string nextPuzzleScene = HazeMonsterManager.Instance.GetNextPuzzleScene();
-                    var switcher = puzzleCrystal.GetScript().AsGodotObject();
-                    if (switcher != null && switcher.HasMethod("set"))
+                    // Try typed cast first
+                    if (puzzleCrystal is MarrieGame.Scripts.Items.SceneSwitcherGem typedGem)
                     {
-                        switcher.Call("set", "TargetScenePath", nextPuzzleScene);
-                        GD.Print($"SceneSwitcher target set to: {nextPuzzleScene}");
+                        typedGem.SetTargetScenePath(nextPuzzleScene);
+                        GD.Print($"[Haze] SceneSwitcherGem (typed) TargetScenePath set to: {nextPuzzleScene} (after SetTargetScenePath)");
+                        if (string.IsNullOrWhiteSpace(typedGem.TargetScenePath))
+                        {
+                            GD.PrintErr("[Haze] WARNING: TargetScenePath still empty immediately after SetTargetScenePath - scheduling deferred retry");
+                            CallDeferred(nameof(DeferredCrystalVerify), new Godot.Collections.Array{ typedGem.GetInstanceId(), nextPuzzleScene });
+                        }
+                        else
+                        {
+                            GD.Print($"[Haze] Immediate verify success: gem.TargetScenePath='{typedGem.TargetScenePath}'");
+                        }
+                    }
+                    else
+                    {
+                        // Fallback: dynamic Set
+                        puzzleCrystal.Set("TargetScenePath", nextPuzzleScene);
+                        GD.Print($"[Haze] SceneSwitcherGem (dynamic) TargetScenePath set to: {nextPuzzleScene}");
+                        // We cannot easily verify dynamic here; rely on runtime switch attempt logging
                     }
                 }
                 
@@ -448,6 +467,41 @@ public partial class Haze : Node2D
         else
         {
             GD.PrintErr("PuzzleCrystal scene not loaded");
+        }
+    }
+
+    private void DeferredCrystalVerify(Godot.Collections.Array data)
+    {
+        if (data == null || data.Count < 2) return;
+        ulong id = (ulong)data[0];
+        string expected = data[1].ToString();
+        var obj = GodotObject.InstanceFromId(id) as MarrieGame.Scripts.Items.SceneSwitcherGem;
+        if (obj == null)
+        {
+            GD.PrintErr("[Haze] DeferredCrystalVerify: gem instance no longer exists");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(obj.TargetScenePath))
+        {
+            GD.PrintErr($"[Haze] Deferred verify detected empty TargetScenePath (expected '{expected}') - reassigning");
+            obj.SetTargetScenePath(expected);
+            if (!string.IsNullOrWhiteSpace(obj.TargetScenePath))
+            {
+                GD.Print($"[Haze] Deferred reassignment success: '{obj.TargetScenePath}'");
+            }
+            else
+            {
+                GD.PrintErr("[Haze] Deferred reassignment still failed - investigate SceneSwitcherGem readiness timing");
+            }
+        }
+        else if (obj.TargetScenePath != expected)
+        {
+            GD.PrintErr($"[Haze] Deferred verify mismatch. Have '{obj.TargetScenePath}' expected '{expected}' - correcting");
+            obj.SetTargetScenePath(expected);
+        }
+        else
+        {
+            GD.Print($"[Haze] Deferred verify success: gem.TargetScenePath='{obj.TargetScenePath}'");
         }
     }
 

@@ -35,6 +35,9 @@ public partial class HazeMonsterManager : Node
     private float _spawnInterval = 10.0f; // Spawn attempt every 10 seconds
     private float _respawnCooldown = 0.0f;
     private Node2D _currentHaze; // Track the single active haze
+    // Puzzle tracking
+    private string _activePuzzleScenePath = null;
+    private bool _puzzleInProgress = false;
     #endregion
 
     public override void _Ready()
@@ -106,6 +109,53 @@ public partial class HazeMonsterManager : Node
             _respawnCooldown -= (float)delta;
 
         MaintainSingleHazeLifecycle();
+        MonitorPuzzleProgress();
+    }
+
+    private void MonitorPuzzleProgress()
+    {
+        if (GameManager.Instance == null) return;
+
+        // If we are inside a puzzle dimension, nothing to do until player leaves
+        if (_puzzleInProgress && !GameManager.Instance.IsPuzzleDimensionScene)
+        {
+            // Player has left puzzle scene; mark completion
+            if (!string.IsNullOrEmpty(_activePuzzleScenePath))
+            {
+                int index = GetPuzzleIndexByPath(_activePuzzleScenePath);
+                if (index >= 0 && !IsPuzzleCompleted(index + 1))
+                {
+                    Log.Gameplay($"Auto-marking puzzle {index + 1} as completed after return from scene '{_activePuzzleScenePath}'", "HazeMonsterManager");
+                    MarkPuzzleCompleted(index + 1);
+                }
+            }
+            _activePuzzleScenePath = null;
+            _puzzleInProgress = false;
+        }
+    }
+
+    private int GetPuzzleIndexByPath(string scenePath)
+    {
+        for (int i = 0; i < PuzzleScenes.Length; i++)
+        {
+            if (PuzzleScenes[i] == scenePath)
+                return i;
+        }
+        return -1;
+    }
+
+    private bool IsScenePathAPuzzle(string scenePath)
+    {
+        return GetPuzzleIndexByPath(scenePath) >= 0;
+    }
+
+    public void NotifyEnteringPuzzle(string puzzleScenePath)
+    {
+        if (!IsScenePathAPuzzle(puzzleScenePath))
+            return;
+        _activePuzzleScenePath = puzzleScenePath;
+        _puzzleInProgress = true;
+        Log.Debug($"Entering puzzle scene '{puzzleScenePath}' (index={GetPuzzleIndexByPath(puzzleScenePath) + 1})", "HazeMonsterManager");
     }
 
     private void InitializePuzzleState()
@@ -222,12 +272,68 @@ public partial class HazeMonsterManager : Node
 
     private void SetupSceneSwitcher(Node2D sceneSwitcher)
     {
-        var switcher = sceneSwitcher.GetScript().AsGodotObject();
-        if (switcher != null && switcher.HasMethod("set"))
+        string nextPuzzleScene = GetNextPuzzleScene();
+        bool assigned = false;
+        // Typed cast first
+        if (sceneSwitcher is MarrieGame.Scripts.Items.SceneSwitcherGem gem)
         {
-            string nextPuzzleScene = GetNextPuzzleScene();
-            switcher.Call("set", "TargetScenePath", nextPuzzleScene);
-            Log.Debug($"Set SceneSwitcher target to: {nextPuzzleScene}", "HazeMonsterManager");
+            gem.SetTargetScenePath(nextPuzzleScene);
+            assigned = true;
+        }
+        else
+        {
+            // Fallback to Set (property) if exposed
+            if (sceneSwitcher.HasMethod("set"))
+            {
+                sceneSwitcher.Set("TargetScenePath", nextPuzzleScene);
+                assigned = true;
+            }
+        }
+
+        if (assigned)
+        {
+            Log.Debug($"Assigned TargetScenePath to SceneSwitcherGem: {nextPuzzleScene} (node={sceneSwitcher.GetPath()})", "HazeMonsterManager");
+            // Verify immediately
+            if (sceneSwitcher is MarrieGame.Scripts.Items.SceneSwitcherGem verifyGem)
+            {
+                if (string.IsNullOrWhiteSpace(verifyGem.TargetScenePath))
+                {
+                    Log.Warning($"Verification failed: TargetScenePath still empty right after assignment on {sceneSwitcher.GetPath()}", "HazeMonsterManager");
+                }
+                else
+                {
+                    Log.Debug($"Verification success: gem.TargetScenePath='{verifyGem.TargetScenePath}'", "HazeMonsterManager");
+                }
+                // Deferred double-check (handle possible race with _Ready) 
+                CallDeferred(nameof(DeferredVerifySceneSwitcher), new Godot.Collections.Array{ verifyGem.GetInstanceId(), nextPuzzleScene });
+            }
+        }
+        else
+        {
+            Log.Warning($"Failed to assign TargetScenePath to SceneSwitcherGem node at '{sceneSwitcher.GetPath()}'", "HazeMonsterManager");
+        }
+    }
+
+    private void DeferredVerifySceneSwitcher(Godot.Collections.Array data)
+    {
+        if (data == null || data.Count < 2) return;
+        ulong id = (ulong)data[0];
+        string expected = data[1].ToString();
+        var obj = GodotObject.InstanceFromId(id) as MarrieGame.Scripts.Items.SceneSwitcherGem;
+        if (obj == null) return;
+        if (string.IsNullOrWhiteSpace(obj.TargetScenePath))
+        {
+            Log.Warning($"Deferred verify: gem.TargetScenePath empty (expected '{expected}') on {obj.GetPath()} - reassigning", "HazeMonsterManager");
+            obj.SetTargetScenePath(expected);
+        }
+        else if (obj.TargetScenePath != expected)
+        {
+            Log.Warning($"Deferred verify: gem.TargetScenePath mismatch '{obj.TargetScenePath}' (expected '{expected}') on {obj.GetPath()} - correcting", "HazeMonsterManager");
+            obj.SetTargetScenePath(expected);
+        }
+        else
+        {
+            Log.Debug($"Deferred verify success: gem.TargetScenePath='{obj.TargetScenePath}'", "HazeMonsterManager");
         }
     }
 

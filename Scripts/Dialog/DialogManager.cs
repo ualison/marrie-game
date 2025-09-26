@@ -26,6 +26,8 @@ public partial class DialogManager : Node
     private bool _playerAgreedToQuestions = false; // Track if player said YES but hasn't answered yet
     private DialogEntry _initialDialog; // Store the initial dialog to access textWhenGoOut
     private bool _isHandlingExit = false; // Prevent multiple exit handling
+    // Fallback reference to the NPC that provided a correct answer passage while waiting for timer
+    private Node2D _pendingCorrectAnswerNPC;
     #endregion
 
     #region Initialization
@@ -356,6 +358,13 @@ public partial class DialogManager : Node
             // Show the correct passage message without auto-hide
             _currentDialog = correctPassageDialog;
             _dialogUI.ShowMessageWithoutAutoHide(correctPassageDialog.Text);
+
+            // Preserve NPC reference in case _currentNPC is cleared (player moves / exit triggers) before timer fires
+            if (_pendingCorrectAnswerNPC == null && _currentNPC != null)
+            {
+                _pendingCorrectAnswerNPC = _currentNPC;
+                GD.Print($"[DialogManager] Stored _pendingCorrectAnswerNPC='{_pendingCorrectAnswerNPC.Name}' for deferred correct answer callback.");
+            }
             
             // Wait for the message display time, then complete the correct answer
             var timer = GetTree().CreateTimer(_dialogUI.MessageDisplayTime);
@@ -364,6 +373,10 @@ public partial class DialogManager : Node
         else
         {
             // No passage dialog, handle immediately
+            if (_pendingCorrectAnswerNPC == null && _currentNPC != null)
+            {
+                _pendingCorrectAnswerNPC = _currentNPC;
+            }
             CompleteCorrectAnswer();
         }
     }
@@ -371,34 +384,50 @@ public partial class DialogManager : Node
     private void CompleteCorrectAnswer()
     {
         GD.Print("CompleteCorrectAnswer called");
-        
-        // Store the current NPC reference before clearing state
-        var npc = _currentNPC;
-        
-        // Reset flags since interaction is complete
+        // Use current NPC or fallback pending reference if current was cleared prematurely
+        var npc = _currentNPC ?? _pendingCorrectAnswerNPC;
+        if (_currentNPC == null && npc != null)
+        {
+            GD.Print($"[DialogManager] Using fallback _pendingCorrectAnswerNPC '{npc.Name}' because _currentNPC was null.");
+        }
         _playerAgreedToQuestions = false;
-        
-        // Hide the dialog UI
+
         _dialogUI.HideDialog();
-        
-        // Clean up state
+
+        bool invoked = false;
+        if (npc != null)
+        {
+            // Prefer typed call for C# script (works even if HasMethod fails due to attribute absence)
+            if (npc is Haze hazeNpc)
+            {
+                GD.Print("Calling OnCorrectAnswer via typed reference");
+                hazeNpc.OnCorrectAnswer();
+                invoked = true;
+            }
+            else if (npc.HasMethod("OnCorrectAnswer"))
+            {
+                GD.Print("Calling OnCorrectAnswer via dynamic Call");
+                npc.Call("OnCorrectAnswer");
+                invoked = true;
+            }
+            else
+            {
+                GD.PrintErr($"Failed to call OnCorrectAnswer - method not found on NPC type {npc.GetType().Name}");
+            }
+        }
+        else
+        {
+            GD.PrintErr("Failed to call OnCorrectAnswer - NPC reference is null");
+        }
+
+        // Clean up after invocation
         _currentDialog = null;
         _currentNPC = null;
         _initialDialog = null;
         _isHandlingExit = false;
-        
-        // Now call the NPC's OnCorrectAnswer method with the stored reference
-        if (npc != null && npc.HasMethod("OnCorrectAnswer"))
-        {
-            GD.Print("Calling OnCorrectAnswer on NPC");
-            npc.Call("OnCorrectAnswer");
-        }
-        else
-        {
-            GD.PrintErr("Failed to call OnCorrectAnswer - NPC is null or doesn't have the method");
-        }
-        
-        GD.Print("Correct answer processed - Haze should disappear and spawn crystal");
+        _pendingCorrectAnswerNPC = null;
+
+        GD.Print($"Correct answer processed - invoked={invoked}");
     }
 
     private void HandleWrongAnswer()
@@ -411,6 +440,7 @@ public partial class DialogManager : Node
         {
             _currentNPC.Call("OnWrongAnswer");
         }
+        _pendingCorrectAnswerNPC = null; // clear fallback if any
     }
 
     private void HandlePlayerExitWithoutAnswering()
@@ -456,6 +486,7 @@ public partial class DialogManager : Node
         OnDialogClosed();
         
         _playerAgreedToQuestions = false; // Reset flag
+        _pendingCorrectAnswerNPC = null; // no longer pending
     }
 
     private void OnDialogClosed()
