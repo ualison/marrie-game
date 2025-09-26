@@ -32,6 +32,11 @@ namespace MarrieGame.Scripts.Items
 
         public override void _Ready()
         {
+            // Add to group so HazeMonsterManager can measure spawn distance from crystals
+            if (!IsInGroup("scene_switcher_gem"))
+            {
+                AddToGroup("scene_switcher_gem");
+            }
             InitializeComponents();
             ConnectSignals();
             SetupPromptLabel();

@@ -15,6 +15,8 @@ public partial class HazeMonsterManager : Node
     [Export] public PackedScene HazePrefab { get; set; }
     [Export] public float DespawnDistance { get; set; } = 2000.0f; // When player is farther than this from the current haze, recycle it
     [Export] public float RespawnDelay { get; set; } = 2.0f;       // Delay after despawn before spawning a replacement
+    [Export] public float MinSpawnDistanceFromCrystal { get; set; } = 600.0f; // Ensure new Haze does not appear too close to an active SceneSwitcherGem (crystal)
+    [Export] public float CrystalDespawnDistance { get; set; } = 1800.0f; // If player moves farther than this from a crystal, it is removed so a new chance can spawn later
     
     [ExportGroup("Puzzle Management")]
     [Export] public string[] PuzzleScenes { get; set; } = {
@@ -109,6 +111,7 @@ public partial class HazeMonsterManager : Node
             _respawnCooldown -= (float)delta;
 
         MaintainSingleHazeLifecycle();
+        MaintainCrystalsLifecycle();
         MonitorPuzzleProgress();
     }
 
@@ -490,11 +493,60 @@ public partial class HazeMonsterManager : Node
             float horiz = Mathf.Abs(candidate.X - _playerCamera.GlobalPosition.X);
             if (horiz >= MinSpawnDistance && horiz <= MaxSpawnDistance)
             {
-                return candidate;
+                if (IsFarFromActiveCrystals(candidate))
+                {
+                    return candidate;
+                }
+                else
+                {
+                    Log.Debug($"Spawn attempt {attempts}: rejected candidate near crystal (x={candidate.X})", "HazeMonsterManager");
+                }
             }
         }
         Log.Debug($"Failed to find spawn position after {attempts} attempts", "HazeMonsterManager");
         return Vector2.Zero;
+    }
+
+    private bool IsFarFromActiveCrystals(Vector2 candidate)
+    {
+        // Gather all scene switcher gems (crystals) via group if available
+        var tree = GetTree();
+        if (tree == null) return true;
+        var gems = tree.GetNodesInGroup("scene_switcher_gem");
+        foreach (var g in gems)
+        {
+            if (g is Node2D n && IsInstanceValid(n))
+            {
+                float dist = Mathf.Abs(candidate.X - n.GlobalPosition.X);
+                if (dist < MinSpawnDistanceFromCrystal)
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private void MaintainCrystalsLifecycle()
+    {
+        if (_playerCamera == null) return;
+        var tree = GetTree();
+        if (tree == null) return;
+        var gems = tree.GetNodesInGroup("scene_switcher_gem");
+        if (gems == null || gems.Count == 0) return;
+
+        foreach (var g in gems)
+        {
+            if (g is Node2D n && IsInstanceValid(n))
+            {
+                float horizDist = Mathf.Abs(n.GlobalPosition.X - _playerCamera.GlobalPosition.X);
+                if (horizDist > CrystalDespawnDistance)
+                {
+                    Log.Debug($"Despawning crystal at {n.GlobalPosition} (horizDist={horizDist} > {CrystalDespawnDistance})", "HazeMonsterManager");
+                    n.QueueFree();
+                }
+            }
+        }
     }
 
     public void ForceSpawnHazeForTesting()
