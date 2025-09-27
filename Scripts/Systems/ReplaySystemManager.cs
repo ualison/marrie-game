@@ -461,6 +461,12 @@ public partial class ReplaySystemManager : Node
             return;
         }
         
+        if (!IsInstanceValid(_recorder) || !_recorder.IsInsideTree())
+        {
+            Log.Warning("Cannot start rolling recording - recorder disposed or not inside tree", "ReplaySystemManager");
+            return;
+        }
+
         // Refresh character references and force recording regardless of player life so the
         // rolling buffer is always available for the replay gem.
         _recorder.RefreshCharacterCache();

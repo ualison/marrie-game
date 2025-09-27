@@ -37,7 +37,7 @@ position = Vector2(-327, 116)
 [node name="Enemies" type="Node2D" parent="GameEntities"]
 
 [node name="Monster" parent="GameEntities/Enemies" instance=ExtResource("5_e2fbs")]
-position = Vector2(117, 93)
+position = Vector2(330, 88)
 
 [node name="GameSystems" type="Node" parent="."]
 
@@ -93,4 +93,7 @@ MonsterAvoidanceDistance = 100.0
 MonsterAvoidanceForce = 150.0
 
 [node name="ReplayGem" parent="." instance=ExtResource("14_gfl13")]
-position = Vector2(-478, 256)
+position = Vector2(521, 229)
+FollowDistance = 250.0
+FollowSmoothing = 5.0
+FollowHeightOffset = -5.0

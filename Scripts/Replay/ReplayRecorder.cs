@@ -290,6 +290,12 @@ public partial class ReplayRecorder : Node
 
     public void RefreshCharacterCache()
     {
+        if (!IsInsideTree())
+        {
+            Log.Warning("ReplayRecorder.RefreshCharacterCache called while recorder is not inside tree", "ReplayRecorder");
+            return;
+        }
+
         _cachedPlayer = GetTree().GetFirstNodeInGroup("player") as Player;
 
         // Connect to player's life system so we can start/stop recording in DeathMode

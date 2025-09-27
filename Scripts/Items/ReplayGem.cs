@@ -19,6 +19,9 @@ public partial class ReplayGem : Node2D
     [Export] public bool BrightEffectEnabled { get; set; } = true; // Enable pulsing bright effect
     [Export] public float BrightnessFactor { get; set; } = 1.6f; // How bright the pulse gets (1 = normal)
     [Export] public float BrightPulseDuration { get; set; } = 1.0f; // Full pulse cycle duration
+    [Export] public float FollowDistance { get; set; } = 96.0f; // Desired distance from the monster
+    [Export(PropertyHint.Range, "0.5,10.0,0.1")] public float FollowSmoothing { get; set; } = 4.0f; // Higher = faster follow
+    [Export] public float FollowHeightOffset { get; set; } = -24.0f; // Vertical offset while following
     #endregion
 
     #region State
@@ -27,6 +30,12 @@ public partial class ReplayGem : Node2D
     private Vector2 _originalGemPosition;
     // Tracks whether the gem was visible before a reality change so we can restore it
     private bool _wasVisibleBeforeRealityChange = false;
+    private Monster _targetMonster;
+    private Vector2 _initialScenePosition;
+    private Vector2 _monsterOffsetDirection = Vector2.Up;
+    private bool _hiddenByMonster = false;
+    private double _monsterSearchTimer = 0.0f;
+    private const double MonsterSearchIntervalSeconds = 1.0;
     #endregion
 
     #region Initialization
@@ -39,6 +48,10 @@ public partial class ReplayGem : Node2D
         SetupPromptLabel();
         HideInitially();
         EnableInputProcessing();
+
+        _initialScenePosition = GlobalPosition;
+        _monsterSearchTimer = 0.0f;
+        TryBindToMonster();
 
         // IMPROVED: Immediate reality check and connection
         if (RealityManager.IsInstanceAvailable && RealityManager.Instance != null)
@@ -178,6 +191,8 @@ public partial class ReplayGem : Node2D
     #region Input Processing
     public override void _Process(double delta)
     {
+        UpdateMonsterFollowing(delta);
+
         // Handle interaction input when player is nearby and interaction is enabled
         if (!_playerNearby || !_canInteract) return;
 
@@ -285,8 +300,227 @@ public partial class ReplayGem : Node2D
     }
     #endregion
 
+    #region Monster Following
+    private void UpdateMonsterFollowing(double delta)
+    {
+        if (!FollowMonsterEnabled())
+        {
+            return;
+        }
+
+        if (!IsInCurrentReality())
+        {
+            return;
+        }
+
+        if (_targetMonster == null || !IsInstanceValid(_targetMonster) || _targetMonster.IsQueuedForDeletion())
+        {
+            UnbindFromMonster();
+
+            _monsterSearchTimer -= delta;
+            if (_monsterSearchTimer <= 0.0)
+            {
+                _monsterSearchTimer = MonsterSearchIntervalSeconds;
+                TryBindToMonster();
+            }
+
+            if (_hiddenByMonster)
+            {
+                ShowGem(_initialScenePosition);
+                _hiddenByMonster = false;
+            }
+            return;
+        }
+
+        if (!IsMonsterActive(_targetMonster))
+        {
+            if (!_hiddenByMonster)
+            {
+                HideGemForMonster();
+            }
+            return;
+        }
+
+        if (_hiddenByMonster)
+        {
+            ShowGemForMonster(CalculateFollowPosition());
+        }
+
+        Vector2 desiredPosition = CalculateFollowPosition();
+        float smoothing = Mathf.Max(0.01f, FollowSmoothing);
+        float lerpAlpha = 1f - Mathf.Exp(-smoothing * (float)delta);
+        GlobalPosition = GlobalPosition.Lerp(desiredPosition, lerpAlpha);
+    }
+
+    private bool FollowMonsterEnabled()
+    {
+        // Only follow a monster if one exists; otherwise remain static
+        return true;
+    }
+
+    private void TryBindToMonster()
+    {
+        Monster followerCandidate = null;
+        Monster fallbackCandidate = null;
+
+        foreach (Node node in GetTree().GetNodesInGroup("enemies"))
+        {
+            if (node is not Monster monster || !IsInstanceValid(monster) || monster.IsQueuedForDeletion())
+                continue;
+
+            if (monster.EnableFollowerBehavior)
+            {
+                followerCandidate = monster;
+                break;
+            }
+
+            fallbackCandidate ??= monster;
+        }
+
+        var chosen = followerCandidate ?? fallbackCandidate;
+        if (chosen != null)
+        {
+            BindToMonster(chosen);
+        }
+    }
+
+    private void BindToMonster(Monster monster)
+    {
+        if (_targetMonster == monster)
+            return;
+
+        UnbindFromMonster();
+
+        _targetMonster = monster;
+        if (_targetMonster == null)
+            return;
+
+        try { _targetMonster.TreeExited += OnTargetMonsterTreeExited; } catch { }
+
+        UpdateMonsterOffsetDirection();
+
+        if (IsMonsterActive(_targetMonster) && IsInCurrentReality())
+        {
+            ShowGemForMonster(CalculateFollowPosition());
+        }
+        else
+        {
+            HideGemForMonster();
+        }
+
+        Log.Debug($"ReplayGem bound to monster {_targetMonster.Name}", "ReplayGem");
+    }
+
+    private void UnbindFromMonster()
+    {
+        if (_targetMonster != null)
+        {
+            try { _targetMonster.TreeExited -= OnTargetMonsterTreeExited; } catch { }
+        }
+        _targetMonster = null;
+    }
+
+    private void OnTargetMonsterTreeExited()
+    {
+        UnbindFromMonster();
+        _monsterSearchTimer = 0.0f;
+        _hiddenByMonster = false;
+    }
+
+    private Vector2 CalculateFollowPosition()
+    {
+        if (_targetMonster == null)
+        {
+            return GlobalPosition;
+        }
+
+        UpdateMonsterOffsetDirection();
+
+        Vector2 basePosition = _targetMonster.GlobalPosition;
+        Vector2 lateral = _monsterOffsetDirection * FollowDistance;
+        Vector2 vertical = new Vector2(0f, FollowHeightOffset);
+
+        return basePosition + lateral + vertical;
+    }
+
+    private void UpdateMonsterOffsetDirection()
+    {
+        if (_targetMonster == null || !IsInstanceValid(_targetMonster))
+        {
+            _monsterOffsetDirection = Vector2.Up;
+            return;
+        }
+
+        Player player = PlayerStateManager.Instance?.GetPlayer();
+        if (player != null && IsInstanceValid(player))
+        {
+            Vector2 diff = player.GlobalPosition - _targetMonster.GlobalPosition;
+            if (diff.LengthSquared() > 1f)
+            {
+                _monsterOffsetDirection = diff.Normalized();
+                return;
+            }
+        }
+
+        Vector2 initialDiff = _initialScenePosition - _targetMonster.GlobalPosition;
+        if (initialDiff.LengthSquared() > 1f)
+        {
+            _monsterOffsetDirection = initialDiff.Normalized();
+            return;
+        }
+
+        _monsterOffsetDirection = Vector2.Up;
+    }
+
+    private bool IsMonsterActive(Monster monster)
+    {
+        if (monster == null || !IsInstanceValid(monster) || monster.IsQueuedForDeletion())
+            return false;
+
+        if (!monster.Visible)
+            return false;
+
+        if (!monster.IsCurrentlyVisible)
+            return false;
+
+        if (monster.IsDisabledForReplay)
+            return false;
+
+        if (monster.LifeSystem?.IsDead == true)
+            return false;
+
+        if (EnemyManager.Instance != null)
+        {
+            if (EnemyManager.Instance.IsMonsterHiddenByPair(monster) || EnemyManager.Instance.IsMonsterScheduledForRespawn(monster))
+                return false;
+        }
+
+        return true;
+    }
+
+    private void HideGemForMonster()
+    {
+        HideGem();
+        _hiddenByMonster = true;
+        _wasVisibleBeforeRealityChange = false;
+    }
+
+    private void ShowGemForMonster(Vector2 position)
+    {
+        ShowGem(position);
+        _hiddenByMonster = false;
+    }
+
+    private bool IsInCurrentReality()
+    {
+        return !RealityManager.IsInstanceAvailable || RealityManager.Instance.CurrentReality == Reality.CurrentReality;
+    }
+    #endregion
+
     public override void _ExitTree()
     {
+        UnbindFromMonster();
+
         // Clean up reality manager connection
         if (RealityManager.IsInstanceAvailable)
         {
@@ -312,14 +546,22 @@ public partial class ReplayGem : Node2D
             _promptLabel.Hide(); // Only show when player nearby
         }
 
-        _detectionArea.SetDeferred("monitoring", true);
+        if (_detectionArea != null)
+        {
+            _detectionArea.SetDeferred("monitorable", true);
+            _detectionArea.SetDeferred("monitoring", true);
+        }
         Log.Replay($"ReplayGem shown at {position}, scale={Scale}", "ReplayGem");
     }
 
     public void HideGem()
     {
         // Hide gem completely and cleanup
-        _detectionArea.SetDeferred("monitoring", false);
+        if (_detectionArea != null)
+        {
+            _detectionArea.SetDeferred("monitoring", false);
+            _detectionArea.SetDeferred("monitorable", false);
+        }
 
         // Stop floating animation
         StopFloatingAnimation();
