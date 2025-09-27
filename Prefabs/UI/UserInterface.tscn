@@ -1,34 +1,48 @@
-[gd_scene load_steps=6 format=3 uid="uid://bhff38051b28y"]
+[gd_scene load_steps=5 format=3 uid="uid://bhff38051b28y"]
 
-[ext_resource type="Script" uid="uid://dfikillaf8den" path="res://Scripts/Systems/CanvasCameraFollower.cs" id="1_pryuf"]
-[ext_resource type="PackedScene" uid="uid://dxvamghbt08mr" path="res://Prefabs/UI/ScreenElements.tscn" id="2_3h2j0"]
-[ext_resource type="PackedScene" uid="uid://d0spjehyu6cuy" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="3_7ddsm"]
-[ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="4_7aa8c"]
-[ext_resource type="PackedScene" uid="uid://bjv4m5whn2djf" path="res://Prefabs/UI/Message.tscn" id="5_message"]
+[ext_resource type="PackedScene" uid="uid://dxvamghbt08mr" path="res://Prefabs/UI/ScreenElements.tscn" id="1_3h2j0"]
+[ext_resource type="PackedScene" uid="uid://d0spjehyu6cuy" path="res://Prefabs/UI/PerformanceMonitor.tscn" id="2_7ddsm"]
+[ext_resource type="PackedScene" uid="uid://56gc36rfogg8" path="res://Prefabs/UI/GameOver.tscn" id="3_7aa8c"]
+[ext_resource type="PackedScene" uid="uid://bjv4m5whn2djf" path="res://Prefabs/UI/Message.tscn" id="4_message"]
 
-[node name="HUD" type="Control"]
+[node name="UserInterface" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_pryuf")
 
-[node name="ScreenElements" parent="." instance=ExtResource("2_3h2j0")]
+[node name="HUD" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ScreenElements" parent="HUD" instance=ExtResource("1_3h2j0")]
 layout_mode = 1
 
-[node name="PerformanceMonitor" parent="." instance=ExtResource("3_7ddsm")]
+[node name="PerformanceMonitor" parent="HUD" instance=ExtResource("2_7ddsm")]
 layout_mode = 0
 offset_left = 9.0
 offset_top = 1.0
 offset_right = 9.0
 offset_bottom = 1.0
 
-[node name="GameOverUI" parent="." instance=ExtResource("4_7aa8c")]
+[node name="Overlays" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="GameOverUI" parent="Overlays" instance=ExtResource("3_7aa8c")]
 visible = false
 layout_mode = 1
 
-[node name="GameMessage" parent="." instance=ExtResource("5_message")]
+[node name="GameMessage" parent="Overlays" instance=ExtResource("4_message")]
 visible = false
 layout_mode = 1

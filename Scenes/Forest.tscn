@@ -18,7 +18,9 @@
 
 [node name="Root" type="Node2D"]
 
-[node name="UserInterface" parent="." instance=ExtResource("2_djgpu")]
+[node name="UICanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="UserInterface" parent="UICanvasLayer" instance=ExtResource("2_djgpu")]
 
 [node name="CameraFollower" parent="." instance=ExtResource("1_08kc0")]
 FollowOffset = Vector2(0, -200)
