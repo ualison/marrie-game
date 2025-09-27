@@ -420,10 +420,12 @@ public partial class ReplayRecorder : Node
 
     #region Recording Control
     // UPDATED METHOD: Initialize monster recording state
-    public void StartRecording()
+    public void StartRecording(bool ignoreLifeRequirement = false)
     {
-        // In DeathMode we only start recording when player is at 1 life. In PuzzleMode start immediately.
-        if (CurrentRecordingMode == ReplayRecordingMode.DeathMode)
+        // In DeathMode we normally wait until the player reaches low life to start recording.
+        // Rolling-window recordings (triggered by ReplaySystemManager) can bypass this guard by
+        // passing ignoreLifeRequirement=true so the replay gem works even before the first death.
+        if (!ignoreLifeRequirement && CurrentRecordingMode == ReplayRecordingMode.DeathMode)
         {
             if (_playerLife == null || _playerLife.CurrentLife > 1)
             {
@@ -432,8 +434,15 @@ public partial class ReplayRecorder : Node
             }
         }
 
-        ClearRecording();
-        IsRecording = true;
+        // Ensure we have up-to-date references before starting to capture frames
+        if (_cachedPlayer == null || (CurrentRecordingMode == ReplayRecordingMode.DeathMode && _cachedMonster == null))
+        {
+            RefreshCharacterCache();
+        }
+
+    ClearRecording();
+    IsRecording = true;
+    IsPausedForReplay = false;
         _recordTimer = 0f;
         _elapsedTime = 0f;
 
@@ -464,6 +473,7 @@ public partial class ReplayRecorder : Node
     public void StopRecording()
     {
         IsRecording = false;
+        IsPausedForReplay = false;
         // If we have no primary frames but the prebuffer holds data (very short session), promote it
         if (_playerFrames.Count == 0 && _playerPreBuffer.Count > 0)
         {
@@ -480,6 +490,7 @@ public partial class ReplayRecorder : Node
     {
         _playerFrames.Clear();
         _monsterFrames.Clear();
+        _playerPreBuffer.Clear();
         _recordTimer = 0f;
         _elapsedTime = 0f;
         _skipCounter = 0;

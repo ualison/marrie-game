@@ -451,7 +451,7 @@ public partial class ReplayOrchestrator : Node
             if (!ReplayRecorder.Instance.IsRecording)
             {
                 ReplayRecorder.Instance.RefreshCharacterCache();
-                ReplayRecorder.Instance.StartRecording();
+                ReplayRecorder.Instance.StartRecording(true);
             }
             else if (ReplayRecorder.Instance.IsPausedForReplay)
             {

@@ -461,9 +461,10 @@ public partial class ReplaySystemManager : Node
             return;
         }
         
-        // Clear previous recording data and start fresh
-        _recorder.ClearRecording();
-        _recorder.StartRecording();
+        // Refresh character references and force recording regardless of player life so the
+        // rolling buffer is always available for the replay gem.
+        _recorder.RefreshCharacterCache();
+        _recorder.StartRecording(true);
         _rollingRecordingStartMs = (long)(Time.GetUnixTimeFromSystem() * 1000);
         
         // Ensure rolling window timer is set up and started
