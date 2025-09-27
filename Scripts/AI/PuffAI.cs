@@ -434,6 +434,13 @@ namespace MarrieGame.AI
             // Handle Q key attack - works from any state if monster is visible
             if (Input.IsActionJustPressed("puff_attack") && _canAttack)
             {
+                // Don't consume energy if already attacking - just ignore the input
+                if (_currentState == PuffState.Attack)
+                {
+                    Log.Debug("PuffAI: Q pressed but already attacking - ignoring input", "PuffAI");
+                    return;
+                }
+                
                 // Check if Puff has enough energy to attack (cost: 1 energy when entering attack state)
                 int currentEnergy = _energyBar?.GetCurrentEnergyValue() ?? CurrentEnergy;
                 Log.Debug($"PuffAI: Q pressed - Current energy: {currentEnergy}, Required: 1", "PuffAI");

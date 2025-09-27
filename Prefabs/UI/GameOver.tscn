@@ -87,7 +87,7 @@ theme_override_constants/shadow_offset_y = 0
 theme_override_constants/shadow_outline_size = 0
 theme_override_fonts/font = ExtResource("3_nc4eo")
 theme_override_font_sizes/font_size = 26
-text = "As interferências temporais te consumiram.."
+text = "Temporal interferences have consumed you.."
 horizontal_alignment = 1
 
 [node name="ButtonContainer" type="HBoxContainer" parent="CenterContainer"]
@@ -104,7 +104,7 @@ theme_override_styles/normal = SubResource("StyleBoxTexture_button_normal")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_button_hover")
 theme_override_styles/hover = SubResource("StyleBoxTexture_button_hover")
 theme_override_styles/focus = SubResource("StyleBoxTexture_button_hover")
-text = "Tentar Novamente"
+text = "Try Again"
 
 [node name="QuitButton" type="Button" parent="CenterContainer/ButtonContainer"]
 custom_minimum_size = Vector2(220, 40)
@@ -115,7 +115,4 @@ theme_override_styles/normal = SubResource("StyleBoxTexture_button_normal")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_button_hover")
 theme_override_styles/hover = SubResource("StyleBoxTexture_button_hover")
 theme_override_styles/focus = SubResource("StyleBoxTexture_button_hover")
-text = "Sair do Jogo"
-
-[connection signal="QuitRequested" from="." to="." method="OnQuitRequested"]
-[connection signal="RestartRequested" from="." to="." method="OnRestartRequested"]
+text = "Exit Game"

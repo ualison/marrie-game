@@ -172,16 +172,6 @@ public partial class GameOver : Control
         EmitSignal(SignalName.QuitRequested);
     }
 
-    // Signal handler methods that match the .tscn connections
-    private void OnRestartRequested()
-    {
-        OnRestartPressed();
-    }
-
-    private void OnQuitRequested()
-    {
-        OnQuitPressed();
-    }
     #endregion
 
     private void EnsureFitsScreen()
