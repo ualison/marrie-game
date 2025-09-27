@@ -20,8 +20,8 @@ namespace MarrieGame.AI
             Attack,
             Jump,
             Idle,
-            FaceLeft,
-            FaceRight,
+            FaceToMonster,
+            JumpAttack,
             Launching
         }
         #endregion
@@ -435,7 +435,7 @@ namespace MarrieGame.AI
             if (Input.IsActionJustPressed("puff_attack") && _canAttack)
             {
                 // Don't consume energy if already attacking - just ignore the input
-                if (_currentState == PuffState.Attack)
+                if (_currentState == PuffState.Attack || _currentState == PuffState.FaceToMonster || _currentState == PuffState.JumpAttack)
                 {
                     Log.Debug("PuffAI: Q pressed but already attacking - ignoring input", "PuffAI");
                     return;
@@ -485,9 +485,9 @@ namespace MarrieGame.AI
                     }
                 }
                 else
-                {
-                    Log.Debug("PuffAI: Player commanded attack but no visible monsters in range", "PuffAI");
-                }
+                    {
+                        Log.Debug("PuffAI: Player commanded attack but no visible monsters in range", "PuffAI");
+                    }
             }
             else if (Input.IsActionJustPressed("puff_attack") && !_canAttack)
             {
@@ -533,8 +533,8 @@ namespace MarrieGame.AI
             // If Puff is not facing the target, use a brief facing state first
             if (targetIsOnRight != _facingRight)
             {
-                Log.Debug($"PuffAI: Need to face target - switching to {(targetIsOnRight ? "FaceRight" : "FaceLeft")} state", "PuffAI");
-                ChangeState(targetIsOnRight ? PuffState.FaceRight : PuffState.FaceLeft);
+                Log.Debug("PuffAI: Need to face target - switching to FaceToMonster state", "PuffAI");
+                ChangeState(PuffState.FaceToMonster);
             }
             else
             {
@@ -569,14 +569,17 @@ namespace MarrieGame.AI
                     // Nothing special to do when exiting following
                     break;
                 case PuffState.Attack:
-                    _currentTarget = null;
+                    // Attack cleanup handled when returning to neutral states
                     break;
                 case PuffState.Jump:
                     // Jump state naturally ends when landing
                     break;
-                case PuffState.FaceLeft:
-                case PuffState.FaceRight:
-                    // Facing states are transitional - no special cleanup needed
+                case PuffState.FaceToMonster:
+                    // Facing state is transitional - no special cleanup needed
+                    break;
+                case PuffState.JumpAttack:
+                    // Reset crossover tracker when leaving jump attack
+                    _lastDeltaToTargetX = float.NaN;
                     break;
             }
         }
@@ -605,11 +608,13 @@ namespace MarrieGame.AI
                 case PuffState.Idle:
                     Velocity = Vector2.Zero;
                     break;
-                case PuffState.FaceLeft:
-                    // Facing states are brief - just used for orientation
+                case PuffState.FaceToMonster:
+                    // Stop horizontal movement while orienting toward target
+                    Velocity = new Vector2(0, Velocity.Y);
+                    Log.Debug("PuffAI: Entered FaceToMonster state", "PuffAI");
                     break;
-                case PuffState.FaceRight:
-                    // Facing states are brief - just used for orientation
+                case PuffState.JumpAttack:
+                    Log.Debug("PuffAI: Entered JumpAttack state", "PuffAI");
                     break;
                 case PuffState.Launching:
                     // Don't modify velocity - let catapult launch physics work
@@ -645,11 +650,11 @@ namespace MarrieGame.AI
                 case PuffState.Idle:
                     UpdateIdleBehavior();
                     break;
-                case PuffState.FaceLeft:
-                    UpdateFacingBehavior();
+                case PuffState.FaceToMonster:
+                    UpdateFaceToMonsterBehavior();
                     break;
-                case PuffState.FaceRight:
-                    UpdateFacingBehavior();
+                case PuffState.JumpAttack:
+                    UpdateJumpAttackBehavior();
                     break;
                 case PuffState.Launching:
                     UpdateLaunchingBehavior();
@@ -877,209 +882,406 @@ namespace MarrieGame.AI
 
         #region Attack Behavior  
        private void UpdateAttackBehavior()
-{
-    if (_currentTarget == null || !IsInstanceValid(_currentTarget))
-    {
-        Log.Debug("PuffAI: Attack target lost, returning to appropriate state", "PuffAI");
-        ReturnToAppropriateState();
-        return;
-    }
-
-    // Comprehensive target validation - check if target is still attackable
-    bool targetIsValid = true;
-    
-    // Check if target monster is in Hidden state - abort attack immediately
-    if (_currentTarget.HasMethod("GetCurrentState"))
-    {
-        var targetState = _currentTarget.Call("GetCurrentState");
-        if (targetState.AsInt32() == (int)MonsterState.Hidden)
         {
-            Log.System($"PuffAI: Target {_currentTarget.Name} became Hidden - aborting attack", "PuffAI");
-            targetIsValid = false;
-        }
-    }
-    
-    // Check if target is dead
-    if (targetIsValid && _currentTarget.HasMethod("GetLifeSystem"))
-    {
-        var lifeSystemVariant = _currentTarget.Call("GetLifeSystem");
-        if (lifeSystemVariant.VariantType != Variant.Type.Nil)
-        {
-            var lifeSystem = lifeSystemVariant.AsGodotObject() as Node;
-            if (lifeSystem != null && lifeSystem.HasMethod("get_IsDead"))
+            if (_currentTarget == null || !IsInstanceValid(_currentTarget))
             {
-                bool isDead = (bool)lifeSystem.Call("get_IsDead");
-                if (isDead)
-                {
-                    Log.System($"PuffAI: Target {_currentTarget.Name} died - aborting attack", "PuffAI");
-                    targetIsValid = false;
-                }
+                Log.Debug("PuffAI: Attack target lost, returning to appropriate state", "PuffAI");
+                _currentTarget = null;
+                _lastDeltaToTargetX = float.NaN;
+                ReturnToAppropriateState();
+                return;
             }
-        }
-    }
-    
-    // Check if target can take damage
-    if (targetIsValid && _currentTarget.HasMethod("CanTakeDamage"))
-    {
-        bool canTakeDamage = (bool)_currentTarget.Call("CanTakeDamage");
-        if (!canTakeDamage)
-        {
-            Log.System($"PuffAI: Target {_currentTarget.Name} can no longer take damage - aborting attack", "PuffAI");
-            targetIsValid = false;
-        }
-    }
-    
-    // If target is no longer valid, return to appropriate state
-    if (!targetIsValid)
-    {
-        ReturnToAppropriateState();
-        return;
-    }
 
-    // Additional safety check before accessing GlobalPosition
-    if (_currentTarget == null || !IsInstanceValid(_currentTarget))
-    {
-        Log.Debug("PuffAI: Target became invalid during validation", "PuffAI");
-        ReturnToAppropriateState();
-        return;
-    }
-
-    // **FIX: Update facing direction every frame during attack to handle teleporting monsters**
-    float targetDirection = _currentTarget.GlobalPosition.X - GlobalPosition.X;
-    bool shouldFaceTarget = targetDirection > 0;
-    if (shouldFaceTarget != _facingRight)
-    {
-        _facingRight = shouldFaceTarget;
-        if (_puffSprite != null)
-        {
-            var scale = _puffSprite.Scale;
-            _puffSprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
-            Log.Debug($"PuffAI: Reorienting to face target - now facing {(_facingRight ? "Right" : "Left")}", "PuffAI");
-        }
-    }
+            if (!EnsureCurrentTargetAttackable())
+            {
+                _currentTarget = null;
+                _lastDeltaToTargetX = float.NaN;
+                ReturnToAppropriateState();
+                return;
+            }
 
             float distanceToTarget = GlobalPosition.DistanceTo(_currentTarget.GlobalPosition);
             float deltaX = _currentTarget.GlobalPosition.X - GlobalPosition.X;
             float deltaY = _currentTarget.GlobalPosition.Y - GlobalPosition.Y;
 
-            // Cross-over detection: if Puff crosses horizontally past the target during a leap,
-            // trigger an instant hit within a small window. This helps right-side jumps that overshoot.
-            if (!float.IsNaN(_lastDeltaToTargetX) && Mathf.Sign(deltaX) != Mathf.Sign(_lastDeltaToTargetX))
+            bool targetIsOnRight = deltaX >= 0f;
+            if (targetIsOnRight != _facingRight)
             {
-                if (Mathf.Abs(deltaX) <= 35.0f && Mathf.Abs(deltaY) <= 60.0f)
+                Log.Debug("PuffAI: Need to reorient before continuing attack pursuit", "PuffAI");
+                ChangeState(PuffState.FaceToMonster);
+                return;
+            }
+
+            if (distanceToTarget > AttackRange * AttackGiveUpRangeMultiplier)
+            {
+                Log.Debug($"PuffAI: Target too far away ({distanceToTarget:F1}), giving up attack", "PuffAI");
+                _currentTarget = null;
+                _lastDeltaToTargetX = float.NaN;
+                ReturnToAppropriateState();
+                return;
+            }
+
+            if (_player != null)
+            {
+                float distanceFromPlayer = GlobalPosition.DistanceTo(_player.GlobalPosition);
+                if (distanceFromPlayer > 500.0f)
                 {
-                    Log.Debug($"PuffAI: Cross-over detected, landing melee on {_currentTarget.Name} (dx={Mathf.Abs(deltaX):F1}, dy={Mathf.Abs(deltaY):F1})", "PuffAI");
-                    AttackTarget(_currentTarget);
+                    Log.Warning($"PuffAI: Too far from player during attack ({distanceFromPlayer:F1}), aborting", "PuffAI");
+                    _currentTarget = null;
+                    _lastDeltaToTargetX = float.NaN;
                     ReturnToAppropriateState();
                     return;
                 }
             }
-    
-    // If target is too far away, give up and return to appropriate state
-    if (distanceToTarget > AttackRange * AttackGiveUpRangeMultiplier)
-    {
-        Log.Debug($"PuffAI: Target too far away ({distanceToTarget:F1}), giving up attack", "PuffAI");
-        ReturnToAppropriateState();
-        return;
-    }
-    
-    // Safety check: if we're too far from player while attacking, abort
-    if (_player != null)
-    {
-        float distanceFromPlayer = GlobalPosition.DistanceTo(_player.GlobalPosition);
-        if (distanceFromPlayer > 500.0f)
-        {
-            Log.Warning($"PuffAI: Too far from player during attack ({distanceFromPlayer:F1}), aborting", "PuffAI");
-            ReturnToAppropriateState();
-            return;
-        }
-    }
-    
-    // Final safety check before attack logic
-    if (_currentTarget == null || !IsInstanceValid(_currentTarget))
-    {
-        Log.Debug("PuffAI: Target became invalid before attack", "PuffAI");
-        ReturnToAppropriateState();
-        return;
-    }
-    
-    // If close enough to attack
-    if (distanceToTarget <= AttackRange)
-    {
-        // If we're on the ground and close to target, jump to attack
-        if (IsOnFloor())
-        {
-            Log.Debug($"PuffAI: Close to target ({distanceToTarget:F1}), jumping to attack (stay in Attack state)", "PuffAI");
-            // Execute a jump impulse while remaining in Attack state so aerial attack logic can trigger
+
+            if (!IsOnFloor())
+            {
+                Log.Debug("PuffAI: Left ground during pursuit - transitioning to JumpAttack", "PuffAI");
+                ChangeState(PuffState.JumpAttack);
+                return;
+            }
+
+            if (distanceToTarget <= AttackRange)
+            {
+                Log.Debug($"PuffAI: In range for jump attack ({distanceToTarget:F1}), initiating JumpAttack state", "PuffAI");
+                BeginJumpAttackTowardsTarget();
+                return;
+            }
+
             if (_currentTarget != null && IsInstanceValid(_currentTarget))
             {
-                Vector2 direction = (_currentTarget.GlobalPosition - GlobalPosition).Normalized();
-                Velocity = new Vector2(direction.X * AttackSpeed, _jumpVelocity);
-            }
-            
-            // Update crossover tracker at end of processing
-            _lastDeltaToTargetX = deltaX;
-        }
-        else
-        {
-            // We're in the air near target - attack when we get close enough
-            // Made attack range more generous while jumping
-            if (distanceToTarget <= AttackRange * AerialAttackRangeMultiplier) 
-            {
-                Log.Debug($"PuffAI: Attempting aerial attack on {_currentTarget.Name}", "PuffAI");
-                AttackTarget(_currentTarget);
-                Log.System($"PuffAI: Completed aerial attack on {_currentTarget.Name}, returning to appropriate state", "PuffAI");
-                ReturnToAppropriateState();
-            }
-            else
-            {
-                Log.Debug($"PuffAI: In air but too far for attack: {distanceToTarget:F1} > {AttackRange * AerialAttackRangeMultiplier:F1}", "PuffAI");
-                // Continue moving toward target while in air
-                if (_currentTarget != null && IsInstanceValid(_currentTarget))
+                Vector2 direction = _currentTarget.GlobalPosition - GlobalPosition;
+                if (direction == Vector2.Zero)
                 {
-                    Vector2 direction = (_currentTarget.GlobalPosition - GlobalPosition).Normalized();
-                    Velocity = new Vector2(direction.X * AttackSpeed * 0.7f, Velocity.Y); // Slightly slower air movement
-                }
-            }
-        }
-    }
-    else
-    {
-        // Chase toward target (ignore monster avoidance while attacking)
-        if (_currentTarget != null && IsInstanceValid(_currentTarget))
-        {
-            Vector2 direction = (_currentTarget.GlobalPosition - GlobalPosition).Normalized();
-            Velocity = new Vector2(direction.X * AttackSpeed, Velocity.Y);
-            
-            // Check if we need to jump over obstacles while chasing (keep Attack state)
-            if (IsOnFloor())
-            {
-                if (IsObstacleInFront())
-                {
-                    Log.Debug("PuffAI: Obstacle detected while chasing - jumping (stay in Attack state)", "PuffAI");
-                    Velocity = new Vector2(direction.X * AttackSpeed, _jumpVelocity);
+                    direction = new Vector2(_facingRight ? 1f : -1f, 0f);
                 }
                 else
                 {
-                    // If target is within a moderate range or at a different elevation, perform a pre-attack leap
-                    float verticalGap = Mathf.Abs(_currentTarget.GlobalPosition.Y - GlobalPosition.Y);
+                    direction = direction.Normalized();
+                }
+
+                Velocity = new Vector2(direction.X * AttackSpeed, Velocity.Y);
+
+                if (IsOnFloor())
+                {
+                    if (IsObstacleInFront())
+                    {
+                        Log.Debug("PuffAI: Obstacle detected while chasing - initiating jump attack", "PuffAI");
+                        BeginJumpAttackTowardsTarget();
+                        return;
+                    }
+
+                    float verticalGap = Mathf.Abs(deltaY);
                     if (distanceToTarget <= AttackRange * 2.5f || verticalGap > 16f)
                     {
-                        Log.Debug($"PuffAI: Performing pre-attack leap (dist={distanceToTarget:F1}, vgap={verticalGap:F1})", "PuffAI");
-                        Velocity = new Vector2(direction.X * AttackSpeed, _jumpVelocity);
+                        Log.Debug($"PuffAI: Pre-attack leap needed (dist={distanceToTarget:F1}, vgap={verticalGap:F1}) - initiating jump attack", "PuffAI");
+                        BeginJumpAttackTowardsTarget();
+                        return;
                     }
                 }
+
+                Log.Debug($"PuffAI: Chasing target, distance: {distanceToTarget:F1}", "PuffAI");
             }
-            
-            Log.Debug($"PuffAI: Chasing target, distance: {distanceToTarget:F1}", "PuffAI");
+            else
+            {
+                Log.Debug("PuffAI: Target became invalid during chase", "PuffAI");
+                _currentTarget = null;
+                _lastDeltaToTargetX = float.NaN;
+                ReturnToAppropriateState();
+            }
+
+            _lastDeltaToTargetX = deltaX;
         }
-        else
+
+        private void UpdateJumpAttackBehavior()
         {
-            Log.Debug("PuffAI: Target became invalid during chase", "PuffAI");
+            if (_currentTarget == null || !IsInstanceValid(_currentTarget))
+            {
+                Log.Debug("PuffAI: JumpAttack target lost, returning to appropriate state", "PuffAI");
+                _currentTarget = null;
+                _lastDeltaToTargetX = float.NaN;
+                ReturnToAppropriateState();
+                return;
+            }
+
+            if (!EnsureCurrentTargetAttackable())
+            {
+                _currentTarget = null;
+                _lastDeltaToTargetX = float.NaN;
+                ReturnToAppropriateState();
+                return;
+            }
+
+            float distanceToTarget = GlobalPosition.DistanceTo(_currentTarget.GlobalPosition);
+            float deltaX = _currentTarget.GlobalPosition.X - GlobalPosition.X;
+            float deltaY = _currentTarget.GlobalPosition.Y - GlobalPosition.Y;
+
+            bool targetIsOnRight = deltaX >= 0f;
+            if (targetIsOnRight != _facingRight)
+            {
+                ForceFacingDirection(targetIsOnRight);
+            }
+
+            if (!float.IsNaN(_lastDeltaToTargetX) && Mathf.Sign(deltaX) != Mathf.Sign(_lastDeltaToTargetX))
+            {
+                if (Mathf.Abs(deltaX) <= 35.0f && Mathf.Abs(deltaY) <= 60.0f && IsFacingCurrentTarget())
+                {
+                    Log.Debug($"PuffAI: Cross-over detected during JumpAttack on {_currentTarget.Name}", "PuffAI");
+                    AttackTargetAndReset();
+                    return;
+                }
+            }
+
+            if (distanceToTarget > AttackRange * AttackGiveUpRangeMultiplier)
+            {
+                Log.Debug($"PuffAI: Target too far away during JumpAttack ({distanceToTarget:F1}), aborting", "PuffAI");
+                _currentTarget = null;
+                _lastDeltaToTargetX = float.NaN;
+                ReturnToAppropriateState();
+                return;
+            }
+
+            if (_player != null)
+            {
+                float distanceFromPlayer = GlobalPosition.DistanceTo(_player.GlobalPosition);
+                if (distanceFromPlayer > 500.0f)
+                {
+                    Log.Warning($"PuffAI: Too far from player during JumpAttack ({distanceFromPlayer:F1}), aborting", "PuffAI");
+                    _currentTarget = null;
+                    _lastDeltaToTargetX = float.NaN;
+                    ReturnToAppropriateState();
+                    return;
+                }
+            }
+
+            if (IsOnFloor())
+            {
+                if (distanceToTarget <= AttackRange * AerialAttackRangeMultiplier && IsFacingCurrentTarget())
+                {
+                    Log.Debug("PuffAI: Landed next to target - finalising attack", "PuffAI");
+                    AttackTargetAndReset();
+                }
+                else
+                {
+                    Log.Debug("PuffAI: Landed without hitting target - resuming pursuit", "PuffAI");
+                    ChangeState(PuffState.Attack);
+                }
+                return;
+            }
+
+            if (distanceToTarget <= AttackRange * AerialAttackRangeMultiplier && IsFacingCurrentTarget())
+            {
+                Log.Debug($"PuffAI: Attempting aerial attack on {_currentTarget.Name}", "PuffAI");
+                AttackTargetAndReset();
+                return;
+            }
+
+            if (_currentTarget != null && IsInstanceValid(_currentTarget))
+            {
+                Vector2 direction = _currentTarget.GlobalPosition - GlobalPosition;
+                if (direction != Vector2.Zero)
+                {
+                    direction = direction.Normalized();
+                    Velocity = new Vector2(direction.X * AttackSpeed * 0.7f, Velocity.Y);
+                }
+            }
+
+            _lastDeltaToTargetX = deltaX;
+        }
+
+        private void UpdateFaceToMonsterBehavior()
+        {
+            // Stop horizontal movement while orienting toward the target
+            Velocity = new Vector2(0, Velocity.Y);
+
+            if (_currentTarget == null || !IsInstanceValid(_currentTarget))
+            {
+                Log.Debug("PuffAI: FaceToMonster state without valid target - returning to appropriate state", "PuffAI");
+                _currentTarget = null;
+                _lastDeltaToTargetX = float.NaN;
+                ReturnToAppropriateState();
+                return;
+            }
+
+            if (!EnsureCurrentTargetAttackable())
+            {
+                _currentTarget = null;
+                _lastDeltaToTargetX = float.NaN;
+                ReturnToAppropriateState();
+                return;
+            }
+
+            float deltaX = _currentTarget.GlobalPosition.X - GlobalPosition.X;
+            bool targetIsOnRight = deltaX >= 0f;
+
+            if (_facingRight != targetIsOnRight)
+            {
+                ForceFacingDirection(targetIsOnRight);
+                return; // Give one frame after turning before pursuing
+            }
+
+            Log.Debug("PuffAI: Facing target complete - transitioning to Attack state", "PuffAI");
+            ChangeState(PuffState.Attack);
+        }
+
+        private void BeginJumpAttackTowardsTarget()
+        {
+            if (_currentTarget == null || !IsInstanceValid(_currentTarget))
+            {
+                Log.Warning("PuffAI: BeginJumpAttack called with invalid target", "PuffAI");
+                ReturnToAppropriateState();
+                return;
+            }
+
+            float deltaX = _currentTarget.GlobalPosition.X - GlobalPosition.X;
+            _lastDeltaToTargetX = deltaX;
+
+            if (!IsOnFloor())
+            {
+                Log.Debug("PuffAI: Not on floor when starting jump attack - switching to JumpAttack state", "PuffAI");
+                ChangeState(PuffState.JumpAttack);
+                return;
+            }
+
+            Vector2 direction = _currentTarget.GlobalPosition - GlobalPosition;
+            if (direction == Vector2.Zero)
+            {
+                direction = new Vector2(_facingRight ? 1f : -1f, 0f);
+            }
+            else
+            {
+                direction = direction.Normalized();
+            }
+
+            Velocity = new Vector2(direction.X * AttackSpeed, _jumpVelocity);
+            ChangeState(PuffState.JumpAttack);
+        }
+
+        private void AttackTargetAndReset()
+        {
+            if (_currentTarget == null || !IsInstanceValid(_currentTarget))
+            {
+                Log.Warning("PuffAI: Attempted to finish attack with invalid target", "PuffAI");
+                ReturnToAppropriateState();
+                return;
+            }
+
+            if (!IsFacingCurrentTarget())
+            {
+                Log.Debug("PuffAI: Attempted to finish attack while not facing target - reorienting", "PuffAI");
+                ChangeState(PuffState.FaceToMonster);
+                return;
+            }
+
+            AttackTarget(_currentTarget);
+            _currentTarget = null;
+            _lastDeltaToTargetX = float.NaN;
             ReturnToAppropriateState();
         }
-    }
-}
+
+        private bool EnsureCurrentTargetAttackable()
+        {
+            if (_currentTarget == null || !IsInstanceValid(_currentTarget))
+            {
+                Log.Debug("PuffAI: Current target invalid or freed", "PuffAI");
+                return false;
+            }
+
+            if (_currentTarget.HasMethod("GetCurrentState"))
+            {
+                try
+                {
+                    var targetState = _currentTarget.Call("GetCurrentState");
+                    if (targetState.AsInt32() == (int)MonsterState.Hidden)
+                    {
+                        Log.System($"PuffAI: Target {_currentTarget.Name} became Hidden - aborting attack", "PuffAI");
+                        return false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning($"PuffAI: Failed to get target state for {_currentTarget.Name}: {ex.Message}", "PuffAI");
+                }
+            }
+
+            if (_currentTarget.HasMethod("GetLifeSystem"))
+            {
+                try
+                {
+                    var lifeSystemVariant = _currentTarget.Call("GetLifeSystem");
+                    if (lifeSystemVariant.VariantType != Variant.Type.Nil)
+                    {
+                        var lifeSystem = lifeSystemVariant.AsGodotObject() as Node;
+                        if (lifeSystem != null && lifeSystem.HasMethod("get_IsDead"))
+                        {
+                            bool isDead = (bool)lifeSystem.Call("get_IsDead");
+                            if (isDead)
+                            {
+                                Log.System($"PuffAI: Target {_currentTarget.Name} died - aborting attack", "PuffAI");
+                                return false;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning($"PuffAI: Failed to check life system for {_currentTarget.Name}: {ex.Message}", "PuffAI");
+                }
+            }
+
+            if (_currentTarget.HasMethod("CanTakeDamage"))
+            {
+                try
+                {
+                    bool canTakeDamage = (bool)_currentTarget.Call("CanTakeDamage");
+                    if (!canTakeDamage)
+                    {
+                        Log.System($"PuffAI: Target {_currentTarget.Name} can no longer take damage - aborting attack", "PuffAI");
+                        return false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning($"PuffAI: Failed to query CanTakeDamage for {_currentTarget.Name}: {ex.Message}", "PuffAI");
+                }
+            }
+
+            if (_currentTarget == null || !IsInstanceValid(_currentTarget))
+            {
+                Log.Debug("PuffAI: Target became invalid after validation", "PuffAI");
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool IsFacingCurrentTarget()
+        {
+            if (_currentTarget == null || !IsInstanceValid(_currentTarget))
+                return false;
+
+            float deltaX = _currentTarget.GlobalPosition.X - GlobalPosition.X;
+            if (Mathf.Abs(deltaX) <= 0.1f)
+                return true;
+
+            bool targetIsOnRight = deltaX > 0f;
+            return targetIsOnRight == _facingRight;
+        }
+
+        private void ForceFacingDirection(bool faceRight)
+        {
+            if (_facingRight == faceRight)
+                return;
+
+            _facingRight = faceRight;
+            if (_puffSprite != null)
+            {
+                var scale = _puffSprite.Scale;
+                _puffSprite.Scale = new Vector2(_facingRight ? Mathf.Abs(scale.X) : -Mathf.Abs(scale.X), scale.Y);
+            }
+
+            UpdateHitboxesForFacing();
+        }
 
         private void AttackTarget(Node2D target)
         {
@@ -1494,13 +1696,12 @@ namespace MarrieGame.AI
             if (!body.IsInGroup("enemies")) return;
 
             // Only attack through detection area when we're actively attacking
-            if (_currentState == PuffState.Attack)
+            if (_currentState == PuffState.JumpAttack)
             {
                 if (_currentTarget != null && IsInstanceValid(_currentTarget) && body == _currentTarget)
                 {
                     Log.System($"PuffAI: Collision-based attack on {body.Name} (MonsterDetectionArea body)", "PuffAI");
-                    AttackTarget(body);
-                    ReturnToAppropriateState();
+                    AttackTargetAndReset();
                 }
             }
         }
@@ -1512,13 +1713,12 @@ namespace MarrieGame.AI
             if (parent == null) return;
             if (!parent.IsInGroup("enemies")) return;
 
-            if (_currentState == PuffState.Attack)
+            if (_currentState == PuffState.JumpAttack)
             {
                 if (_currentTarget != null && IsInstanceValid(_currentTarget) && parent == _currentTarget)
                 {
                     Log.System($"PuffAI: Collision-based attack on {parent.Name} (MonsterDetectionArea area)", "PuffAI");
-                    AttackTarget(parent as Node2D);
-                    ReturnToAppropriateState();
+                    AttackTargetAndReset();
                 }
             }
         }
@@ -1617,31 +1817,26 @@ namespace MarrieGame.AI
 
         private bool DetermineFacingDirection()
         {
-            // Priority 1: If in Attack state and have a target, face the target
-            if (_currentState == PuffState.Attack && _currentTarget != null && IsInstanceValid(_currentTarget))
+            // Priority 1: If actively engaging a target, always face it
+            if ((_currentState == PuffState.Attack || _currentState == PuffState.JumpAttack || _currentState == PuffState.FaceToMonster)
+                && _currentTarget != null && IsInstanceValid(_currentTarget))
             {
                 float targetDirection = _currentTarget.GlobalPosition.X - GlobalPosition.X;
                 return targetDirection > 0; // True if target is to the right
             }
 
-            // Priority 2: If in FaceLeft or FaceRight state, use that direction
-            if (_currentState == PuffState.FaceLeft)
-                return false;
-            if (_currentState == PuffState.FaceRight)
-                return true;
-
-            // Priority 3: If in Idle state, face the player
+            // Priority 2: If in Idle state, face the player
             if (_currentState == PuffState.Idle && _player != null)
             {
                 float directionToPlayer = _player.GlobalPosition.X - GlobalPosition.X;
                 return directionToPlayer > 0; // True if player is to the right
             }
 
-            // Priority 4: Use velocity direction (existing behavior)
+            // Priority 3: Use velocity direction (existing behavior)
             if (Mathf.Abs(Velocity.X) > 0.1f)
                 return Velocity.X > 0;
 
-            // Priority 5: Keep current facing direction if no movement
+            // Priority 4: Keep current facing direction if no movement
             return _facingRight;
         }
         
