@@ -67,13 +67,14 @@ alignment = 1
 
 [node name="GameOverLabel" type="Label" parent="CenterContainer"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.24600765, 0.20622054, 0.1421121, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.2901961)
+theme_override_colors/font_color = Color(0.25, 0.21058333, 0.1425, 1)
+theme_override_colors/font_shadow_color = Color(0.24477637, 0.2447764, 0.24477637, 0.2901961)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_constants/shadow_outline_size = 1
 theme_override_fonts/font = ExtResource("2_4f23q")
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 38
 text = "GAME OVER"
 horizontal_alignment = 1
 
@@ -85,7 +86,7 @@ theme_override_constants/shadow_offset_x = 0
 theme_override_constants/shadow_offset_y = 0
 theme_override_constants/shadow_outline_size = 0
 theme_override_fonts/font = ExtResource("3_nc4eo")
-theme_override_font_sizes/font_size = 25
+theme_override_font_sizes/font_size = 26
 text = "As interferências temporais te consumiram.."
 horizontal_alignment = 1
 
@@ -98,7 +99,7 @@ alignment = 1
 custom_minimum_size = Vector2(220, 40)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("3_nc4eo")
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxTexture_button_normal")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_button_hover")
 theme_override_styles/hover = SubResource("StyleBoxTexture_button_hover")
@@ -109,7 +110,7 @@ text = "Tentar Novamente"
 custom_minimum_size = Vector2(220, 40)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("3_nc4eo")
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxTexture_button_normal")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_button_hover")
 theme_override_styles/hover = SubResource("StyleBoxTexture_button_hover")
