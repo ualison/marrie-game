@@ -28,7 +28,24 @@ public partial class CameraFollow : Camera2D
         if (SetCurrentOnStart)
             MakeCurrent();
             
+        PlayerSceneManager.PlayerInstantiated += OnPlayerInstantiated;
+
+        // If the player already exists (e.g., when returning to a scene), lock on immediately.
+        var existingPlayer = PlayerSceneManager.Instance?.GetCurrentPlayer();
+        if (IsValidNode(existingPlayer))
+        {
+            var resolved = ResolveTargetFromPlayer(existingPlayer);
+            if (resolved != null)
+                SetTarget(resolved);
+        }
+
         CallDeferred(nameof(FindTarget));
+    }
+
+    public override void _ExitTree()
+    {
+        PlayerSceneManager.PlayerInstantiated -= OnPlayerInstantiated;
+        base._ExitTree();
     }
 
     private void FindTarget()
@@ -132,11 +149,17 @@ public partial class CameraFollow : Camera2D
 
     private Node2D FindCharacterBodyInTree(Node parent)
     {
+        if (!IsValidNode(parent))
+            return null;
+
         if (parent is CharacterBody2D characterBody)
             return characterBody;
 
         foreach (Node child in parent.GetChildren())
         {
+            if (!IsValidNode(child))
+                continue;
+
             var result = FindCharacterBodyInTree(child);
             if (result != null)
                 return result;
@@ -148,13 +171,16 @@ public partial class CameraFollow : Camera2D
     // Helper to find a node by name recursively starting from the given parent
     private Node FindNodeByNameRecursive(Node parent, string name)
     {
-        if (parent == null) return null;
+        if (!IsValidNode(parent)) return null;
 
         if (parent.Name == name)
             return parent;
 
         foreach (Node child in parent.GetChildren())
         {
+            if (!IsValidNode(child))
+                continue;
+
             var result = FindNodeByNameRecursive(child, name);
             if (result != null)
                 return result;
@@ -217,5 +243,38 @@ public partial class CameraFollow : Camera2D
     public Node2D GetTarget()
     {
         return _target;
+    }
+
+    private void OnPlayerInstantiated(Node2D player)
+    {
+        if (!IsValidNode(player))
+            return;
+
+        var resolvedTarget = ResolveTargetFromPlayer(player);
+        if (resolvedTarget != null)
+        {
+            SetTarget(resolvedTarget);
+            if (SetCurrentOnStart && !IsCurrent())
+            {
+                MakeCurrent();
+            }
+        }
+    }
+
+    private Node2D ResolveTargetFromPlayer(Node player)
+    {
+        if (!IsValidNode(player))
+            return null;
+
+        if (player is CharacterBody2D characterBody)
+            return characterBody;
+
+        var childBody = FindCharacterBodyInTree(player);
+        return childBody ?? player as Node2D;
+    }
+
+    private bool IsValidNode(Node node)
+    {
+        return node != null && GodotObject.IsInstanceValid(node);
     }
 }
