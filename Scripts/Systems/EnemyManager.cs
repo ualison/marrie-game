@@ -156,8 +156,7 @@ public partial class EnemyManager : Node
 
         Log.Warning($"Monster depleted - hiding for {LocalHideTime}s (local timer)", "EnemyManager");
 
-        HideMonster(pair.Monster);
-        pair.IsHidden = true;
+    HideMonster(pair.Monster);
         ScheduleRespawn(pair, LocalHideTime, RespawnType.MonsterOnly);
     }
 
@@ -310,16 +309,12 @@ public partial class EnemyManager : Node
 
         if (currentReality == Reality.CurrentReality)
         {
-            pair.Monster.ForceShow();
-
-            // Notify ReplayRecorder that monster is now visible again
-            if (ReplayRecorder.Instance != null)
-            {
-                ReplayRecorder.Instance.OnMonsterVisibilityChanged(pair.Monster, true);
-            }
+            ShowMonster(pair.Monster);
         }
-
-        pair.IsHidden = false;
+        else
+        {
+            pair.IsHidden = true;
+        }
     }
 
     private void RespawnPair(EnemyPair pair)
@@ -335,16 +330,14 @@ public partial class EnemyManager : Node
             var currentReality = RealityManager.Instance?.CurrentReality ?? Reality.CurrentReality;
             if (currentReality == Reality.CurrentReality)
             {
-                pair.Monster.ForceShow();
+                ShowMonster(pair.Monster);
 
                 // Ensure monster is actually visible after respawn (bug fix)
                 CallDeferred(nameof(VerifyMonsterVisibility), pair.Monster);
-
-                // Notify ReplayRecorder that monster is now visible again
-                if (ReplayRecorder.Instance != null)
-                {
-                    ReplayRecorder.Instance.OnMonsterVisibilityChanged(pair.Monster, true);
-                }
+            }
+            else
+            {
+                pair.IsHidden = true;
             }
         }
 
@@ -354,7 +347,6 @@ public partial class EnemyManager : Node
             pair.Ghost.LifeSystem?.Reset();
         }
 
-        pair.IsHidden = false;
     }
 
     private void VerifyMonsterVisibility(Monster monster)
@@ -385,24 +377,31 @@ public partial class EnemyManager : Node
 
             if (newReality == Reality.CurrentReality)
             {
-                // Only show monster if global ghost life is NOT defeated
-                if (!isGlobalGhostLifeDefeated && pair.Monster.LifeSystem?.CurrentRedHearts > 0 && !pair.IsHidden)
+                bool hasRespawnTimer = _respawnTimers.ContainsKey(pair);
+                bool monsterHasRedHearts = pair.Monster.LifeSystem == null || pair.Monster.LifeSystem.CurrentRedHearts > 0;
+
+                if (isGlobalGhostLifeDefeated)
                 {
-                    pair.Monster.ForceShow();
-                }
-                else if (isGlobalGhostLifeDefeated)
-                {
-                    // Keep monster hidden if global ghost life is defeated
-                    pair.Monster.ForceHide();
+                    HideMonster(pair.Monster);
                     Log.Debug($"Monster {pair.Monster.Name} kept hidden - global ghost life defeated", "EnemyManager");
+                }
+                else if (hasRespawnTimer || !monsterHasRedHearts)
+                {
+                    HideMonster(pair.Monster);
+                }
+                else
+                {
+                    ShowMonster(pair.Monster);
                 }
 
                 if (IsInstanceValid(pair.Ghost))
+                {
                     pair.Ghost.FadeOutAndDestroy();
+                }
             }
             else if (newReality == Reality.PastReality)
             {
-                pair.Monster.ForceHide();
+                HideMonster(pair.Monster);
                 // Ghost visibility handled by replay system
             }
         }
@@ -614,7 +613,7 @@ public partial class EnemyManager : Node
         foreach (var pair in _pairs)
         {
             if (IsInstanceValid(pair.Monster))
-                pair.Monster.ForceHide();
+                HideMonster(pair.Monster);
         }
 
         Log.System("Player died, hiding all monsters", "EnemyManager");
@@ -631,7 +630,7 @@ public partial class EnemyManager : Node
             foreach (var pair in _pairs)
             {
                 if (IsInstanceValid(pair.Monster))
-                    pair.Monster.ForceShow();
+                    ShowMonster(pair.Monster);
             }
         }
 
@@ -682,16 +681,41 @@ public partial class EnemyManager : Node
     #region Utility
     private void HideMonster(Monster monster)
     {
-        if (IsInstanceValid(monster))
-        {
-            monster.ForceHide();
+        if (!IsInstanceValid(monster))
+            return;
 
-            // Notify ReplayRecorder that monster is now hidden
-            if (ReplayRecorder.Instance != null)
-            {
-                ReplayRecorder.Instance.OnMonsterVisibilityChanged(monster, false);
-            }
+        monster.ForceHide();
+
+        var pair = GetPair(monster);
+        if (pair != null)
+        {
+            pair.IsHidden = true;
         }
+
+        // Notify ReplayRecorder that monster is now hidden
+        ReplayRecorder.Instance?.OnMonsterVisibilityChanged(monster, false);
+    }
+
+    private void ShowMonster(Monster monster)
+    {
+        if (!IsInstanceValid(monster))
+            return;
+
+        // Only force show if the monster still has red hearts (or no life system to consult)
+        if (monster.LifeSystem != null && monster.LifeSystem.CurrentRedHearts <= 0)
+        {
+            return;
+        }
+
+        monster.ForceShow();
+
+        var pair = GetPair(monster);
+        if (pair != null)
+        {
+            pair.IsHidden = false;
+        }
+
+        ReplayRecorder.Instance?.OnMonsterVisibilityChanged(monster, true);
     }
 
     private void HideAllMonstersInitially()
@@ -701,7 +725,6 @@ public partial class EnemyManager : Node
             if (IsInstanceValid(pair.Monster))
             {
                 HideMonster(pair.Monster);
-                pair.IsHidden = true;
             }
         }
 
