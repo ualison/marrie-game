@@ -1,4 +1,5 @@
 using Godot;
+using System.Collections.Generic;
 using MarrieGame.Core.Utils;
 
 namespace MarrieGame.Scripts.Items
@@ -29,6 +30,10 @@ namespace MarrieGame.Scripts.Items
 
         private bool _playerNearby = false;
         private Vector2 _originalGemPosition;
+        private bool _isUsed = false;
+        
+        // Static storage for crystal positions across scenes
+        private static Dictionary<string, Vector2> _crystalPositions = new Dictionary<string, Vector2>();
 
         public override void _Ready()
         {
@@ -99,6 +104,8 @@ namespace MarrieGame.Scripts.Items
 
         private void TrySwitchScene()
         {
+            if (_isUsed) return; // Prevent multiple uses
+            
             // Debug: always print current target before attempting
             Log.Debug($"SceneSwitcherGem '{GetPath()}' attempting switch. Current TargetScenePath='{TargetScenePath}'", nameof(SceneSwitcherGem));
 
@@ -109,18 +116,14 @@ namespace MarrieGame.Scripts.Items
                 return;
             }
 
-            // Notify HazeMonsterManager of puzzle entry (if applicable) BEFORE switching
-            if (HazeMonsterManager.Instance != null)
-            {
-                HazeMonsterManager.Instance.NotifyEnteringPuzzle(TargetScenePath);
-            }
-
-            var result = GetTree().ChangeSceneToFile(TargetScenePath);
-            if (result != Error.Ok)
-            {
-                UIManager.ShowGameplayMessage($"Failed to load scene: {TargetScenePath}");
-                Log.Error($"SceneSwitcherGem: ChangeSceneToFile failed with {result} for '{TargetScenePath}'", nameof(SceneSwitcherGem));
-            }
+            _isUsed = true;
+            _promptLabel?.Hide();
+            
+            // Store crystal position for target scene position updates
+            StoreCrystalPosition();
+            
+            // Start fade out animation before switching
+            StartFadeOutAndSwitch();
         }
 
         private void OnBodyEntered(Node2D body)
@@ -140,6 +143,107 @@ namespace MarrieGame.Scripts.Items
                 _promptLabel?.Hide();
             }
         }
+        
+        private void StoreCrystalPosition()
+        {
+            string currentScene = GetTree().CurrentScene?.Name ?? "Unknown";
+            Vector2 crystalPosition = GlobalPosition;
+            
+            _crystalPositions[currentScene] = crystalPosition;
+            Log.Debug($"SceneSwitcherGem: Stored position {crystalPosition} for scene '{currentScene}'", nameof(SceneSwitcherGem));
+            
+            // Update PlayerPosition and PuffPosition in current scene to crystal location
+            UpdateCurrentScenePositions(crystalPosition);
+            
+            // Notify PlayerSceneManager about the crystal position for spawning in target scene
+            if (PlayerSceneManager.Instance != null)
+            {
+                PlayerSceneManager.Instance.SetCrystalTeleportPosition(crystalPosition);
+                Log.Debug($"SceneSwitcherGem: Notified PlayerSceneManager of crystal position {crystalPosition}", nameof(SceneSwitcherGem));
+            }
+        }
+        
+        private void UpdateCurrentScenePositions(Vector2 crystalPosition)
+        {
+            var currentScene = GetTree().CurrentScene;
+            if (currentScene == null) return;
+            
+            // Find and update PlayerPosition
+            var playerPosition = FindNodeByName(currentScene, "PlayerPosition");
+            if (playerPosition is Node2D playerPos)
+            {
+                playerPos.GlobalPosition = crystalPosition;
+                Log.Debug($"Updated PlayerPosition to crystal location {crystalPosition}", nameof(SceneSwitcherGem));
+            }
+            
+            // Find and update PuffPosition  
+            var puffPosition = FindNodeByName(currentScene, "PuffPosition");
+            if (puffPosition is Node2D puffPos)
+            {
+                puffPos.GlobalPosition = crystalPosition;
+                Log.Debug($"Updated PuffPosition to crystal location {crystalPosition}", nameof(SceneSwitcherGem));
+            }
+        }
+        
+        private Node FindNodeByName(Node root, string nodeName)
+        {
+            if (root == null) return null;
+            
+            if (root.Name == nodeName)
+                return root;
+                
+            foreach (Node child in root.GetChildren())
+            {
+                var found = FindNodeByName(child, nodeName);
+                if (found != null)
+                    return found;
+            }
+            
+            return null;
+        }
+        
+        private void StartFadeOutAndSwitch()
+        {
+            // Stop floating animation
+            StopFloatingAnimation();
+            
+            // Create fade out tween
+            var fadeTween = CreateTween();
+            fadeTween.SetParallel(true);
+            
+            // Fade out sprite
+            if (_gemSprite != null)
+            {
+                fadeTween.TweenProperty(_gemSprite, "modulate", new Color(1, 1, 1, 0), 0.5f);
+            }
+            
+            // Fade out prompt label
+            if (_promptLabel != null)
+            {
+                fadeTween.TweenProperty(_promptLabel, "modulate", new Color(1, 1, 1, 0), 0.3f);
+            }
+            
+            // Switch scene after fade
+            fadeTween.TweenCallback(Callable.From(PerformSceneSwitch)).SetDelay(0.5f);
+        }
+        
+        private void PerformSceneSwitch()
+        {
+            // Notify HazeMonsterManager of puzzle entry (if applicable) BEFORE switching
+            if (HazeMonsterManager.Instance != null)
+            {
+                HazeMonsterManager.Instance.NotifyEnteringPuzzle(TargetScenePath);
+            }
+
+            var result = GetTree().ChangeSceneToFile(TargetScenePath);
+            if (result != Error.Ok)
+            {
+                UIManager.ShowGameplayMessage($"Failed to load scene: {TargetScenePath}");
+                Log.Error($"SceneSwitcherGem: ChangeSceneToFile failed with {result} for '{TargetScenePath}'", nameof(SceneSwitcherGem));
+            }
+        }
+        
+
 
         private void StartFloatingAnimation()
         {

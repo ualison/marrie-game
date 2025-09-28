@@ -33,6 +33,9 @@ public partial class PlayerStateManager : Node
             // Listen to scene changes to rediscover components
             SceneLifecycleManager.SceneReady += OnSceneReady;
             
+            // Listen to PlayerSceneManager events for more reactive player discovery
+            PlayerSceneManager.PlayerInstantiated += OnPlayerInstantiated;
+            
             // Also try immediate initialization as fallback
             CallDeferred(nameof(TryImmediateInitialization));
         }
@@ -57,6 +60,16 @@ public partial class PlayerStateManager : Node
     
     private void OnSceneReady()
     {
+        DiscoverPlayerComponents();
+        ConnectPlayerSystems();
+        CachePlayerSpawn();
+    }
+    
+    private void OnPlayerInstantiated(Node2D player)
+    {
+        Log.Debug($"PlayerStateManager: Player instantiated by PlayerSceneManager: {player?.Name}", "PlayerStateManager");
+        
+        // Rediscover components now that player is available
         DiscoverPlayerComponents();
         ConnectPlayerSystems();
         CachePlayerSpawn();
@@ -199,6 +212,7 @@ public partial class PlayerStateManager : Node
         if (Instance == this)
         {
             SceneLifecycleManager.SceneReady -= OnSceneReady;
+            PlayerSceneManager.PlayerInstantiated -= OnPlayerInstantiated;
             Instance = null;
         }
     }

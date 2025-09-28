@@ -3,7 +3,6 @@
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="1_08kc0"]
 [ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="2_djgpu"]
 [ext_resource type="PackedScene" uid="uid://bprvmud1sukcc" path="res://Prefabs/Environment.tscn" id="2_wjun0"]
-[ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_e2fbs"]
 [ext_resource type="PackedScene" uid="uid://djryvxjy0bkfe" path="res://Prefabs/Monster.tscn" id="5_e2fbs"]
 [ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="6_8u8ny"]
 [ext_resource type="Script" uid="uid://sdqhqn52n3xp" path="res://Scripts/Systems/InfiniteForestManager.cs" id="8_r6l07"]
@@ -11,7 +10,6 @@
 [ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="10_e2fbs"]
 [ext_resource type="PackedScene" uid="uid://dgmpsx8qec0pg" path="res://Prefabs/Haze.tscn" id="11_pw6c3"]
 [ext_resource type="Script" uid="uid://boyvsaf4s7lic" path="res://Scripts/Systems/SceneLifecycleManager.cs" id="11_r6l07"]
-[ext_resource type="PackedScene" uid="uid://dfauk4svx1fjh" path="res://Prefabs/Puff.tscn" id="13_j3sk6"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
 [ext_resource type="PackedScene" uid="uid://kufqrmkh1vbu" path="res://Prefabs/ReplayCrystal.tscn" id="14_gfl13"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
@@ -25,15 +23,12 @@
 
 [node name="CameraFollower" parent="." instance=ExtResource("1_08kc0")]
 FollowOffset = Vector2(0, -200)
-TargetPath = NodePath("../GameEntities/Player")
+TargetPath = NodePath("")
 SmoothSpeed = 10.0
 
 [node name="Environment" parent="." instance=ExtResource("2_wjun0")]
 
 [node name="GameEntities" type="Node2D" parent="."]
-
-[node name="Player" parent="GameEntities" instance=ExtResource("4_e2fbs")]
-position = Vector2(-449, 137)
 
 [node name="Enemies" type="Node2D" parent="GameEntities"]
 
@@ -78,21 +73,6 @@ stream = ExtResource("10_e2fbs")
 volume_db = 6.038
 autoplay = true
 script = ExtResource("15_r6l07")
-
-[node name="Puff" parent="." instance=ExtResource("13_j3sk6")]
-z_index = -1
-position = Vector2(-574, 250)
-FollowSpeed = 100.0
-FollowDistance = 100.0
-MinFollowDistance = 75.0
-AttackRange = 150.0
-AerialAttackRangeMultiplier = 0.9
-AttackCommandRangeMultiplier = 8.0
-AttackGiveUpRangeMultiplier = 15.0
-JumpHeight = 75.0
-AttackCooldown = 1.0
-MonsterAvoidanceDistance = 100.0
-MonsterAvoidanceForce = 150.0
 
 [node name="ReplayGem" parent="." instance=ExtResource("14_gfl13")]
 position = Vector2(469, 119)

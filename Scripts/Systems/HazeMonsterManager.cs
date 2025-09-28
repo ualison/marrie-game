@@ -68,11 +68,21 @@ public partial class HazeMonsterManager : Node
         // Subscribe to game restart to reset puzzle progress
         GameEventSystem.GameRestart += OnGameRestart;
         
+        // Subscribe to scene changes to refresh camera reference
+        SceneLifecycleManager.SceneReady += OnSceneReady;
+        
         // Subscribe to scene changes to detect puzzle completion
         if (GetTree() != null)
         {
             GetTree().Connect("node_added", new Callable(this, nameof(OnNodeAdded)));
         }
+    }
+    
+    private void OnSceneReady()
+    {
+        // Refresh camera reference on scene change
+        FindReferences();
+        Log.Debug("HazeMonsterManager: References refreshed for new scene", "HazeMonsterManager");
     }
 
     private void OnGameRestart()
@@ -207,9 +217,27 @@ public partial class HazeMonsterManager : Node
         }
     }
 
+    private bool IsValidCamera()
+    {
+        return _playerCamera != null && GodotObject.IsInstanceValid(_playerCamera);
+    }
+
+    private void EnsureValidCamera()
+    {
+        if (!IsValidCamera())
+        {
+            _playerCamera = GetViewport()?.GetCamera2D();
+            if (_playerCamera != null)
+            {
+                Log.Debug("HazeMonsterManager: Camera reference refreshed", "HazeMonsterManager");
+            }
+        }
+    }
+
     public Vector2 GetRandomSpawnPosition()
     {
-        if (_playerCamera == null) return Vector2.Zero;
+        EnsureValidCamera();
+        if (!IsValidCamera()) return Vector2.Zero;
 
         float playerX = _playerCamera.GlobalPosition.X;
         float distance = _rng.RandfRange(MinSpawnDistance, MaxSpawnDistance);
@@ -444,8 +472,13 @@ public partial class HazeMonsterManager : Node
         // If more than one (legacy or accidental), keep the nearest and remove the rest
         if (active.Count > 1)
         {
-            active.Sort((a,b) => Mathf.Abs(a.GlobalPosition.X - _playerCamera.GlobalPosition.X)
-                .CompareTo(Mathf.Abs(b.GlobalPosition.X - _playerCamera.GlobalPosition.X)));
+            EnsureValidCamera();
+            if (IsValidCamera())
+            {
+                float cameraX = _playerCamera.GlobalPosition.X;
+                active.Sort((a,b) => Mathf.Abs(a.GlobalPosition.X - cameraX)
+                    .CompareTo(Mathf.Abs(b.GlobalPosition.X - cameraX)));
+            }
             for (int i = 1; i < active.Count; i++)
             {
                 active[i].QueueFree();
@@ -458,6 +491,9 @@ public partial class HazeMonsterManager : Node
         // Despawn if too far (horizontal) from player
         if (_currentHaze != null)
         {
+            EnsureValidCamera();
+            if (!IsValidCamera()) return;
+            
             float horizDist = Mathf.Abs(_currentHaze.GlobalPosition.X - _playerCamera.GlobalPosition.X);
             if (horizDist > DespawnDistance)
             {
@@ -483,13 +519,17 @@ public partial class HazeMonsterManager : Node
 
     private Vector2 SelectValidSpawnPosition()
     {
-        if (_playerCamera == null) return Vector2.Zero;
+        EnsureValidCamera();
+        if (!IsValidCamera()) return Vector2.Zero;
+        
         int attempts = 0;
         const int MAX_ATTEMPTS = 8;
         while (attempts < MAX_ATTEMPTS)
         {
             attempts++;
             Vector2 candidate = GetRandomSpawnPosition();
+            if (!IsValidCamera()) return Vector2.Zero; // Double-check after GetRandomSpawnPosition
+            
             float horiz = Mathf.Abs(candidate.X - _playerCamera.GlobalPosition.X);
             if (horiz >= MinSpawnDistance && horiz <= MaxSpawnDistance)
             {
@@ -529,17 +569,21 @@ public partial class HazeMonsterManager : Node
 
     private void MaintainCrystalsLifecycle()
     {
-        if (_playerCamera == null) return;
+        EnsureValidCamera();
+        if (!IsValidCamera()) return;
+        
         var tree = GetTree();
         if (tree == null) return;
         var gems = tree.GetNodesInGroup("scene_switcher_gem");
         if (gems == null || gems.Count == 0) return;
 
+        float cameraX = _playerCamera.GlobalPosition.X;
+
         foreach (var g in gems)
         {
             if (g is Node2D n && IsInstanceValid(n))
             {
-                float horizDist = Mathf.Abs(n.GlobalPosition.X - _playerCamera.GlobalPosition.X);
+                float horizDist = Mathf.Abs(n.GlobalPosition.X - cameraX);
                 if (horizDist > CrystalDespawnDistance)
                 {
                     Log.Debug($"Despawning crystal at {n.GlobalPosition} (horizDist={horizDist} > {CrystalDespawnDistance})", "HazeMonsterManager");
@@ -575,6 +619,7 @@ public partial class HazeMonsterManager : Node
         {
             // Cleanup event subscriptions
             GameEventSystem.GameRestart -= OnGameRestart;
+            SceneLifecycleManager.SceneReady -= OnSceneReady;
             
             if (GetTree() != null)
             {

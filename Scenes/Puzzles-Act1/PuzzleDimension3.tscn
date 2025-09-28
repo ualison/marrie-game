@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://bnuqff4emdbno"]
+[gd_scene load_steps=20 format=3 uid="uid://bnuqff4emdbno"]
 
 [ext_resource type="PackedScene" uid="uid://844rfld3y4ee" path="res://Prefabs/UI/RockCount.tscn" id="1_3i0aq"]
 [ext_resource type="Script" uid="uid://1o447xq10j6e" path="res://Scripts/UI/ManaBar.cs" id="2_njslr"]
@@ -8,7 +8,6 @@
 [ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/LifeHeart.png" id="6_136e7"]
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="7_pb5l6"]
 [ext_resource type="PackedScene" uid="uid://bfsyt4vafmqr8" path="res://Prefabs/EnvironmentPuzzleDimension.tscn" id="8_a0ed6"]
-[ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="9_7ttib"]
 [ext_resource type="PackedScene" uid="uid://kufqrmkh1vbu" path="res://Prefabs/ReplayCrystal.tscn" id="10_48q6r"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="11_71u5o"]
 [ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="12_ytjuo"]
@@ -78,8 +77,8 @@ script = null
 
 [node name="GameEntities" type="Node2D" parent="."]
 
-[node name="Player" parent="GameEntities" instance=ExtResource("9_7ttib")]
-position = Vector2(-550, 128)
+[node name="PlayerPosition" type="Node2D" parent="GameEntities"]
+position = Vector2(-550, 126)
 
 [node name="ReplayGem" parent="." instance=ExtResource("10_48q6r")]
 position = Vector2(-422, 238)

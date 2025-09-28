@@ -81,16 +81,15 @@ public partial class GameManager : Node
 
         // Ensure all managers exist as children - order matters!
         EnsureManagerExists<SceneLifecycleManager>();  // First - needed for scene events
-        EnsureManagerExists<RealityManager>();         // Early - needed for reality-based game logic
+        EnsureManagerExists<RealityManager>();         // Early - needed for reality-based game logic  
         EnsureManagerExists<GlobalGhostLifeManager>(); // Global ghost life system
+        EnsureManagerExists<PlayerSceneManager>();     // Global player and Puff management
         EnsureManagerExists<PlayerStateManager>();     // Now managed by GameManager
         EnsureManagerExists<EnemyManager>();           // Add EnemyManager for consistency
         EnsureManagerExists<HazeMonsterManager>();     // Haze Monster spawning and puzzle progression
         EnsureManagerExists<UIManager>();
         EnsureManagerExists<DialogManager>();          // Dialog system for NPCs
-        EnsureManagerExists<ReplaySystemManager>();
-
-        Log.EndTimer("ManagerInitialization", "All managers initialized");
+        EnsureManagerExists<ReplaySystemManager>();        Log.EndTimer("ManagerInitialization", "All managers initialized");
     }
 
     private void EnsureManagerExists<T>() where T : Node, new()

@@ -445,14 +445,37 @@ public partial class YellowCage : RigidBody2D
 
     private void SpawnPuffAndDestroy()
     {
-        Log.Debug("YellowCage: Spawning Puff and destroying cage", "YellowCage");
+        Log.Debug("YellowCage: Unlocking Puff globally and destroying cage", "YellowCage");
         
+        // Notify PlayerSceneManager that Puff is now unlocked
+        if (PlayerSceneManager.Instance != null)
+        {
+            PlayerSceneManager.Instance.UnlockPuff();
+            Log.System("YellowCage: Puff unlocked globally via PlayerSceneManager", "YellowCage");
+        }
+        else
+        {
+            Log.Warning("YellowCage: PlayerSceneManager not found - falling back to local Puff spawn", "YellowCage");
+            
+            // Fallback to local spawn if PlayerSceneManager is not available
+            SpawnLocalPuff();
+        }
+        
+        // Destroy the cage
+        QueueFree();
+        Log.Debug("YellowCage: Cage destroyed", "YellowCage");
+    }
+
+    /// <summary>
+    /// Fallback method to spawn Puff locally if PlayerSceneManager is not available
+    /// </summary>
+    private void SpawnLocalPuff()
+    {
         // Load the Puff prefab
         var puffScene = GD.Load<PackedScene>("res://Prefabs/Puff.tscn");
         if (puffScene == null)
         {
             Log.Error("YellowCage: Failed to load Puff.tscn prefab", "YellowCage");
-            QueueFree(); // Still destroy cage even if Puff can't be spawned
             return;
         }
         
@@ -461,7 +484,6 @@ public partial class YellowCage : RigidBody2D
         if (puffInstance == null)
         {
             Log.Error("YellowCage: Failed to instantiate Puff prefab", "YellowCage");
-            QueueFree();
             return;
         }
         
@@ -471,7 +493,6 @@ public partial class YellowCage : RigidBody2D
         {
             Log.Error("YellowCage: No parent found to spawn Puff", "YellowCage");
             puffInstance.QueueFree();
-            QueueFree();
             return;
         }
         
@@ -484,12 +505,12 @@ public partial class YellowCage : RigidBody2D
             if (_puffPrisoner != null)
             {
                 puffNode.GlobalPosition = _puffPrisoner.GlobalPosition;
-                Log.Debug($"YellowCage: Puff spawned at PuffPresioner position {puffNode.GlobalPosition}", "YellowCage");
+                Log.Debug($"YellowCage: Puff spawned locally at PuffPresioner position {puffNode.GlobalPosition}", "YellowCage");
             }
             else
             {
                 puffNode.GlobalPosition = GlobalPosition;
-                Log.Debug($"YellowCage: Puff spawned at cage position (PuffPresioner not found) {puffNode.GlobalPosition}", "YellowCage");
+                Log.Debug($"YellowCage: Puff spawned locally at cage position (PuffPresioner not found) {puffNode.GlobalPosition}", "YellowCage");
             }
         }
         else
@@ -497,10 +518,6 @@ public partial class YellowCage : RigidBody2D
             Log.Warning("YellowCage: Puff prefab is not Node2D, adding anyway", "YellowCage");
             parent.AddChild(puffInstance);
         }
-        
-        // Destroy the cage
-        QueueFree();
-        Log.Debug("YellowCage: Cage destroyed", "YellowCage");
     }
     #endregion
 

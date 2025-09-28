@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://bpk70wjc7430w"]
+[gd_scene load_steps=20 format=3 uid="uid://bpk70wjc7430w"]
 
 [ext_resource type="PackedScene" uid="uid://844rfld3y4ee" path="res://Prefabs/UI/RockCount.tscn" id="1_iduov"]
 [ext_resource type="Script" uid="uid://1o447xq10j6e" path="res://Scripts/UI/ManaBar.cs" id="2_0qaj2"]
@@ -8,7 +8,6 @@
 [ext_resource type="Texture2D" uid="uid://davc57ase3j5q" path="res://Art/LifeHeart.png" id="6_pxss5"]
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="7_0kkmk"]
 [ext_resource type="PackedScene" uid="uid://bfsyt4vafmqr8" path="res://Prefabs/EnvironmentPuzzleDimension.tscn" id="8_ppplc"]
-[ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="9_w0fwt"]
 [ext_resource type="PackedScene" uid="uid://kufqrmkh1vbu" path="res://Prefabs/ReplayCrystal.tscn" id="10_7ttox"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="11_feybk"]
 [ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="12_2qhcc"]
@@ -78,10 +77,14 @@ script = null
 
 [node name="GameEntities" type="Node2D" parent="."]
 
-[node name="Player" parent="GameEntities" instance=ExtResource("9_w0fwt")]
-position = Vector2(-550, 128)
+[node name="PlayerPosition" type="Node2D" parent="GameEntities"]
+position = Vector2(-548, 129)
 
-[node name="ReplayGem" parent="." instance=ExtResource("10_7ttox")]
+[node name="SceneSwicherCrystal" parent="GameEntities" instance=ExtResource("19_b8cht")]
+position = Vector2(-541, 223)
+TargetScenePath = "uid://54o6xy0qaoae"
+
+[node name="ReplayGem" parent="GameEntities" instance=ExtResource("10_7ttox")]
 position = Vector2(-422, 228)
 
 [node name="GameSystems" type="Node" parent="."]
@@ -141,7 +144,3 @@ position = Vector2(-297, 143)
 
 [node name="Rock4" parent="PuzzleManager" instance=ExtResource("18_6wfpn")]
 position = Vector2(-258, 143)
-
-[node name="SceneSwicherCrystal" parent="." instance=ExtResource("19_b8cht")]
-position = Vector2(-541, 223)
-TargetScenePath = "uid://54o6xy0qaoae"

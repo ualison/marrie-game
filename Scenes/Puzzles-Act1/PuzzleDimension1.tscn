@@ -1,8 +1,7 @@
-[gd_scene load_steps=21 format=3 uid="uid://djkt6xtpabbyo"]
+[gd_scene load_steps=20 format=3 uid="uid://djkt6xtpabbyo"]
 
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="2_6po3t"]
 [ext_resource type="PackedScene" uid="uid://bfsyt4vafmqr8" path="res://Prefabs/EnvironmentPuzzleDimension.tscn" id="3_2kkwa"]
-[ext_resource type="PackedScene" uid="uid://ckwbdf3jm340m" path="res://Prefabs/Player.tscn" id="4_ju2da"]
 [ext_resource type="Script" uid="uid://bk37wsl8lt23o" path="res://Scripts/Systems/PlayerStateManager.cs" id="6_8u8ny"]
 [ext_resource type="PackedScene" uid="uid://844rfld3y4ee" path="res://Prefabs/UI/RockCount.tscn" id="8_1wrpf"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="8_tfei0"]
@@ -78,8 +77,8 @@ script = null
 
 [node name="GameEntities" type="Node2D" parent="."]
 
-[node name="Player" parent="GameEntities" instance=ExtResource("4_ju2da")]
-position = Vector2(-559, 136)
+[node name="PlayerPosition" type="Node2D" parent="GameEntities"]
+position = Vector2(-559, 137)
 
 [node name="ReplayGem" parent="." instance=ExtResource("10_soofq")]
 position = Vector2(-357, 235)
@@ -135,5 +134,5 @@ position = Vector2(237, 175)
 position = Vector2(276, 175)
 
 [node name="SceneSwicherCrystal" parent="." instance=ExtResource("19_dyyws")]
-position = Vector2(-560, 231)
+position = Vector2(-549, 218)
 TargetScenePath = "uid://54o6xy0qaoae"

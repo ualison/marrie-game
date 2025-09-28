@@ -27,6 +27,11 @@ public static class GameEventSystem
     // System Events
     public static event Action<Vector2> ReplayGemCreated;
     
+    // Character Events
+    public static event Action PuffUnlocked;
+    public static event Action<Node2D> PlayerSpawned;
+    public static event Action<Node2D> PuffSpawned;
+    
     #region Player Event Triggers
     public static void OnPlayerDied(PlayerDeath payload)
     {
@@ -85,6 +90,23 @@ public static class GameEventSystem
     }
     #endregion
     
+    #region Character Event Triggers
+    public static void OnPuffUnlocked()
+    {
+        PuffUnlocked?.Invoke();
+    }
+    
+    public static void OnPlayerSpawned(Node2D player)
+    {
+        PlayerSpawned?.Invoke(player);
+    }
+    
+    public static void OnPuffSpawned(Node2D puff)
+    {
+        PuffSpawned?.Invoke(puff);
+    }
+    #endregion
+    
     #region Cleanup
     public static void ClearAllSubscriptions()
     {
@@ -98,6 +120,9 @@ public static class GameEventSystem
         GameRestart = null;
         GameRestarted = null;
         ReplayGemCreated = null;
+        PuffUnlocked = null;
+        PlayerSpawned = null;
+        PuffSpawned = null;
     }
     #endregion
 }
