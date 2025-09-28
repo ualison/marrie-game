@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3 uid="uid://54o6xy0qaoae"]
+[gd_scene load_steps=17 format=3 uid="uid://54o6xy0qaoae"]
 
 [ext_resource type="PackedScene" uid="uid://3xysy2jcdjr0" path="res://Prefabs/CameraFollower.tscn" id="1_08kc0"]
 [ext_resource type="PackedScene" uid="uid://bhff38051b28y" path="res://Prefabs/UI/UserInterface.tscn" id="2_djgpu"]
@@ -15,6 +15,7 @@
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="13_r6l07"]
 [ext_resource type="PackedScene" uid="uid://kufqrmkh1vbu" path="res://Prefabs/ReplayCrystal.tscn" id="14_gfl13"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="15_r6l07"]
+[ext_resource type="PackedScene" uid="uid://byspjo0wirw6v" path="res://Prefabs/Catapult.tscn" id="16_pw6c3"]
 
 [node name="Root" type="Node2D"]
 
@@ -32,12 +33,12 @@ SmoothSpeed = 10.0
 [node name="GameEntities" type="Node2D" parent="."]
 
 [node name="Player" parent="GameEntities" instance=ExtResource("4_e2fbs")]
-position = Vector2(-327, 116)
+position = Vector2(-449, 137)
 
 [node name="Enemies" type="Node2D" parent="GameEntities"]
 
 [node name="Monster" parent="GameEntities/Enemies" instance=ExtResource("5_e2fbs")]
-position = Vector2(330, 88)
+position = Vector2(467, 114)
 
 [node name="GameSystems" type="Node" parent="."]
 
@@ -79,7 +80,8 @@ autoplay = true
 script = ExtResource("15_r6l07")
 
 [node name="Puff" parent="." instance=ExtResource("13_j3sk6")]
-position = Vector2(-135, 221)
+z_index = -1
+position = Vector2(-574, 250)
 FollowSpeed = 100.0
 FollowDistance = 100.0
 MinFollowDistance = 75.0
@@ -93,7 +95,23 @@ MonsterAvoidanceDistance = 100.0
 MonsterAvoidanceForce = 150.0
 
 [node name="ReplayGem" parent="." instance=ExtResource("14_gfl13")]
-position = Vector2(521, 229)
+position = Vector2(469, 119)
 FollowDistance = 250.0
 FollowSmoothing = 5.0
 FollowHeightOffset = -5.0
+
+[node name="PlayerPosition" type="Node2D" parent="."]
+position = Vector2(-449, 137)
+
+[node name="PuffPosition" type="Node2D" parent="."]
+position = Vector2(-575, 250)
+
+[node name="Catapult" parent="." instance=ExtResource("16_pw6c3")]
+z_index = -1
+position = Vector2(-18, 159)
+PushForce = 1150.0
+WheelRotationSpeed = 55.0
+BodyGravityScale = 1.5
+LaunchSpeed = 750.0
+TrajectorySamples = 60
+TrajectorySampleDt = 0.07

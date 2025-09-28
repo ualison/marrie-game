@@ -7,6 +7,12 @@ using System.Collections.Generic;
 /// Catapult that can be pushed by the player when pressing C key
 /// Features rolling wheels and collision detection
 /// 
+/// Collision Setup:
+/// - Catapult RigidBody2D is on collision layer 4 (catapult layer)
+/// - Monsters ignore layer 4, so they won't collide with catapults
+/// - Additional collision exceptions with monsters prevent them from pushing catapult
+/// - Player collision is managed via collision exceptions when not pushing
+/// 
 /// How to use:
 /// 1. Place this script on a Node2D root that has a RigidBody2D child
 /// 2. Ensure the catapult has collision shapes
@@ -87,6 +93,8 @@ public partial class Catapult : Node2D, IPausable
 	// Track whether collisions with the player are currently enabled to avoid
 	// logging the same debug message every frame.
 	private bool _playerCollisionEnabled = false;
+	// Debug tracking for push input state
+	private bool _lastWantsToPush = false;
 	#endregion
 
 	public override void _Ready()
@@ -116,6 +124,7 @@ public partial class Catapult : Node2D, IPausable
 				if (obj is PhysicsBody2D physBody)
 				{
 					// Add collision exception so player and catapult do not collide by default
+					// (Catapult is on layer 4, player collisions managed via exceptions)
 					_rigidBody.AddCollisionExceptionWith(physBody);
 				}
 			}
@@ -327,7 +336,31 @@ public partial class Catapult : Node2D, IPausable
 		// Set up RigidBody2D properties for realistic physics
 		_rigidBody.GravityScale = BodyGravityScale;
 		// Do not override linear/angular damping here; respect authoring-time values
-		// Do NOT override collision layers/masks here; respect prefab/scene instance settings
+		
+		// Put catapult on collision layer 4 so monsters can ignore it
+		// while still allowing player collision when needed
+		_rigidBody.SetCollisionLayerValue(1, false); // Remove from default layer 1
+		_rigidBody.SetCollisionLayerValue(4, true);  // Add to catapult layer 4
+		
+		// Clear collision mask and set only what we want (override prefab settings)
+		_rigidBody.CollisionMask = 0; // Clear all collision detection first
+		_rigidBody.SetCollisionMaskValue(1, true);   // Detect ground (layer 1)
+		_rigidBody.SetCollisionMaskValue(2, true);   // Detect player (layer 2) for pushing
+		// Note: Monsters are also on layer 2, but collision exceptions prevent them from pushing
+		
+		// Add collision exceptions with all monsters to prevent them from pushing catapult
+		var monsters = GetTree().GetNodesInGroup("enemies");
+		foreach (var obj in monsters)
+		{
+			if (obj is PhysicsBody2D monsterBody)
+			{
+				_rigidBody.AddCollisionExceptionWith(monsterBody);
+				Log.Debug($"Added collision exception with monster: {monsterBody.Name}", "Catapult");
+			}
+		}
+		
+		// Log final collision settings for debugging
+		Log.Debug($"Catapult collision setup - Layer: {_rigidBody.CollisionLayer}, Mask: {_rigidBody.CollisionMask} (detects ground+player)", "Catapult");
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -338,6 +371,36 @@ public partial class Catapult : Node2D, IPausable
 		HandlePlayerInteraction();
 		UpdateWheelRotation((float)delta);
 		UpdateVisualFeedback();
+		
+		// Periodically check for new monsters and add collision exceptions
+		// This handles monsters that might be spawned after catapult initialization
+		EnsureMonsterCollisionExceptions();
+	}
+	
+	private float _lastMonsterCheckTime = 0f;
+	private const float MONSTER_CHECK_INTERVAL = 2.0f; // Check every 2 seconds
+	
+	private void EnsureMonsterCollisionExceptions()
+	{
+		_lastMonsterCheckTime += (float)GetPhysicsProcessDeltaTime();
+		if (_lastMonsterCheckTime >= MONSTER_CHECK_INTERVAL)
+		{
+			_lastMonsterCheckTime = 0f;
+			
+			if (_rigidBody != null)
+			{
+				var monsters = GetTree().GetNodesInGroup("enemies");
+				foreach (var obj in monsters)
+				{
+					if (obj is PhysicsBody2D monsterBody)
+					{
+						// Check if this monster already has a collision exception
+						// AddCollisionExceptionWith is safe to call multiple times
+						_rigidBody.AddCollisionExceptionWith(monsterBody);
+					}
+				}
+			}
+		}
 	}
 
 	private void UpdateMovementState()
@@ -355,6 +418,13 @@ public partial class Catapult : Node2D, IPausable
 	{
 		// Check if player is pressing push button (check this regardless of range)
 		bool wantsToPush = Input.IsActionPressed("push_catapult");
+		
+		// Debug: Log input state changes
+		if (wantsToPush != _lastWantsToPush)
+		{
+			Log.Debug($"Push catapult input changed: C key {(_lastWantsToPush ? "released" : "pressed")}", "Catapult");
+			_lastWantsToPush = wantsToPush;
+		}
 		
 		// If player is not in range or null, they can't push
 		if (_player == null || !_playerInRange)
@@ -767,7 +837,7 @@ public partial class Catapult : Node2D, IPausable
 			{
 				_rigidBody.RemoveCollisionExceptionWith(phys);
 				_playerCollisionEnabled = true;
-				Log.Debug("Enabled collisions with player", "Catapult");
+				Log.Debug($"Enabled collisions with player {phys.Name} (player can now push catapult)", "Catapult");
 			}
 		}
 	}
@@ -783,7 +853,7 @@ public partial class Catapult : Node2D, IPausable
 			{
 				_rigidBody.AddCollisionExceptionWith(phys);
 				_playerCollisionEnabled = false;
-				Log.Debug("Disabled collisions with player", "Catapult");
+				Log.Debug($"Disabled collisions with player {phys.Name} (player passes through catapult)", "Catapult");
 			}
 		}
 	}
@@ -848,7 +918,11 @@ public partial class Catapult : Node2D, IPausable
 		// Add a small upward component to prevent getting stuck on ground
 		_rigidBody.ApplyCentralForce(Vector2.Up * forceMagnitude * 0.1f);
 		
-		Log.Debug($"Applied push force {forceVector.Length():F1} to catapult (player speed: {playerSpeed:F1})", "Catapult");
+		// Debug logging (reduce frequency to avoid spam)
+		if (GD.Randi() % 30 == 0) // Log roughly once per second at 30 FPS
+		{
+			Log.Debug($"Pushing catapult: force={forceVector.Length():F1}, direction={pushDirection}, playerSpeed={playerSpeed:F1}", "Catapult");
+		}
 	}
 
 	private void UpdateWheelRotation(float delta)
@@ -1071,6 +1145,19 @@ public partial class Catapult : Node2D, IPausable
 	public bool IsBeingPushed() => _isBeingPushed;
 	public float GetCurrentSpeed() => _currentSpeed;
 	public bool IsPlayerInRange() => _playerInRange;
+	
+	/// <summary>
+	/// Add collision exception with a specific monster to prevent it from pushing the catapult.
+	/// Call this when monsters are spawned dynamically after catapult initialization.
+	/// </summary>
+	public void AddMonsterCollisionException(PhysicsBody2D monster)
+	{
+		if (_rigidBody != null && monster != null)
+		{
+			_rigidBody.AddCollisionExceptionWith(monster);
+			Log.Debug($"Added collision exception with dynamically spawned monster: {monster.Name}", "Catapult");
+		}
+	}
 	#endregion
 
 	#region IPausable Implementation

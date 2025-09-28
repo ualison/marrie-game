@@ -46,6 +46,7 @@ position = Vector2(25.999996, -36.999996)
 scale = Vector2(0.6399989, 0.6800001)
 
 [node name="Skeleton" type="Sprite2D" parent="RigidBody2D/Sprites"]
+z_index = -1
 position = Vector2(-39.000023, 18.600075)
 scale = Vector2(0.64923346, 0.5573592)
 texture = ExtResource("1_utwii")
@@ -70,7 +71,6 @@ scale = Vector2(1.0000001, 1.0000001)
 texture = ExtResource("3_utwii")
 
 [node name="SpoonIsolated" type="Sprite2D" parent="RigidBody2D/Sprites/SpoonPivot/Spoon"]
-z_index = 1
 position = Vector2(-273.3697, -98.23532)
 scale = Vector2(0.88712066, 1.0450877)
 texture = ExtResource("5_70bc4")

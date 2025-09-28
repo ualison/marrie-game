@@ -3,6 +3,8 @@ using MarrieGame.Core.Enums;
 using MarrieGame.Core.Utils;
 
 // Unified Monster class supporting both simple and follower behaviors
+// Collision Setup: Uses collision mask 1u (layer 1 only) to collide with ground
+// but ignore catapults on layer 4, preventing unwanted monster-catapult interactions
 public partial class Monster : CharacterBody2D, IPoolable
 {
     #region Exported Properties
@@ -504,7 +506,7 @@ public partial class Monster : CharacterBody2D, IPoolable
         _isVisible = true;
         _isFullyVisible = true;
 
-        SetCollisionMask(1u);
+        SetCollisionMask(1u);  // Ground collision only (layer 1), ignores catapults (layer 4)
         SetCollisionLayer(1u);
 
     // IMPORTANT: Do NOT reset MonsterLife when returning from a replay.
@@ -578,8 +580,9 @@ public partial class Monster : CharacterBody2D, IPoolable
             _monsterLifeBar.Show();
         }
 
-        // Always keep ground collision enabled (layer 0), disable player collision during initial wait
-        SetCollisionMask(1u); // Bit 0 = ground collision
+        // Always keep ground collision enabled (layer 1), disable player collision during initial wait
+        // Collision mask 1u = layer 1 only (ground), ignores catapults on layer 4
+        SetCollisionMask(1u); // Layer 1 = ground collision, excludes catapult layer 4
         SetCollisionLayer(2u); // Put monster on layer 2 to avoid player collision during wait
 
         FacePlayer();
@@ -613,7 +616,7 @@ public partial class Monster : CharacterBody2D, IPoolable
         }
 
         PositionBehindPlayerOnGround();
-        SetCollisionMask(1u);
+        SetCollisionMask(1u);  // Ground collision only (layer 1), ignores catapults (layer 4)
         SetCollisionLayer(2u);
         FacePlayer();
         UpdateLifeBarPosition();
@@ -882,7 +885,7 @@ public void ForceShow()
     Visible = true;
 
     // Enable collisions immediately
-    SetCollisionMask(1u);  // Ground collision
+    SetCollisionMask(1u);  // Ground collision only (layer 1), ignores catapults (layer 4)
     SetCollisionLayer(1u); // Player can interact
 
     // Enable damage area
@@ -1025,7 +1028,7 @@ public void ForceShow()
             }
 
             // Keep ground collision during reset
-            SetCollisionMask(1u); // Ground collision
+            SetCollisionMask(1u); // Ground collision only (layer 1), ignores catapults (layer 4)
             SetCollisionLayer(2u); // Layer 2 during reset
 
             // Reset MonsterLife
