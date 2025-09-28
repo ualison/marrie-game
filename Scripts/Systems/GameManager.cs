@@ -164,6 +164,9 @@ public partial class GameManager : Node
         // Listen to scene changes to update scene state
         SceneLifecycleManager.SceneReady += OnSceneChanged;
 
+        // Listen to crystal teleport spawns to reposition enemies
+        PlayerSceneManager.CrystalTeleportSpawn += OnCrystalTeleportSpawn;
+
         Log.System("Event subscriptions active", "GameManager");
     }
 
@@ -178,6 +181,27 @@ public partial class GameManager : Node
             var newMode = GetReplayRecordingMode();
             ReplayRecorder.Instance.ForceSetRecordingMode(newMode);
             Log.System($"Updated ReplayRecorder mode to: {newMode} for scene: {CurrentSceneName}", "GameManager");
+        }
+    }
+
+    private void OnCrystalTeleportSpawn(Vector2 teleportPosition)
+    {
+        Log.Debug($"Crystal teleport spawn detected at {teleportPosition}", "GameManager");
+        
+        // Only reposition enemies in Forest scenes to maintain minimum distance
+        if (IsForestScene && EnemyManager.Instance != null)
+        {
+            // Use CallDeferred to ensure repositioning happens after all spawning is complete
+            CallDeferred(nameof(RepositionMonstersDeferred), teleportPosition);
+        }
+    }
+
+    private void RepositionMonstersDeferred(Vector2 teleportPosition)
+    {
+        if (EnemyManager.Instance != null)
+        {
+            EnemyManager.Instance.RepositionMonstersForPlayerSpawn(teleportPosition, 300.0f);
+            Log.System($"Repositioned monsters for crystal teleport spawn in Forest scene", "GameManager");
         }
     }
 
@@ -332,6 +356,7 @@ public partial class GameManager : Node
             // Cleanup subscriptions
             GameEventSystem.GameRestart -= OnGameRestart;
             SceneLifecycleManager.SceneReady -= OnSceneChanged;
+            PlayerSceneManager.CrystalTeleportSpawn -= OnCrystalTeleportSpawn;
 
             // Clear any remaining static subscriptions to avoid memory leaks
             GameEventSystem.ClearAllSubscriptions();

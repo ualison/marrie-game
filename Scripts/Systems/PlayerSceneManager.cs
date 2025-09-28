@@ -1,5 +1,5 @@
 using Godot;
-using MarrieGame.Core.Logging;
+using System;
 
 /// <summary>
 /// Manages global player and Puff instantiation across scenes
@@ -30,9 +30,10 @@ public partial class PlayerSceneManager : Node
     #endregion
 
     #region Events
-    public static event System.Action<Node2D> PlayerInstantiated;
-    public static event System.Action<Node2D> PuffInstantiated;
-    public static event System.Action PuffUnlocked;
+    public static event Action<Node2D> PlayerInstantiated;
+    public static event Action<Node2D> PuffInstantiated;
+    public static event Action PuffUnlocked;
+    public static event Action<Vector2> CrystalTeleportSpawn;
     #endregion
 
     public override void _Ready()
@@ -185,11 +186,15 @@ public partial class PlayerSceneManager : Node
 
             Log.System($"Player instantiated at position {playerNode.GlobalPosition}", "PlayerSceneManager");
 
-            // Clear crystal teleport position after use
+            // Clear crystal teleport position after use and notify other systems
             if (_crystalTeleportPosition.HasValue)
             {
                 Log.Debug("Used crystal teleport position for player spawn", "PlayerSceneManager");
+                Vector2 teleportPos = _crystalTeleportPosition.Value;
                 _crystalTeleportPosition = null;
+                
+                // Notify other systems about crystal teleport spawn
+                CrystalTeleportSpawn?.Invoke(teleportPos);
             }
 
             // Notify other systems
@@ -268,6 +273,13 @@ public partial class PlayerSceneManager : Node
             
             // Use crystal teleport position if available, otherwise use PuffPosition
             Vector2 spawnPosition = _crystalTeleportPosition ?? puffPosition.GlobalPosition;
+            
+            // If using crystal teleport position, add a small offset to avoid overlapping with player
+            if (_crystalTeleportPosition.HasValue)
+            {
+                spawnPosition += new Vector2(50, 0); // Offset Puff 50 units to the right of crystal position
+            }
+            
             puffNode.GlobalPosition = spawnPosition;
             _currentPuff = puffNode;
 

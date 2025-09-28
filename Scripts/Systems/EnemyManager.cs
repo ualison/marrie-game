@@ -10,6 +10,7 @@ public partial class EnemyManager : Node
     #region Configuration
     [Export] public float GlobalHideTime { get; set; } = 40f; // Ghost death -> both respawn
     [Export] public float LocalHideTime { get; set; } = 10f;  // Monster depleted -> monster respawn
+    [Export] public float MinSpawnDistance { get; set; } = 300.0f; // Minimum distance from player spawn for monsters
 
     public static EnemyManager Instance { get; private set; }
     #endregion
@@ -494,6 +495,40 @@ public partial class EnemyManager : Node
         }
 
         Log.System("All enemies reset", "EnemyManager");
+    }
+
+    /// <summary>
+    /// Repositions monsters to maintain minimum distance from player spawn position
+    /// Uses the exported MinSpawnDistance property if no distance is specified
+    /// </summary>
+    public void RepositionMonstersForPlayerSpawn(Vector2 playerSpawnPosition, float minDistance = -1.0f)
+    {
+        // Use exported value if no specific distance provided
+        float effectiveDistance = minDistance > 0 ? minDistance : MinSpawnDistance;
+        
+        foreach (var pair in _pairs)
+        {
+            if (!IsInstanceValid(pair.Monster)) continue;
+
+            Vector2 monsterPos = pair.Monster.GlobalPosition;
+            float distance = playerSpawnPosition.DistanceTo(monsterPos);
+
+            if (distance < effectiveDistance)
+            {
+                // Calculate direction away from player spawn
+                Vector2 direction = (monsterPos - playerSpawnPosition).Normalized();
+                if (direction.Length() < 0.1f) // If too close, use random direction
+                {
+                    direction = new Vector2((float)(GD.Randf() - 0.5f), 0).Normalized();
+                }
+
+                // Position monster at minimum distance
+                Vector2 newPosition = playerSpawnPosition + (direction * effectiveDistance);
+                pair.Monster.GlobalPosition = newPosition;
+
+                Log.Debug($"Repositioned monster from {monsterPos} to {newPosition} (distance: {distance} -> {effectiveDistance})", "EnemyManager");
+            }
+        }
     }
 
     public void NotifyGhostsChanged()

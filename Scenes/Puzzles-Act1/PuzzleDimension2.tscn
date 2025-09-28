@@ -10,7 +10,7 @@
 [ext_resource type="PackedScene" uid="uid://bfsyt4vafmqr8" path="res://Prefabs/EnvironmentPuzzleDimension.tscn" id="8_ppplc"]
 [ext_resource type="PackedScene" uid="uid://kufqrmkh1vbu" path="res://Prefabs/ReplayCrystal.tscn" id="10_7ttox"]
 [ext_resource type="Script" uid="uid://du4xh0jhx6fr7" path="res://Scripts/Systems/UIManager.cs" id="11_feybk"]
-[ext_resource type="AudioStream" uid="uid://dpklqqud8pmx" path="res://Sounds/Forest.wav" id="12_2qhcc"]
+[ext_resource type="AudioStream" uid="uid://rmas443l38ds" path="res://Sounds/Whisper of Shadows.mp3" id="12_7vnva"]
 [ext_resource type="Script" uid="uid://bvqr861aurv3x" path="res://Scripts/Systems/AudioManager.cs" id="13_q1tmw"]
 [ext_resource type="PackedScene" uid="uid://6eg7ul4k085w" path="res://Prefabs/PuzzleManager.tscn" id="14_x531m"]
 [ext_resource type="PackedScene" uid="uid://ciuebxrm6y66f" path="res://Prefabs/PuzzleCrystal.tscn" id="15_tnd5u"]
@@ -100,7 +100,7 @@ script = ExtResource("11_feybk")
 
 [node name="AudioManager" type="AudioStreamPlayer2D" parent="AudioSystem"]
 position = Vector2(-10, -27)
-stream = ExtResource("12_2qhcc")
+stream = ExtResource("12_7vnva")
 volume_db = 6.038
 autoplay = true
 script = ExtResource("13_q1tmw")
