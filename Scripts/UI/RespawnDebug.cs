@@ -141,13 +141,13 @@ public partial class RespawnDebug : Control
         else
         {
             // No global timer active
-            globalDisplay = $"{EnemyManager.Instance.GlobalHideTime:F1}s (config)";
+            globalDisplay = "Inactive";
 
             // Show local timer if active, otherwise show config
             localDisplay = activeLocalLeft > 0 ? $"{activeLocalLeft:F1}s (active)" : $"{EnemyManager.Instance.LocalHideTime:F1}s (config)";
         }
 
-        _headerLabel.Text = $"Reality: {currentReality}\nMonster Local Time: {localDisplay}";
+        _headerLabel.Text = $"Reality: {currentReality}\nGlobal Timer: {globalDisplay}\nMonster Local Time: {localDisplay}";
     }
 
     private void UpdatePairsList()

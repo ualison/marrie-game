@@ -33,7 +33,7 @@ SmoothSpeed = 10.0
 [node name="Enemies" type="Node2D" parent="GameEntities"]
 
 [node name="Monster" parent="GameEntities/Enemies" instance=ExtResource("5_e2fbs")]
-position = Vector2(467, 114)
+position = Vector2(480, 116)
 
 [node name="GameSystems" type="Node" parent="."]
 

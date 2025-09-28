@@ -33,6 +33,8 @@ public partial class ReplayGem : Node2D
     private Monster _targetMonster;
     private Vector2 _initialScenePosition;
     private Vector2 _monsterOffsetDirection = Vector2.Up;
+    private ReplayGemState _stateBeforeRealityChange = ReplayGemState.Hidden;
+    private Vector2 _positionBeforeRealityChange = Vector2.Zero;
     private enum ReplayGemState
     {
         Hidden,
@@ -97,12 +99,30 @@ public partial class ReplayGem : Node2D
                 {
                     // If we're in CurrentReality and this gem is statically placed, show it
                     CheckAndShowStaticGem();
+                    
+                    // Additional safety check after a short delay to ensure proper monster detection
+                    GetTree().CreateTimer(0.5f).Timeout += () => {
+                        if (ShouldHideForVisibleMonster() && _currentState != ReplayGemState.Hidden)
+                        {
+                            Log.Replay("Final safety check: Monster detected as visible after gem shown - hiding gem", "ReplayGem");
+                            HideGem();
+                        }
+                    };
                 }
             }
             else
             {
                 // If RealityManager isn't available yet, assume CurrentReality and show static gem
                 CheckAndShowStaticGem();
+                
+                // Additional safety check
+                GetTree().CreateTimer(0.5f).Timeout += () => {
+                    if (ShouldHideForVisibleMonster() && _currentState != ReplayGemState.Hidden)
+                    {
+                        Log.Replay("Final safety check (no RealityManager): Monster detected as visible - hiding gem", "ReplayGem");
+                        HideGem();
+                    }
+                };
             }
         };
 
@@ -142,9 +162,29 @@ public partial class ReplayGem : Node2D
 
         if (isStaticGem)
         {
-            Log.Replay($"Detected static ReplayGem in scene {sceneFilePath} - showing gem", "ReplayGem");
-            ShowGem(GlobalPosition);
+            Log.Replay($"Detected static ReplayGem in scene {sceneFilePath} - deferring monster visibility check", "ReplayGem");
+            
+            // Defer the visibility check to ensure all scene nodes are ready
+            CallDeferred(nameof(CheckStaticGemVisibilityDeferred));
         }
+    }
+    
+    private void CheckStaticGemVisibilityDeferred()
+    {
+        Log.Replay("CheckStaticGemVisibilityDeferred: Checking if any monsters are visible", "ReplayGem");
+        
+        // Force monster binding first
+        TryBindToMonster();
+        
+        // Only show if no monster is currently visible
+        if (ShouldHideForVisibleMonster())
+        {
+            Log.Replay("CheckStaticGemVisibilityDeferred: Monster is visible - keeping ReplayGem hidden", "ReplayGem");
+            return;
+        }
+        
+        Log.Replay("CheckStaticGemVisibilityDeferred: No visible monsters found - showing gem", "ReplayGem");
+        ShowGem(GlobalPosition);
     }
     private void InitializeComponents()
     {
@@ -339,15 +379,24 @@ public partial class ReplayGem : Node2D
                 TryBindToMonster();
             }
 
+            // FIXED: Only show gem if no monsters are visible anywhere in the scene
             if (_currentState == ReplayGemState.ParkedAtLastMonsterPosition)
             {
-                ShowGem(_initialScenePosition, ReplayGemState.ParkedAtLastMonsterPosition);
+                if (!ShouldHideForVisibleMonster())
+                {
+                    ShowGem(_initialScenePosition, ReplayGemState.ParkedAtLastMonsterPosition);
+                }
+                else
+                {
+                    Log.Replay("UpdateMonsterFollowing: Monster is visible - keeping gem hidden even without bound monster", "ReplayGem");
+                    HideGem();
+                }
             }
             return;
         }
 
-        MonsterState currentState = _targetMonster.GetState();
-        bool monsterVisible = currentState == MonsterState.Visible && IsMonsterActive(_targetMonster);
+    MonsterState currentState = _targetMonster.GetState();
+    bool monsterVisible = IsMonsterVisibleToPlayer(_targetMonster);
 
         if (monsterVisible)
         {
@@ -377,10 +426,20 @@ public partial class ReplayGem : Node2D
 
             if (_currentState != ReplayGemState.ParkedAtLastMonsterPosition)
             {
-                ShowGem(showPosition, ReplayGemState.ParkedAtLastMonsterPosition);
+                // Only show if no other monsters are visible
+                if (!ShouldHideForVisibleMonster())
+                {
+                    ShowGem(showPosition, ReplayGemState.ParkedAtLastMonsterPosition);
+                }
+                else
+                {
+                    Log.Replay("UpdateMonsterFollowing: Cannot show gem - other monsters are visible", "ReplayGem");
+                    HideGem();
+                }
             }
             else
             {
+                // Gem is already shown, just update position
                 GlobalPosition = showPosition;
             }
 
@@ -447,15 +506,24 @@ public partial class ReplayGem : Node2D
         {
             HideGem();
         }
-        else if (_lastKnownMonsterState == MonsterState.Hidden || !IsMonsterActive(_targetMonster))
-        {
-            // Monster is hidden or inactive - show gem at last visible position
-            ShowGem(_lastMonsterVisiblePosition, ReplayGemState.ParkedAtLastMonsterPosition);
-        }
         else
         {
-            // Monster is visible - hide the gem
-            HideGem();
+            // Check current monster state for immediate visibility decision
+            var currentState = _lastKnownMonsterState;
+            bool monsterVisible = IsMonsterVisibleToPlayer(_targetMonster);
+            
+            if (monsterVisible)
+            {
+                // Monster is visible - hide the gem
+                Log.Debug($"BindToMonster: Hiding gem because monster {_targetMonster.Name} is visible", "ReplayGem");
+                HideGem();
+            }
+            else
+            {
+                // Monster is hidden or inactive - show gem at last visible position
+                Log.Debug($"BindToMonster: Showing gem because monster {_targetMonster.Name} is not visible", "ReplayGem");
+                ShowGem(_lastMonsterVisiblePosition, ReplayGemState.ParkedAtLastMonsterPosition);
+            }
         }
 
         Log.Debug($"ReplayGem bound to monster {_targetMonster.Name}", "ReplayGem");
@@ -551,6 +619,37 @@ public partial class ReplayGem : Node2D
         return true;
     }
 
+    private bool IsMonsterVisibleToPlayer(Monster monster)
+    {
+        if (monster == null || !IsInstanceValid(monster) || monster.IsQueuedForDeletion())
+            return false;
+
+        var state = monster.GetState();
+        if (state == MonsterState.Visible)
+            return true;
+
+        if (state == MonsterState.Hidden)
+            return false;
+
+        // Fall back to broader visibility heuristics for transitional states
+        if (!monster.Visible || !monster.IsCurrentlyVisible)
+            return false;
+
+        if (monster.IsDisabledForReplay)
+            return false;
+
+        if (monster.LifeSystem?.IsDead == true)
+            return false;
+
+        if (EnemyManager.Instance != null)
+        {
+            if (EnemyManager.Instance.IsMonsterHiddenByPair(monster) || EnemyManager.Instance.IsMonsterScheduledForRespawn(monster))
+                return false;
+        }
+
+        return true;
+    }
+
     private bool IsInCurrentReality()
     {
         return !RealityManager.IsInstanceAvailable || RealityManager.Instance.CurrentReality == Reality.CurrentReality;
@@ -576,6 +675,14 @@ public partial class ReplayGem : Node2D
 
     private void ShowGem(Vector2 position, ReplayGemState newState)
     {
+        // CRITICAL: Always check if we should hide due to visible monster before showing
+        if (ShouldHideForVisibleMonster())
+        {
+            Log.Replay($"ShowGem called but monster is visible - keeping gem hidden at {position}", "ReplayGem");
+            _currentState = ReplayGemState.Hidden;
+            return;
+        }
+
         GlobalPosition = position;
         _lastFollowPosition = position;
         if (newState == ReplayGemState.ParkedAtLastMonsterPosition)
@@ -642,6 +749,8 @@ public partial class ReplayGem : Node2D
         {
             // Remember if the gem was visible so we can restore later
             _wasVisibleBeforeRealityChange = Visible && (_gemSprite?.Visible ?? false);
+            _stateBeforeRealityChange = _currentState;
+            _positionBeforeRealityChange = GlobalPosition;
             Log.Replay($"Hiding ReplayGem because reality is PastReality (wasVisible={_wasVisibleBeforeRealityChange})", "ReplayGem");
 
             // IMPROVED: Force hide everything immediately
@@ -653,27 +762,23 @@ public partial class ReplayGem : Node2D
             if (_wasVisibleBeforeRealityChange)
             {
                 Log.Replay("Restoring ReplayGem after returning from PastReality", "ReplayGem");
+                var stateToRestore = _stateBeforeRealityChange == ReplayGemState.Hidden
+                    ? ReplayGemState.FollowingMonster
+                    : _stateBeforeRealityChange;
 
-                // Restore full visibility
-                Show();
-                Visible = true;
+                var positionToRestore = stateToRestore == ReplayGemState.ParkedAtLastMonsterPosition
+                    ? _lastMonsterVisiblePosition
+                    : _positionBeforeRealityChange;
 
-                if (_gemSprite != null)
+                if (stateToRestore == ReplayGemState.ParkedAtLastMonsterPosition && Mathf.IsZeroApprox(positionToRestore.LengthSquared()))
                 {
-                    _gemSprite.Show();
-                    _gemSprite.Visible = true;
-                    StartFloatingAnimation();
+                    positionToRestore = _positionBeforeRealityChange;
                 }
 
-                if (_promptLabel != null)
-                {
-                    _promptLabel.Hide(); // show only when player nearby
-                }
+                ShowGem(positionToRestore, stateToRestore);
+                EnforceVisibilityForVisibleMonster();
 
-                if (_detectionArea != null)
-                {
-                    _detectionArea.SetDeferred("monitoring", true);
-                }
+                _stateBeforeRealityChange = ReplayGemState.Hidden;
             }
             _wasVisibleBeforeRealityChange = false;
         }
@@ -717,6 +822,44 @@ public partial class ReplayGem : Node2D
         Log.Debug("ReplayGem completely hidden for PastReality", "ReplayGem");
     }
     #endregion
+
+    private void EnforceVisibilityForVisibleMonster()
+    {
+        if (ShouldHideForVisibleMonster())
+        {
+            Log.Replay("EnforceVisibilityForVisibleMonster: Hiding gem due to visible monster", "ReplayGem");
+            if (_targetMonster != null && IsInstanceValid(_targetMonster))
+            {
+                _lastMonsterVisiblePosition = _targetMonster.GlobalPosition;
+                _lastKnownMonsterState = _targetMonster.GetState();
+            }
+            HideGem();
+        }
+    }
+
+    private bool ShouldHideForVisibleMonster()
+    {
+        // Always check ALL monsters in the scene for visibility
+        var enemiesGroup = GetTree().GetNodesInGroup("enemies");
+        Log.Replay($"ShouldHideForVisibleMonster: Checking {enemiesGroup.Count} enemies in scene", "ReplayGem");
+        
+        foreach (Node node in enemiesGroup)
+        {
+            if (node is Monster monster && IsInstanceValid(monster) && !monster.IsQueuedForDeletion())
+            {
+                bool isVisible = IsMonsterVisibleToPlayer(monster);
+                Log.Replay($"ShouldHideForVisibleMonster: Monster {monster.Name} consideredVisible={isVisible}", "ReplayGem");
+                if (isVisible)
+                {
+                    Log.Replay($"ShouldHideForVisibleMonster: Found visible monster {monster.Name} - gem should hide", "ReplayGem");
+                    return true;
+                }
+            }
+        }
+        
+        Log.Replay("ShouldHideForVisibleMonster: No visible monsters found - gem can show", "ReplayGem");
+        return false;
+    }
 
     #region Player Detection
     private void OnPlayerEntered(Node2D body)

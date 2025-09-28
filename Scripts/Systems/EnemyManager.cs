@@ -8,10 +8,7 @@ using MarrieGame.Core.Models;
 public partial class EnemyManager : Node
 {
     #region Configuration
-    [Export] public float GlobalHideTime { get; set; } = 40f; // Ghost death -> both respawn
-    [Export] public float LocalHideTime { get; set; } = 10f;  // Monster depleted -> monster respawn
-    [Export] public float MinSpawnDistance { get; set; } = 300.0f; // Minimum distance from player spawn for monsters
-
+    [Export] public float LocalHideTime { get; set; } = 25.0f;  // Monster depleted -> monster respawn
     public static EnemyManager Instance { get; private set; }
     #endregion
 
@@ -51,13 +48,29 @@ public partial class EnemyManager : Node
         if (RealityManager.Instance != null)
             RealityManager.Instance.RealityChangedEvent += OnRealityChanged;
 
+        SceneLifecycleManager.SceneReady += OnSceneReady;
+
         CallDeferred(nameof(Initialize));
     }
 
     private void Initialize()
     {
+        RefreshSceneState();
+    }
+
+    private void OnSceneReady()
+    {
+        if (!IsInsideTree())
+            return;
+
+        CallDeferred(nameof(RefreshSceneState));
+    }
+
+    private void RefreshSceneState()
+    {
         DiscoverPairs();
         ConnectLifeEvents();
+        HideAllMonstersInitially();
     }
     #endregion
 
@@ -499,12 +512,14 @@ public partial class EnemyManager : Node
 
     /// <summary>
     /// Repositions monsters to maintain minimum distance from player spawn position
-    /// Uses the exported MinSpawnDistance property if no distance is specified
     /// </summary>
-    public void RepositionMonstersForPlayerSpawn(Vector2 playerSpawnPosition, float minDistance = -1.0f)
+    public void RepositionMonstersForPlayerSpawn(Vector2 playerSpawnPosition, float minDistance)
     {
-        // Use exported value if no specific distance provided
-        float effectiveDistance = minDistance > 0 ? minDistance : MinSpawnDistance;
+        if (minDistance <= 0.0f)
+        {
+            Log.Warning("RepositionMonstersForPlayerSpawn called with non-positive minDistance. Aborting reposition.", "EnemyManager");
+            return;
+        }
         
         foreach (var pair in _pairs)
         {
@@ -513,7 +528,7 @@ public partial class EnemyManager : Node
             Vector2 monsterPos = pair.Monster.GlobalPosition;
             float distance = playerSpawnPosition.DistanceTo(monsterPos);
 
-            if (distance < effectiveDistance)
+            if (distance < minDistance)
             {
                 // Calculate direction away from player spawn
                 Vector2 direction = (monsterPos - playerSpawnPosition).Normalized();
@@ -523,10 +538,10 @@ public partial class EnemyManager : Node
                 }
 
                 // Position monster at minimum distance
-                Vector2 newPosition = playerSpawnPosition + (direction * effectiveDistance);
+                Vector2 newPosition = playerSpawnPosition + (direction * minDistance);
                 pair.Monster.GlobalPosition = newPosition;
 
-                Log.Debug($"Repositioned monster from {monsterPos} to {newPosition} (distance: {distance} -> {effectiveDistance})", "EnemyManager");
+                Log.Debug($"Repositioned monster from {monsterPos} to {newPosition} (distance: {distance} -> {minDistance})", "EnemyManager");
             }
         }
     }
@@ -679,6 +694,20 @@ public partial class EnemyManager : Node
         }
     }
 
+    private void HideAllMonstersInitially()
+    {
+        foreach (var pair in _pairs)
+        {
+            if (IsInstanceValid(pair.Monster))
+            {
+                HideMonster(pair.Monster);
+                pair.IsHidden = true;
+            }
+        }
+
+        Log.Debug("All monsters hidden on scene start", "EnemyManager");
+    }
+
     private void CancelAllRespawns()
     {
         foreach (var timer in _respawnTimers.Values)
@@ -704,6 +733,7 @@ public partial class EnemyManager : Node
     {
         if (Instance == this)
         {
+            SceneLifecycleManager.SceneReady -= OnSceneReady;
             ClearAll();
             Instance = null;
         }

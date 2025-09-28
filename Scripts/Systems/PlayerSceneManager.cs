@@ -22,6 +22,7 @@ public partial class PlayerSceneManager : Node
     #region Game State
     public bool IsPuffUnlocked { get; private set; } = false;
     private Vector2? _crystalTeleportPosition = null;
+    private Vector2? _pendingPuffTeleportPosition = null;
     #endregion
 
     #region Component References
@@ -130,21 +131,38 @@ public partial class PlayerSceneManager : Node
     #region Player Management
     private void InstantiatePlayerIfNeeded()
     {
+        var playerPosition = FindPlayerPosition();
+
         // Check if player already exists in the scene
         var existingPlayer = GetTree().GetFirstNodeInGroup("player");
         if (existingPlayer != null)
         {
-            _currentPlayer = existingPlayer as Node2D;
-            Log.Debug($"Player already exists in scene: {existingPlayer.Name}", "PlayerSceneManager");
-            
+            var existingPlayerNode = existingPlayer as Node2D;
+            _currentPlayer = existingPlayerNode;
+
+            if (existingPlayerNode != null)
+            {
+                bool positioned = PositionPlayer(existingPlayerNode, playerPosition);
+                if (positioned)
+                {
+                    Log.Debug($"Player already exists - repositioned to {existingPlayerNode.GlobalPosition}", "PlayerSceneManager");
+                }
+                else
+                {
+                    Log.Debug($"Player already exists in scene: {existingPlayer.Name}", "PlayerSceneManager");
+                }
+            }
+            else
+            {
+                Log.Warning("Player found in group 'player' is not a Node2D", "PlayerSceneManager");
+            }
+
             // Still notify other systems about the existing player
-            PlayerInstantiated?.Invoke(_currentPlayer);
-            GameEventSystem.OnPlayerSpawned(_currentPlayer);
+            PlayerInstantiated?.Invoke(existingPlayerNode ?? existingPlayer as Node2D);
+            GameEventSystem.OnPlayerSpawned(existingPlayerNode ?? existingPlayer as Node2D);
             return;
         }
 
-        // Find PlayerPosition node
-        var playerPosition = FindPlayerPosition();
         if (playerPosition == null)
         {
             Log.Warning("No PlayerPosition node found in current scene", "PlayerSceneManager");
@@ -179,23 +197,16 @@ public partial class PlayerSceneManager : Node
         {
             sceneRoot.AddChild(playerInstance);
             
-            // Use crystal teleport position if available, otherwise use PlayerPosition
-            Vector2 spawnPosition = _crystalTeleportPosition ?? playerPosition.GlobalPosition;
-            playerNode.GlobalPosition = spawnPosition;
-            _currentPlayer = playerNode;
-
-            Log.System($"Player instantiated at position {playerNode.GlobalPosition}", "PlayerSceneManager");
-
-            // Clear crystal teleport position after use and notify other systems
-            if (_crystalTeleportPosition.HasValue)
+            bool positioned = PositionPlayer(playerNode, playerPosition);
+            if (positioned)
             {
-                Log.Debug("Used crystal teleport position for player spawn", "PlayerSceneManager");
-                Vector2 teleportPos = _crystalTeleportPosition.Value;
-                _crystalTeleportPosition = null;
-                
-                // Notify other systems about crystal teleport spawn
-                CrystalTeleportSpawn?.Invoke(teleportPos);
+                Log.System($"Player instantiated at position {playerNode.GlobalPosition}", "PlayerSceneManager");
             }
+            else
+            {
+                Log.System("Player instantiated without explicit spawn position - using prefab default", "PlayerSceneManager");
+            }
+            _currentPlayer = playerNode;
 
             // Notify other systems
             PlayerInstantiated?.Invoke(playerNode);
@@ -222,21 +233,38 @@ public partial class PlayerSceneManager : Node
     #region Puff Management
     private void InstantiatePuffIfNeeded()
     {
+        var puffPosition = FindPuffPosition();
+
         // Check if Puff already exists in the scene
         var existingPuff = GetTree().GetFirstNodeInGroup("puff");
         if (existingPuff != null)
         {
-            _currentPuff = existingPuff as Node2D;
-            Log.Debug($"Puff already exists in scene: {existingPuff.Name}", "PlayerSceneManager");
-            
+            var existingPuffNode = existingPuff as Node2D;
+            _currentPuff = existingPuffNode;
+
+            if (existingPuffNode != null)
+            {
+                bool positioned = PositionPuff(existingPuffNode, puffPosition);
+                if (positioned)
+                {
+                    Log.Debug($"Puff already exists - repositioned to {existingPuffNode.GlobalPosition}", "PlayerSceneManager");
+                }
+                else
+                {
+                    Log.Debug($"Puff already exists in scene: {existingPuff.Name}", "PlayerSceneManager");
+                }
+            }
+            else
+            {
+                Log.Warning("Puff found in group 'puff' is not a Node2D", "PlayerSceneManager");
+            }
+
             // Still notify other systems about the existing Puff
-            PuffInstantiated?.Invoke(_currentPuff);
-            GameEventSystem.OnPuffSpawned(_currentPuff);
+            PuffInstantiated?.Invoke(existingPuffNode ?? existingPuff as Node2D);
+            GameEventSystem.OnPuffSpawned(existingPuffNode ?? existingPuff as Node2D);
             return;
         }
 
-        // Find PuffPosition node
-        var puffPosition = FindPuffPosition();
         if (puffPosition == null)
         {
             Log.Debug("No PuffPosition node found in current scene", "PlayerSceneManager");
@@ -271,26 +299,16 @@ public partial class PlayerSceneManager : Node
         {
             sceneRoot.AddChild(puffInstance);
             
-            // Use crystal teleport position if available, otherwise use PuffPosition
-            Vector2 spawnPosition = _crystalTeleportPosition ?? puffPosition.GlobalPosition;
-            
-            // If using crystal teleport position, add a small offset to avoid overlapping with player
-            if (_crystalTeleportPosition.HasValue)
+            bool positioned = PositionPuff(puffNode, puffPosition);
+            if (positioned)
             {
-                spawnPosition += new Vector2(50, 0); // Offset Puff 50 units to the right of crystal position
+                Log.System($"Puff instantiated at position {puffNode.GlobalPosition}", "PlayerSceneManager");
             }
-            
-            puffNode.GlobalPosition = spawnPosition;
+            else
+            {
+                Log.System("Puff instantiated without explicit spawn position - using prefab default", "PlayerSceneManager");
+            }
             _currentPuff = puffNode;
-
-            Log.System($"Puff instantiated at position {puffNode.GlobalPosition}", "PlayerSceneManager");
-
-            // Clear crystal teleport position after use (only if not already cleared by player spawn)
-            if (_crystalTeleportPosition.HasValue)
-            {
-                Log.Debug("Used crystal teleport position for Puff spawn", "PlayerSceneManager");
-                _crystalTeleportPosition = null;
-            }
 
             // Notify other systems
             PuffInstantiated?.Invoke(puffNode);
@@ -385,6 +403,7 @@ public partial class PlayerSceneManager : Node
     public void SetCrystalTeleportPosition(Vector2 position)
     {
         _crystalTeleportPosition = position;
+        _pendingPuffTeleportPosition = null;
         Log.Debug($"Crystal teleport position set to {position}", "PlayerSceneManager");
     }
 
@@ -394,11 +413,72 @@ public partial class PlayerSceneManager : Node
     public void ClearCrystalTeleportPosition()
     {
         _crystalTeleportPosition = null;
+        _pendingPuffTeleportPosition = null;
         Log.Debug("Crystal teleport position cleared", "PlayerSceneManager");
     }
     #endregion
 
     #region Utility Methods
+    private static readonly Vector2 PuffTeleportOffset = new Vector2(50, 0);
+
+    private bool PositionPlayer(Node2D playerNode, Node2D spawnMarker)
+    {
+        if (playerNode == null)
+            return false;
+
+        if (_crystalTeleportPosition.HasValue)
+        {
+            var teleportPos = _crystalTeleportPosition.Value;
+            playerNode.GlobalPosition = teleportPos;
+            _pendingPuffTeleportPosition = teleportPos;
+
+            Log.Debug("Used crystal teleport position for player spawn", "PlayerSceneManager");
+            _crystalTeleportPosition = null;
+
+            // Notify other systems about crystal teleport spawn
+            CrystalTeleportSpawn?.Invoke(teleportPos);
+            return true;
+        }
+
+        if (spawnMarker != null)
+        {
+            playerNode.GlobalPosition = spawnMarker.GlobalPosition;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool PositionPuff(Node2D puffNode, Node2D spawnMarker)
+    {
+        if (puffNode == null)
+            return false;
+
+        if (_pendingPuffTeleportPosition.HasValue)
+        {
+            puffNode.GlobalPosition = _pendingPuffTeleportPosition.Value + PuffTeleportOffset;
+            Log.Debug("Used player's teleport position for Puff spawn", "PlayerSceneManager");
+            _pendingPuffTeleportPosition = null;
+            return true;
+        }
+
+        if (_crystalTeleportPosition.HasValue)
+        {
+            puffNode.GlobalPosition = _crystalTeleportPosition.Value + PuffTeleportOffset;
+            Log.Debug("Used crystal teleport position for Puff spawn", "PlayerSceneManager");
+            _crystalTeleportPosition = null;
+            return true;
+        }
+
+        if (spawnMarker != null)
+        {
+            puffNode.GlobalPosition = spawnMarker.GlobalPosition;
+            return true;
+        }
+
+        return false;
+    }
+
     private Node FindNodeByName(Node root, string nodeName)
     {
         if (root == null) return null;
