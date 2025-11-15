@@ -229,6 +229,7 @@ public partial class Monster : CharacterBody2D, IPoolable
         FindSprite();
         FindMonsterLife();
         FindMonsterLifeBar();
+        SetupAudio();
         SetupDamageArea();
     }
 
@@ -328,15 +329,15 @@ public partial class Monster : CharacterBody2D, IPoolable
 
     private void SetupAudio()
     {
-        if (!EnableFollowerBehavior) return;
-
         if (FootstepAudioPath != null && FootstepAudioPath.ToString() != "")
             _footstepAudio = NodeHelpers.GetNodeOrNull<AudioStreamPlayer2D>(this, FootstepAudioPath, "");
 
         _footstepAudio ??= NodeHelpers.GetNodeOrNull<AudioStreamPlayer2D>(this, null, "FootstepAudio");
+        _footstepAudio ??= NodeHelpers.GetNodeOrNull<AudioStreamPlayer2D>(this, null, "MonsterAudio");
+
         if (_footstepAudio == null)
         {
-            _footstepAudio = new AudioStreamPlayer2D { Name = "FootstepAudio" };
+            _footstepAudio = new AudioStreamPlayer2D { Name = "MonsterAudio" };
             AddChild(_footstepAudio);
         }
     }
@@ -437,6 +438,7 @@ public partial class Monster : CharacterBody2D, IPoolable
             {
                 _monsterLifeBar.Show();
             }
+            PlayAudio(true);
 #if DEBUG
             Log.Debug("Monster: Ready for contact damage", "Monster");
 #endif
@@ -452,6 +454,7 @@ public partial class Monster : CharacterBody2D, IPoolable
             {
                 _monsterLifeBar.Hide();
             }
+            PlayAudio(false);
         }
     }
     #endregion
@@ -463,6 +466,7 @@ public partial class Monster : CharacterBody2D, IPoolable
 
         IsDisabledForReplay = true;
         SetProcessMode(ProcessModeEnum.Disabled);
+        PlayAudio(false);
 
         // Hide MonsterLifeBar during replay
         if (_monsterLifeBar != null)
@@ -579,6 +583,8 @@ public partial class Monster : CharacterBody2D, IPoolable
         {
             _monsterLifeBar.Show();
         }
+
+        PlayAudio(true);
 
         // Always keep ground collision enabled (layer 1), disable player collision during initial wait
         // Collision mask 1u = layer 1 only (ground), ignores catapults on layer 4
@@ -700,6 +706,8 @@ public partial class Monster : CharacterBody2D, IPoolable
         // Hide life bar immediately
         if (_monsterLifeBar != null)
             _monsterLifeBar.Hide();
+
+        PlayAudio(false);
 
         // Trigger visual fade-out (handles collision layers/masking)
         FadeOut();
@@ -841,6 +849,7 @@ public partial class Monster : CharacterBody2D, IPoolable
             {
                 _monsterLifeBar.Hide();
             }
+            PlayAudio(false);
         }
     }
 
@@ -936,7 +945,8 @@ public void ForceShow()
         CallDeferred(nameof(DoUpdateLifeBarPositionForced));
     }
 
-    Log.Debug($"Monster {Name} forced to show - should be visible and interactive", "Monster");
+        Log.Debug($"Monster {Name} forced to show - should be visible and interactive", "Monster");
+        PlayAudio(true);
 }
 
     // Simplified CanTakeDamage check

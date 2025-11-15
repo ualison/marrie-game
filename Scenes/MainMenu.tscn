@@ -1,0 +1,316 @@
+[gd_scene load_steps=8 format=3 uid="uid://c388k2eoxhcpo"]
+
+[ext_resource type="Script" uid="uid://pbvoilljir01" path="res://Scripts/UI/MainMenu.cs" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://dyxpg1x6y4fgy" path="res://Art/MarrieSatDown.png" id="2_background"]
+[ext_resource type="Texture2D" uid="uid://cupek236utd7e" path="res://Art/DialogBackground.png" id="3_panel"]
+[ext_resource type="FontFile" uid="uid://dfikg8e04shh3" path="res://Fonts/graveyrd.ttf" id="4_8um5k"]
+[ext_resource type="Texture2D" uid="uid://jospwn0er7na" path="res://Art/DialogButtonActive.png" id="4_button_active"]
+[ext_resource type="Texture2D" uid="uid://b048utqew270k" path="res://Art/DialogButtonUnactive.png" id="5_button_inactive"]
+[ext_resource type="FontFile" uid="uid://d1dsdbmcemewf" path="res://Fonts/JFWilwod.ttf" id="7_xim88"]
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="BackgroundSprite" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 850.0
+offset_top = 377.0
+offset_right = 25.0
+offset_bottom = -9.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_background")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = -863.0
+offset_bottom = -217.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MenuPanel" type="NinePatchRect" parent="CenterContainer"]
+custom_minimum_size = Vector2(400, 500)
+layout_mode = 2
+texture = ExtResource("3_panel")
+patch_margin_left = 20
+patch_margin_top = 20
+patch_margin_right = 20
+patch_margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/MenuPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -164.0
+offset_top = -199.0
+offset_right = 165.0
+offset_bottom = 168.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/MenuPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("4_8um5k")
+theme_override_font_sizes/font_size = 75
+text = "MARRIE"
+horizontal_alignment = 1
+
+[node name="StartButton" type="TextureButton" parent="CenterContainer/MenuPanel/VBoxContainer"]
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+size_flags_horizontal = 4
+texture_normal = ExtResource("5_button_inactive")
+texture_pressed = ExtResource("4_button_active")
+texture_hover = ExtResource("4_button_active")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="Label" type="Label" parent="CenterContainer/MenuPanel/VBoxContainer/StartButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("7_xim88")
+theme_override_font_sizes/font_size = 28
+text = "START"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="OptionsButton" type="TextureButton" parent="CenterContainer/MenuPanel/VBoxContainer"]
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+size_flags_horizontal = 4
+texture_normal = ExtResource("5_button_inactive")
+texture_pressed = ExtResource("4_button_active")
+texture_hover = ExtResource("4_button_active")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="Label" type="Label" parent="CenterContainer/MenuPanel/VBoxContainer/OptionsButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("7_xim88")
+theme_override_font_sizes/font_size = 28
+text = "OPTIONS"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ExitButton" type="TextureButton" parent="CenterContainer/MenuPanel/VBoxContainer"]
+custom_minimum_size = Vector2(250, 60)
+layout_mode = 2
+size_flags_horizontal = 4
+texture_normal = ExtResource("5_button_inactive")
+texture_pressed = ExtResource("4_button_active")
+texture_hover = ExtResource("4_button_active")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="Label" type="Label" parent="CenterContainer/MenuPanel/VBoxContainer/ExitButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("7_xim88")
+theme_override_font_sizes/font_size = 28
+text = "EXIT"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="OptionsPanel" type="NinePatchRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -250.0
+offset_right = 300.0
+offset_bottom = 250.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_panel")
+patch_margin_left = 20
+patch_margin_top = 20
+patch_margin_right = 20
+patch_margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="OptionsPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 15
+
+[node name="TitleMargin" type="MarginContainer" parent="OptionsPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/margin_top = 20
+
+[node name="TitleLabel" type="Label" parent="OptionsPanel/VBoxContainer/TitleMargin"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 36
+text = "OPTIONS"
+horizontal_alignment = 1
+
+[node name="OptionsMargin" type="MarginContainer" parent="OptionsPanel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 20
+
+[node name="OptionsVBox" type="VBoxContainer" parent="OptionsPanel/VBoxContainer/OptionsMargin"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="FullscreenContainer" type="HBoxContainer" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/FullscreenContainer"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "Fullscreen:"
+vertical_alignment = 1
+
+[node name="CheckButton" type="CheckButton" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/FullscreenContainer"]
+layout_mode = 2
+
+[node name="VSyncContainer" type="HBoxContainer" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/VSyncContainer"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "VSync:"
+vertical_alignment = 1
+
+[node name="CheckButton" type="CheckButton" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/VSyncContainer"]
+layout_mode = 2
+
+[node name="ResolutionContainer" type="HBoxContainer" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/ResolutionContainer"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "Resolution:"
+vertical_alignment = 1
+
+[node name="OptionButton" type="OptionButton" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/ResolutionContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 2
+item_count = 5
+popup/item_0/text = "1280x720"
+popup/item_0/id = 0
+popup/item_1/text = "1366x768"
+popup/item_1/id = 1
+popup/item_2/text = "1920x1080"
+popup/item_2/id = 2
+popup/item_3/text = "2560x1440"
+popup/item_3/id = 3
+popup/item_4/text = "3840x2160"
+popup/item_4/id = 4
+
+[node name="FPSContainer" type="HBoxContainer" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/FPSContainer"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "FPS Limit:"
+vertical_alignment = 1
+
+[node name="OptionButton" type="OptionButton" parent="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/FPSContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 1
+item_count = 4
+popup/item_0/text = "30 FPS"
+popup/item_0/id = 0
+popup/item_1/text = "60 FPS"
+popup/item_1/id = 1
+popup/item_2/text = "120 FPS"
+popup/item_2/id = 2
+popup/item_3/text = "Unlimited"
+popup/item_3/id = 3
+
+[node name="ButtonsMargin" type="MarginContainer" parent="OptionsPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/margin_bottom = 20
+
+[node name="BackButton" type="TextureButton" parent="OptionsPanel/VBoxContainer/ButtonsMargin"]
+custom_minimum_size = Vector2(200, 50)
+layout_mode = 2
+size_flags_horizontal = 4
+texture_normal = ExtResource("5_button_inactive")
+texture_pressed = ExtResource("4_button_active")
+texture_hover = ExtResource("4_button_active")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="Label" type="Label" parent="OptionsPanel/VBoxContainer/ButtonsMargin/BackButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 28
+text = "BACK"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[connection signal="pressed" from="CenterContainer/MenuPanel/VBoxContainer/StartButton" to="." method="OnStartPressed"]
+[connection signal="pressed" from="CenterContainer/MenuPanel/VBoxContainer/OptionsButton" to="." method="OnOptionsPressed"]
+[connection signal="pressed" from="CenterContainer/MenuPanel/VBoxContainer/ExitButton" to="." method="OnExitPressed"]
+[connection signal="toggled" from="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/FullscreenContainer/CheckButton" to="." method="OnFullscreenToggled"]
+[connection signal="toggled" from="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/VSyncContainer/CheckButton" to="." method="OnVSyncToggled"]
+[connection signal="item_selected" from="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/ResolutionContainer/OptionButton" to="." method="OnResolutionSelected"]
+[connection signal="item_selected" from="OptionsPanel/VBoxContainer/OptionsMargin/OptionsVBox/FPSContainer/OptionButton" to="." method="OnFPSLimitSelected"]
+[connection signal="pressed" from="OptionsPanel/VBoxContainer/ButtonsMargin/BackButton" to="." method="OnBackPressed"]

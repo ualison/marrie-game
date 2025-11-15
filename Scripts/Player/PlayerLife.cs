@@ -27,6 +27,7 @@ public partial class PlayerLife : Node, IHealthSystem
 
     #region Components
     private Timer _invulnerabilityTimer;
+    private AudioStreamPlayer2D _screamPlayer;
     #endregion
 
     #region Initialization
@@ -35,6 +36,7 @@ public partial class PlayerLife : Node, IHealthSystem
         // Initialize health to starting amount and setup systems
         CurrentLife = Mathf.Clamp(StartingLife, 0, MaxLife);
         SetupInvulnerabilityTimer();
+        _screamPlayer = GetNodeOrNull<AudioStreamPlayer2D>("../ScreamSFX");
         NotifyLifeChanged();
     }
 
@@ -59,6 +61,7 @@ public partial class PlayerLife : Node, IHealthSystem
 
         // Apply damage and clamp to minimum of 0
         CurrentLife = Mathf.Max(0, CurrentLife - damage);
+    PlayDamageScream();
         StartInvulnerability();
         NotifyLifeChanged();
 
@@ -120,6 +123,19 @@ public partial class PlayerLife : Node, IHealthSystem
         
         // Also notify through simple event bus
         GameEventSystem.OnPlayerHealthChanged(CurrentLife, MaxLife);
+    }
+    #endregion
+
+    #region Audio
+    private void PlayDamageScream()
+    {
+        if (_screamPlayer == null)
+            return;
+
+        if (_screamPlayer.Playing)
+            _screamPlayer.Stop();
+
+        _screamPlayer.Play();
     }
     #endregion
 }

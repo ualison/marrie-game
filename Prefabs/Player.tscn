@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://ckwbdf3jm340m"]
+[gd_scene load_steps=11 format=3 uid="uid://ckwbdf3jm340m"]
 
 [ext_resource type="PackedScene" uid="uid://cqfnsp48rsmge" path="res://Prefabs/MarrieStatic.tscn" id="2_javds"]
 [ext_resource type="Script" uid="uid://dtbbh4gt6l7cr" path="res://Scripts/Player/Player.cs" id="2_kyqiw"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://Scripts/Systems/Inventory.cs" id="5_inventory"]
 [ext_resource type="Script" path="res://Scripts/Player/RockThrower.cs" id="6_rockthrower"]
 [ext_resource type="PackedScene" uid="uid://b3k2m7n8x5qxa" path="res://Prefabs/RockThrowable.tscn" id="7_javds"]
+[ext_resource type="AudioStream" uid="uid://bh6hubhg7esi0" path="res://Sounds/MarrieScreaming.mp3" id="8_scream"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_gntrk"]
 size = Vector2(156, 268)
@@ -66,3 +67,8 @@ TrajectoryColor = Color(0.47451, 0, 0.545098, 1)
 TrajectoryWidth = 3.5
 LineOpacity = 0.65
 RockVelocity = 700.0
+
+[node name="ScreamSFX" type="AudioStreamPlayer2D" parent="CharacterBody2D"]
+stream = ExtResource("8_scream")
+volume_db = -2.0
+attenuation = 0.5

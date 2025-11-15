@@ -114,6 +114,9 @@ namespace MarrieGame.AI
         private Area2D _monsterDetectionArea;
         private Area2D _hurtBox;
         private MarrieGame.UI.PuffEnergyBar _energyBar; // Reference to the energy bar (source of truth)
+        private AudioStreamPlayer2D _voicePlayer;
+        private Timer _voiceTimer;
+        private AudioStreamPlayer2D _attackPlayer;
         #endregion
 
         #region Energy System
@@ -235,6 +238,27 @@ namespace MarrieGame.AI
                 
             if (_puffSprite == null)
                 Log.Warning("PuffAI: PuffSprite not found as direct child", "PuffAI");
+
+            // Get voice components
+            _voicePlayer = GetNodeOrNull<AudioStreamPlayer2D>("VoicePlayer");
+            _voiceTimer = GetNodeOrNull<Timer>("VoiceTimer");
+            
+            if (_voicePlayer != null && _voiceTimer != null)
+            {
+                _voiceTimer.Timeout += OnVoiceTimerTimeout;
+                Log.System("PuffAI: Voice system initialized", "PuffAI");
+            }
+            else
+            {
+                Log.Warning("PuffAI: Voice system not found - VoicePlayer or VoiceTimer missing", "PuffAI");
+            }
+
+            // Get attack sound player
+            _attackPlayer = GetNodeOrNull<AudioStreamPlayer2D>("AttackPlayer");
+            if (_attackPlayer == null)
+            {
+                Log.Warning("PuffAI: AttackPlayer not found", "PuffAI");
+            }
         }
 
         private void SetupTimers()
@@ -1344,6 +1368,7 @@ namespace MarrieGame.AI
                 if (damageDealt)
                 {
                     Log.System($"PuffAI: Successfully damaged monster {target.Name}", "PuffAI");
+                    PlayAttackSound();
                 }
                 else
                 {
@@ -1358,6 +1383,7 @@ namespace MarrieGame.AI
                 if (damageDealt)
                 {
                     Log.System($"PuffAI: Successfully damaged ghost monster {target.Name}", "PuffAI");
+                    PlayAttackSound();
                 }
                 else
                 {
@@ -1423,6 +1449,7 @@ namespace MarrieGame.AI
                     if (dealt)
                     {
                         Log.System($"PuffAI: Successfully damaged target {target.Name} via fallback", "PuffAI");
+                        PlayAttackSound();
                     }
                     else
                     {
@@ -1436,6 +1463,15 @@ namespace MarrieGame.AI
             }
 
             StartAttackCooldown();
+        }
+
+        private void PlayAttackSound()
+        {
+            if (_attackPlayer != null && _attackPlayer.Stream != null)
+            {
+                _attackPlayer.Play();
+                Log.Debug("PuffAI: Playing attack sound", "PuffAI");
+            }
         }
 
         private Node2D FindNearestMonster()
@@ -1546,6 +1582,21 @@ namespace MarrieGame.AI
             {
                 Log.Warning("PuffAI: Launching timer timeout - forcing return to appropriate state", "PuffAI");
                 ReturnToAppropriateState();
+            }
+        }
+
+        private void OnVoiceTimerTimeout()
+        {
+            if (_voicePlayer != null && _voicePlayer.Stream != null)
+            {
+                _voicePlayer.Play();
+            }
+            
+            // Set random wait time between 4 and 8 seconds for next play
+            if (_voiceTimer != null)
+            {
+                var random = new Random();
+                _voiceTimer.WaitTime = (float)(random.NextDouble() * 4.0 + 4.0); // Random between 4.0 and 8.0
             }
         }
         #endregion

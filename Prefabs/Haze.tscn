@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3 uid="uid://dgmpsx8qec0pg"]
+[gd_scene load_steps=7 format=3 uid="uid://dgmpsx8qec0pg"]
 
 [ext_resource type="Texture2D" uid="uid://dm1g6uy2xcy1c" path="res://Art/Haze.png" id="1_yaj4r"]
 [ext_resource type="PackedScene" uid="uid://soq5k82eeov0" path="res://Prefabs/SceneSwitcherCrystal.tscn" id="2_cbi2h"]
 [ext_resource type="Texture2D" uid="uid://du8wmkhu6j7p1" path="res://Art/DimensionCrystal.png" id="2_wnvcy"]
 [ext_resource type="Script" uid="uid://dxygaxuxh7p0i" path="res://Scripts/NPCs/Haze.cs" id="3_haze_script"]
+[ext_resource type="AudioStream" uid="uid://bxpniup8u7qwk" path="res://Sounds/HazeVoice.wav" id="4_hazeaudio"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_1"]
 radius = 80.0
@@ -37,3 +38,10 @@ offset_bottom = -110.0
 text = "Press E to talk."
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="HazeVoicePlayer" type="AudioStreamPlayer2D" parent="."]
+stream = ExtResource("4_hazeaudio")
+autoplay = true
+volume_db = 5.0
+max_distance = 500.0
+attenuation = 2.0

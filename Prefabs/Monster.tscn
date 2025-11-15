@@ -1,9 +1,10 @@
-[gd_scene load_steps=7 format=3 uid="uid://djryvxjy0bkfe"]
+[gd_scene load_steps=8 format=3 uid="uid://djryvxjy0bkfe"]
 
 [ext_resource type="Script" uid="uid://c0o15dmumujxy" path="res://Scripts/Enemy/Monster.cs" id="1_x8qak"]
 [ext_resource type="Script" uid="uid://2hx87sinu6t" path="res://Scripts/Enemy/MonsterLife.cs" id="3_monsterlife"]
 [ext_resource type="Texture2D" uid="uid://bjltsffihyof5" path="res://Art/MonsterNew2.png" id="4_hp6r8"]
 [ext_resource type="PackedScene" uid="uid://1ppt7yfvx3tk" path="res://Prefabs/UI/MonsterLifeBar.tscn" id="4_lifebar"]
+[ext_resource type="AudioStream" uid="uid://b5djbuhv2oqdd" path="res://Sounds/Monster.wav" id="5_monsteraudio"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wqfq0"]
 size = Vector2(263, 350)
@@ -27,6 +28,7 @@ MinVisibleTime = 3.0
 MaxVisibleTime = 5.0
 MinHiddenTime = 3.0
 MaxHiddenTime = 5.0
+FootstepAudioPath = NodePath("MonsterAudio")
 
 [node name="DamageArea" type="Area2D" parent="CharacterBody2D"]
 position = Vector2(0, -4)
@@ -59,3 +61,8 @@ InvulnerabilityTime = 0.8
 position = Vector2(-31.000004, 25.000002)
 scale = Vector2(0.385, 0.39)
 texture = ExtResource("4_hp6r8")
+
+[node name="MonsterAudio" type="AudioStreamPlayer2D" parent="CharacterBody2D"]
+stream = ExtResource("5_monsteraudio")
+volume_db = -3.0
+max_distance = 800.0
